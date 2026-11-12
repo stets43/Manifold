@@ -1,0 +1,17 @@
+# MANIFOLD: a generative resonator-bank instrument for the M-VAVE FM-1, on fm1-base (tools/build.py)
+name = "MANIFOLD"
+id_prefix = "FM-1_63"          # package identity: dev FM-1_6300, releases FM-1_63XXYYZZ
+usb_manufacturer = "fm1-base"
+usb_product = "MANIFOLD FM-1"
+o2 = ["dsp/*.c"]               # the engine: separate units at -O2 (the rest of the build is -Os)
+o2_cflags = ["-DMANIFOLD_FW=1"]
+cpu2 = true                    # the pad layer runs on the second core while the first runs the bank
+cpu2_fallback = true           # a second core that fails is given up: one core until power-off, no restart
+words = "words.tsv"
+ble = true                     # Bluetooth MIDI, and the radio Bluetooth audio needs
+ble_stack = "own"              # fm1-base's own stack (bt/): no JieLi library; what bt_audio needs
+bt_audio = true                # Bluetooth audio out to headphones and speakers (A2DP source, SBC)
+tagline = "a manifold of just-intonation resonators, struck, bowed and breathed by a generative rhythm section"
+repo = "https://github.com/stets43/Manifold"
+licence = "MPL-2.0"
+credits = "Built on fm1-base by Charles Vestal (MPL-2.0)."

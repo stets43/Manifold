@@ -1,0 +1,19 @@
+# A listening tour: the boot patch, then a roll in each style (PRESET), 16 s each
+master 3600
+wait 1000
+tap PLAY
+wait 300
+wav tour.wav
+wait 16000
+turn PRESET 1
+wait 16000
+turn PRESET 1
+wait 16000
+turn PRESET 1
+wait 16000
+turn PRESET 1
+key 7 down 100
+wait 2000
+key 7 up
+wait 14000
+wavstop

@@ -1,0 +1,229 @@
+# MANIFOLD user guide screenshots: build/host/manifold_host tests/guide.txt OUT_DIR (then 2x, nearest, into docs/img/manual)
+wait 2500
+tap PLAY
+wait 4000
+shot perform.png
+key 9 down 110
+wait 900
+shot perform-key.png
+key 9 up
+wait 300
+press PLAY
+wait 400
+shot perform-keys.png
+release PLAY
+wait 200
+turn K1 6
+wait 60
+shot perform-knob.png
+wait 900
+tap SEL
+wait 300
+shot scale-1.png
+turn SELECT 1
+wait 120
+shot scale-2.png
+turn SELECT 1
+wait 120
+turn SELECT -4
+wait 60
+tap ENV
+wait 300
+shot voice1-1.png
+turn SELECT 1
+wait 120
+shot voice1-2.png
+turn SELECT 1
+wait 120
+shot voice1-3.png
+turn SELECT 1
+wait 120
+turn SELECT -5
+wait 60
+tap EDIT
+wait 300
+shot layer1-1.png
+turn SELECT 1
+wait 120
+shot layer1-2.png
+turn SELECT 1
+wait 120
+shot layer1-3.png
+turn SELECT 1
+wait 120
+shot layer1-4.png
+turn SELECT 1
+wait 120
+turn SELECT -6
+wait 60
+tap SEQ
+wait 300
+shot drums-1.png
+turn SELECT 1
+wait 120
+shot drums-2.png
+turn SELECT 1
+wait 120
+shot drums-3.png
+turn SELECT 1
+wait 120
+shot drums-4.png
+turn SELECT 1
+wait 120
+shot drums-5.png
+turn SELECT 1
+wait 120
+shot drums-6.png
+turn SELECT 1
+wait 120
+shot drums-7.png
+turn SELECT 1
+wait 120
+shot drums-8.png
+turn SELECT 1
+wait 120
+shot drums-9.png
+turn SELECT 1
+wait 120
+shot drums-10.png
+turn SELECT 1
+wait 120
+shot drums-11.png
+turn SELECT 1
+wait 120
+shot drums-12.png
+turn SELECT 1
+wait 120
+shot drums-13.png
+turn SELECT 1
+wait 120
+shot drums-14.png
+turn SELECT 1
+wait 120
+shot drums-15.png
+turn SELECT 1
+wait 120
+shot drums-16.png
+turn SELECT 1
+wait 120
+shot drums-17.png
+turn SELECT 1
+wait 120
+shot drums-18.png
+turn SELECT 1
+wait 120
+shot drums-19.png
+turn SELECT 1
+wait 120
+turn SELECT -21
+wait 60
+tap ARP
+wait 300
+shot layer2-1.png
+turn SELECT 1
+wait 120
+shot layer2-2.png
+turn SELECT 1
+wait 120
+shot layer2-3.png
+turn SELECT 1
+wait 120
+turn SELECT -5
+wait 60
+tap LFO
+wait 300
+shot mod-1.png
+turn SELECT 1
+wait 120
+shot mod-2.png
+turn SELECT 1
+wait 120
+shot mod-3.png
+turn SELECT 1
+wait 120
+shot mod-4.png
+turn SELECT 1
+wait 120
+shot mod-5.png
+turn SELECT 1
+wait 120
+shot mod-6.png
+turn SELECT 1
+wait 120
+shot mod-7.png
+turn SELECT 1
+wait 120
+turn SELECT -9
+wait 60
+tap FX
+wait 300
+shot fx-1.png
+turn SELECT 1
+wait 120
+shot fx-2.png
+turn SELECT 1
+wait 120
+shot fx-3.png
+turn SELECT 1
+wait 120
+shot fx-4.png
+turn SELECT 1
+wait 120
+shot fx-5.png
+turn SELECT 1
+wait 120
+shot fx-6.png
+turn SELECT 1
+wait 120
+shot fx-7.png
+turn SELECT 1
+wait 120
+shot fx-8.png
+turn SELECT 1
+wait 120
+turn SELECT -10
+wait 60
+tap GLO
+wait 300
+shot voice2-1.png
+turn SELECT 1
+wait 120
+shot voice2-2.png
+turn SELECT 1
+wait 120
+shot voice2-3.png
+turn SELECT 1
+wait 120
+turn SELECT -5
+wait 60
+tap LFO
+wait 60
+turn K1 23
+wait 30
+turn K2 1
+wait 30
+turn K3 2
+wait 30
+turn K4 10
+wait 200
+shot matrix-route.png
+tap HOME
+wait 1500
+shot perform-routed.png
+tap HOME
+wait 300
+shot setup-1.png
+turn SELECT 1
+wait 1200
+shot setup-2.png
+turn SELECT 1
+wait 1200
+shot setup-3.png
+turn SELECT 1
+wait 1200
+shot setup-4.png
+turn SELECT 1
+wait 1200
+shot setup-5.png
+turn SELECT 1
+wait 1200

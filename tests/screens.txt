@@ -1,0 +1,52 @@
+# The README's screenshots: build/host/manifold_host tests/screens.txt docs/img
+wait 4000
+tap PLAY
+wait 300
+key 7 down 110
+wait 400
+shot screen-perform.png
+key 7 up
+press PLAY
+wait 400
+shot screen-perform-keys.png
+release PLAY
+tap SEL
+wait 30
+shot screen-scale.png
+tap ENV
+wait 30
+shot screen-voice1.png
+tap EDIT
+wait 30
+turn K1 6
+wait 1200
+shot screen-layer1.png
+tap SEQ
+wait 30
+turn SELECT 6
+wait 30
+turn K1 1
+wait 30
+turn SELECT -6
+wait 30
+turn K1 15
+turn K2 25
+turn K3 30
+turn K4 15
+wait 2210
+shot screen-meter.png
+tap ARP
+wait 30
+shot screen-layer2.png
+tap FX
+wait 30
+turn SELECT 6
+wait 1500
+shot screen-reverb.png
+tap HOME
+wait 30
+tap HOME
+wait 30
+turn SELECT 2
+wait 1600
+shot screen-load.png

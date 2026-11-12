@@ -1,0 +1,126 @@
+diff --git a/device/app.ld b/device/app.ld
+index 06002a2..b3c1c5f 100644
+--- a/device/app.ld
++++ b/device/app.ld
+@@ -14,8 +14,8 @@ MEMORY
+ {
+     XIP    (rx)  : ORIGIN = 0x02000120, LENGTH = 0x9DFBC   /* the app slot (0x8DFBC) and 64 KB: the image before
+                                                        * boot_pack packs it; build.py checks the slot */
+-    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x8000
+-    RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
++    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0xBC00   /* (was 0x8000: MANIFOLD's control tick runs from RAM too) */
++    RAM    (rwx) : ORIGIN = 0x01C0BC00, LENGTH = 81K      /* (was 0x01C08000, 96K) */
+     POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54000
+     NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
+ }
+diff --git a/device/main_fm1.c b/device/main_fm1.c
+index 89d4069..bfe97f5 100644
+--- a/device/main_fm1.c
++++ b/device/main_fm1.c
+@@ -776,8 +776,13 @@ static void enter_uboot(const char *why)
+ {
+     fm1_audio_stop();
+     lcd_fill(0, 0, 240, 240, C_BLACK);
+-    sys_box(0, 110, 240, SYS_S, why, C_WHITE, 1);
+-    fm1_delay_ms(20);
++    sys_box(0, 40, 240, SYS_B, "UPDATE MODE", C_HI, 1);
++    sys_box(0, 84, 240, SYS_S, why, C_WHITE, 1);
++    sys_box(0, 114, 240, SYS_S, "THE SCREEN GOES DARK", C_WHITE, 1);
++    sys_box(0, 134, 240, SYS_S, "WHILE THE COMPUTER", C_WHITE, 1);
++    sys_box(0, 154, 240, SYS_S, "WRITES THE FIRMWARE.", C_WHITE, 1);
++    sys_box(0, 184, 240, SYS_S, "WAIT. DO NOT UNPLUG.", C_HI, 1);
++    { uint32_t i; for (i = 0; i < 12u; i++) { fm1_delay_ms(100); fm1_wdt_feed(); } }   /* long enough to read: the chip's own updater draws nothing */
+     usb_detach();
+     fm1_delay_ms(30);
+     bootguard.pending = 0;                          /* intentional reset: not a failed boot */
+@@ -977,6 +982,12 @@ static void fm1_main(void)
+ #ifdef APP_BOOT
+     app_boot();                                     /* the app's own start (a radio), the platform up */
+ #endif
++    {   /* the battery once at the SDK's settings, while the converter is still the main loop's: the scale for the
++           scan's readings later (and the first level at once) */
++        int32_t b = fm1_an.con || fm1_an.pend ? -1 : fm1_adc_read(FM1_ADC_BATT);
++        if (b > 0)
++            batt_raw = batt_ref = b;
++    }
+     app_ui_init();
+ 
+     for (;;) {
+@@ -996,7 +1007,25 @@ static void fm1_main(void)
+                 master_pos = mirror_in_master(remote.master >= 0 ? (uint32_t)remote.master : (uint32_t)(knob / 4));
+             }
+         }
+-        if (!fm1_an.con && !fm1_an.pend && fm1_ms - batt_t >= 100u) {   /* the battery, ten times a second (plat_battery) */
++        if (fm1_an.con) {                           /* the keys' readings on: the battery in the pot's slot, every 10 s
++                                                     * (the keys keep every reading; the pot skips one) */
++            if (fm1_an.batt_got) {
++                int32_t v = fm1_an.batt, b;
++                fm1_an.batt_got = 0;
++                if (v > 0) {
++                    if (!batt_k) {                  /* the first: its ratio to the slow reading at power-on (the scan's
++                                                     * fast conversion may settle short on the divider) */
++                        batt_k = batt_ref > 0 ? batt_ref * 256 / v : 256;
++                        batt_k = batt_k < 192 ? 192 : batt_k > 384 ? 384 : batt_k;
++                    }
++                    b = v * batt_k / 256;
++                    batt_raw = batt_raw ? batt_raw + (b - batt_raw) / 4 : b;
++                }
++            } else if (!fm1_an.batt_req && fm1_ms - batt_t >= 10000u) {
++                batt_t = fm1_ms;
++                fm1_an.batt_req = 1;
++            }
++        } else if (!fm1_an.pend && fm1_ms - batt_t >= 100u) {   /* the battery, ten times a second (plat_battery) */
+             int32_t b = fm1_adc_read(FM1_ADC_BATT);
+             batt_t = fm1_ms;
+             if (b > 0)
+diff --git a/device/plat_fm1.c b/device/plat_fm1.c
+index 50aa17c..e93870e 100644
+--- a/device/plat_fm1.c
++++ b/device/plat_fm1.c
+@@ -45,6 +45,8 @@ uint32_t plat_master(void) { return master_pos; }
+ /* the battery: ADC ch3 (its divider), a slow average by the main loop. The stock firmware's thresholds, as X0X, melodee
+  * and dxsloop use them, give 0-3 bars; there is no charger line, so a USB host means power */
+ static int32_t batt_raw;
++static int32_t batt_ref;                         /* a reading at the SDK's settings before the keys' readings start */
++static int32_t batt_k;                           /* the scan's readings to the SDK's scale, x 256 (0: not set yet) */
+ static int8_t batt_bars = -1;
+ int plat_battery(void)                           /* (a level moves once the reading is 4 past its threshold) */
+ {
+diff --git a/include/plat.h b/include/plat.h
+index f3ff8eb..28235f4 100644
+--- a/include/plat.h
++++ b/include/plat.h
+@@ -36,7 +36,7 @@ uint32_t plat_keys(void);              /* held: bit k = key k (0 = F3) */
+ int32_t plat_enc(int role);            /* detents since the last call, + = clockwise; EN_* */
+ uint32_t plat_master(void);            /* MASTER pot's position, 0..4096 (the render gets it as a gain: APP_GAIN) */
+ int plat_battery(void);                /* the battery: 0 (empty) .. 3 (full), 4 a USB host powers the FM-1, -1 not read
+-                                        * yet (the keys' readings own the converter: APP_KEY_SENSE) */
++                                        * yet (with the keys' readings on: every 10 s, in the MASTER pot's scan slot, scaled to a reading at power-on) */
+ 
+ /* lights: bright buttons and keys, and dim ones (a short pulse each scan frame; a bright bit wins); glow 0 the dim
+  * ones off, 1 low, 2 high. Bit NB in buttons / dim_buttons is PLAY's second, green LED */
+diff --git a/tools/build.py b/tools/build.py
+index 24011e2..0429adf 100755
+--- a/tools/build.py
++++ b/tools/build.py
+@@ -846,7 +846,7 @@ def check(img, syms, dis, rt):
+         if bt:
+             errors.append(f"ble_stack = own links JieLi's Bluetooth code: {bt}")
+         rf = re.search(r"^([0-9a-f]+) .*\sfm1_rf_burst_run$", syms, re.M)
+-        if not rf or not 0x01C00000 <= int(rf.group(1), 16) < 0x01C08000:
++        if not rf or not 0x01C00000 <= int(rf.group(1), 16) < 0x01C0BC00:
+             errors.append("fm1_rf_burst_run is not in .ram_text (the radio's crystal ramp must run from RAM)")
+         else:
+             notes.append("own Bluetooth stack: nothing of JieLi's linked, the radio's ramp in RAM")
+@@ -869,9 +869,9 @@ def check(img, syms, dis, rt):
+     def sym(name):
+         mm = re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M)
+         return int(mm.group(1), 16) if mm else 0
+-    bss = sym("_bss_end") - 0x01C08000
++    bss = sym("_bss_end") - (0x01C08000 if WIFI else 0x01C0BC00)   # (app.ld: the RAM code window is 47 KB)
+     pool = sym("_pool_end") - sym("_pool_start")
+-    ram, pool_max, spare = (128 * 1024, 0x4C000, 2048) if WIFI else (96 * 1024, 0x54000, 8192)   # (app_wifi.ld)
++    ram, pool_max, spare = (128 * 1024, 0x4C000, 2048) if WIFI else (81 * 1024, 0x54000, 8192)   # (app_wifi.ld)
+     if os.environ.get("FM1B_POOL_SPARE", "").isdigit():   # an app's own build for itself (a demo build with mirror)
+         spare = int(os.environ["FM1B_POOL_SPARE"])
+     notes.append(f"image {len(img)} B; RAM .data+.bss {bss} B of {ram}; pool {pool} B of {pool_max}")

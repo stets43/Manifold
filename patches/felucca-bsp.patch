@@ -1,0 +1,52 @@
+diff --git a/boards/fm1/fm1_input.h b/boards/fm1/fm1_input.h
+index c43e7a8..7206f2b 100644
+--- a/boards/fm1/fm1_input.h
++++ b/boards/fm1/fm1_input.h
+@@ -223,6 +223,10 @@ static volatile struct {
+     uint8_t phase;               /* frame phase: 0 PA7, 1 PA8, 2 the probe */
+     uint16_t master;             /* the MASTER pot, 0..1023 */
+     uint16_t timeouts;           /* conversions not done after a tick (the clock too slow) */
++    uint8_t batt_req;            /* set by the main loop: the pot's next slot reads the battery instead (keys untouched) */
++    uint8_t batting;             /* the pending conversion is that battery reading */
++    uint8_t batt_got;            /* set here when batt holds a new reading (the main loop clears it) */
++    uint16_t batt;               /* the battery divider, 0..1023, at the scan's conversion settings */
+ } fm1_an;
+ 
+ /* scan diagnostics (console `inp`, read and cleared by the main loop): the gap between ticks
+@@ -474,9 +478,10 @@ static void fm1__pa10_probe(int on)
+ /* the conversion started on the previous tick: its result to the app (FM1_INPUT_ANALOG / _PROBE) or the pot */
+ static void fm1__an_take(void)
+ {
+-    uint32_t driven = fm1_an.driven, probing = fm1_an.probing;
++    uint32_t driven = fm1_an.driven, probing = fm1_an.probing, batting = fm1_an.batting;
+     (void)driven;                                  /* (FM1_INPUT_ANALOG may ignore it) */
+     fm1_an.pend = 0;
++    fm1_an.batting = 0;
+     if (driven || probing)
+         fm1__row_release(fm1_an.rowbit);
+     if (probing)
+@@ -488,7 +493,11 @@ static void fm1__an_take(void)
+             FM1_INPUT_PROBE(fm1_an.col, fm1_an.rowbit, v, (fm1_in.raw[fm1_an.col] >> fm1_an.rowbit) & 1u);
+         else if (fm1_an.rowbit)
+             FM1_INPUT_ANALOG(fm1_an.col, fm1_an.rowbit, v, driven);
+-        else
++        else if (batting) {                        /* the pot's slot lent to the battery: the pot keeps its last */
++            fm1_an.batt = (uint16_t)v;
++            fm1_an.batt_got = 1;
++            fm1_an.batt_req = 0;
++        } else
+             fm1_an.master = (uint16_t)v;
+     } else {
+         fm1_adc_abort();
+@@ -514,8 +523,9 @@ static void fm1__an_start(uint32_t n, uint32_t lit)
+         fm1_an.pend = 1;
+         return;
+     }
+-    if (fm1_an.phase && n == 0u) {                 /* the pot's slot */
+-        ch = FM1_ADC_MASTER;
++    if (fm1_an.phase && n == 0u) {                 /* the pot's slot (now and then the battery's: fm1_an.batt_req) */
++        ch = fm1_an.batt_req ? FM1_ADC_BATT : FM1_ADC_MASTER;
++        fm1_an.batting = fm1_an.batt_req;
+         rowbit = 0;
+     } else {
+         ch = fm1_an.phase ? FM1_ADC_ROW_PA8 : FM1_ADC_ROW_PA7;

@@ -1,0 +1,5 @@
+build/
+hosttest/render
+hosttest/blk
+hosttest/peak2
+hosttest/win

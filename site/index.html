@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MANIFOLD · generative just intonation for the M-VAVE FM-1</title>
+<meta name="description" content="MANIFOLD: open-source generative firmware for the M-VAVE FM-1. Moving points on a just-intonation Tonnetz, a continuous rhythm, drums that ride the synth.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Cpath d='M3 8h10M8 3v10' stroke='%2340a8e8' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "Barlow SC"; src: url(fonts/BarlowSemiCondensed-Medium.ttf); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Barlow SC"; src: url(fonts/BarlowSemiCondensed-SemiBold.ttf); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow SC"; src: url(fonts/BarlowSemiCondensed-Bold.ttf); font-weight: 700; font-display: swap; }
+:root {
+  --bg: #000; --line: #222228; --dim: #4c4c56; --gray: #9c9ca6; --white: #f4f4f8;
+  --amb: rgb(64,168,232); --hi: rgb(168,226,255);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg); color: var(--gray); font: 500 17px/1.45 "Barlow SC", "Barlow Semi Condensed", system-ui, sans-serif; }
+body { max-width: 980px; margin: 0 auto; padding: 0 20px 48px; }
+a { color: var(--hi); text-decoration: none; }
+a:hover { color: var(--white); }
+::selection { background: var(--amb); color: #000; }
+
+/* the header bar, as on the FM-1 */
+.bar { display: flex; align-items: center; gap: 14px; height: 58px; border-bottom: 2px solid var(--line); }
+.bar .name { color: var(--white); font-weight: 700; font-size: 26px; letter-spacing: .02em; }
+.bar .sub { color: var(--hi); font-weight: 600; font-size: 20px; }
+.bar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--white); font-weight: 700; font-size: 22px; }
+.tri { width: 0; height: 0; border-left: 11px solid var(--hi); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: 300px 1fr; gap: 36px; padding: 34px 0 30px; align-items: start; }
+.screen { width: 300px; border: 2px solid var(--line); image-rendering: pixelated; display: block; background: #000; }
+.map { width: 300px; height: 300px; border: 2px solid var(--line); display: block; }
+h1 { color: var(--white); font-weight: 700; font-size: 54px; line-height: 1; letter-spacing: .01em; }
+.tag { color: var(--hi); font-weight: 600; font-size: 22px; margin: 10px 0 14px; }
+.lede { max-width: 560px; }
+
+/* knob rows: K1..K4, a name, a value, a bar */
+.rows { margin-top: 22px; border-top: 2px solid var(--line); }
+.row { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 9px 0 13px; border-bottom: 2px solid var(--line); position: relative; color: var(--gray); }
+.row .k { font-size: 12px; font-weight: 700; color: var(--dim); background: var(--line); padding: 1px 0; text-align: center; border-radius: 2px; }
+.row .v { color: var(--white); font-weight: 700; font-size: 20px; }
+.row .b { position: absolute; left: 44px; right: 0; bottom: 5px; height: 3px; background: var(--line); }
+.row .b i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--amb); width: var(--w, 50%); transition: width .5s; }
+a.row:hover { color: var(--white); }
+a.row:hover .k { background: var(--amb); color: #000; }
+a.row:hover .b i { background: var(--hi); width: 100%; }
+
+/* sections */
+h2 { color: var(--white); font-weight: 700; font-size: 24px; margin: 40px 0 6px; display: flex; align-items: baseline; gap: 12px; }
+h2 span { color: var(--hi); font-weight: 600; font-size: 18px; }
+p + p { margin-top: 10px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 14px; background: var(--line); border: 2px solid var(--line); }
+.grid4 div { background: var(--bg); padding: 12px 14px 14px; }
+.grid4 b { color: var(--white); font-weight: 700; display: block; font-size: 18px; }
+.grid4 small { font-size: 15px; display: block; margin-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.chip { font-weight: 700; font-size: 15px; padding: 3px 9px; background: var(--amb); color: #000; border-radius: 2px; }
+.chip.off { background: var(--line); color: var(--dim); }
+.shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+.shots figure { border: 2px solid var(--line); }
+.shots img { width: 100%; display: block; }
+.shots figcaption { font-size: 14px; padding: 4px 8px; border-top: 2px solid var(--line); }
+
+/* footer: tabs and hints */
+.tabs { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 44px; padding-top: 12px; border-top: 2px solid var(--line); }
+.tabs button { background: none; border: 0; font: inherit; color: var(--dim); cursor: pointer; padding: 0 0 2px; }
+.tabs button.on { color: var(--hi); border-bottom: 2px solid var(--hi); }
+.hint { color: var(--dim); font-size: 15px; margin-top: 10px; }
+.hint a { color: var(--gray); }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .screen, .map { width: 100%; height: auto; aspect-ratio: 1; }
+  h1 { font-size: 44px; }
+  .grid4, .shots { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="name">MANIFOLD</span><span class="sub">for the M-VAVE FM-1</span>
+  <span class="right">v{{VERSION}} <span class="tri"></span></span>
+</header>
+
+<section class="hero">
+  <div>
+    <canvas class="map" id="map" width="300" height="300" aria-label="Points moving over a just-intonation lattice"></canvas>
+  </div>
+  <div>
+    <h1>MANIFOLD</h1>
+    <p class="tag">Generative just intonation. Nothing is sequenced.</p>
+    <p class="lede">Firmware that turns the FM-1 into a self-playing instrument. Two layers of moving points wander over
+    a map of a just-intonation scale, and every note they pass near sounds. The rhythm is a continuous landscape, the
+    drums ride the synth's own notes, and every partial is a whole-number multiple of its note. Steer it with four
+    knobs; play into it with the keys.</p>
+    <nav class="rows">
+      <a class="row" href="install/"><span class="k">K1</span><span>Install in the browser</span><span class="v">Chrome · Edge</span><span class="b"><i style="--w:72%"></i></span></a>
+      <a class="row" href="firmware/{{PKG}}"><span class="k">K2</span><span>Download the firmware</span><span class="v">{{PKG}}</span><span class="b"><i style="--w:38%"></i></span></a>
+      <a class="row" href="manual/"><span class="k">K3</span><span>User guide</span><span class="v">every page</span><span class="b"><i style="--w:55%"></i></span></a>
+      <a class="row" href="{{REPO}}"><span class="k">K4</span><span>Source code</span><span class="v">MPL-2.0</span><span class="b"><i style="--w:86%"></i></span></a>
+    </nav>
+  </div>
+</section>
+
+<h2>How it plays <span>Perform</span></h2>
+<div class="grid4">
+  <div><b>The map</b><small>A scale laid out on a Tonnetz: neighbours are fifths, thirds and sevenths. 41 scales, from the harmonic series to handpan tunings.</small></div>
+  <div><b>Two layers</b><small>Up to eight points each, moving along continuous functions. A note sounds as loud as the points near it.</small></div>
+  <div><b>The stream</b><small>Rhythm as one smooth function of the bar: swing, three-against-four and long form are continuous controls.</small></div>
+  <div><b>Four knobs</b><small>Timbre, Groove, Space and Motion each ride a path through a dozen settings. REC rolls a new patch.</small></div>
+</div>
+
+<h2>Twelve motions <span>Layer 1 · Layer 2</span></h2>
+<div class="chips">
+  <span class="chip">Orbit</span><span class="chip">Ladder</span><span class="chip">Swarm</span><span class="chip">Lorenz</span>
+  <span class="chip">Motif</span><span class="chip">Drift</span><span class="chip">Billiard</span><span class="chip">Gravity</span>
+  <span class="chip">Stride</span><span class="chip">Loops</span><span class="chip">Erode</span><span class="chip">Chords</span>
+</div>
+<div class="chips">
+  <span class="chip off">Pulse</span><span class="chip off">Swell</span><span class="chip off">Speed</span><span class="chip off">Pass</span>
+  <span class="chip off">Height</span><span class="chip off">Hold</span><span class="chip off">Stream</span><span class="chip off">Drums</span>
+</div>
+<p class="hint">Lissajous figures, Kuramoto swarms, the Lorenz attractor, Sinai billiards, gravity wells over the key's own notes,
+coprime tape loops, eroding figures and chord progressions, each with eight envelopes and routes that let one layer
+move, add to or gate the other. The <a href="manual/#for-developers">developer notes</a> give the mathematics.</p>
+
+<h2>On the screen <span>every page</span></h2>
+<div class="shots">
+  <figure><img src="img/perform.png" alt="Perform page" loading="lazy"><figcaption>Perform</figcaption></figure>
+  <figure><img src="img/layer1-1.png" alt="Layer 1, Motion" loading="lazy"><figcaption>Layer 1 · Motion</figcaption></figure>
+  <figure><img src="img/drums-1.png" alt="Drums, Groove" loading="lazy"><figcaption>Drums · Groove</figcaption></figure>
+  <figure><img src="img/matrix-route.png" alt="Modulation matrix" loading="lazy"><figcaption>Modulation · Matrix</figcaption></figure>
+  <figure><img src="img/voice1-2.png" alt="Voice 1, Spectrum" loading="lazy"><figcaption>Voice 1 · Spectrum</figcaption></figure>
+  <figure><img src="img/scale-1.png" alt="Scale, Tuning" loading="lazy"><figcaption>Scale · Tuning</figcaption></figure>
+  <figure><img src="img/fx-5.png" alt="Effects, Reverb" loading="lazy"><figcaption>Effects · Reverb</figcaption></figure>
+  <figure><img src="img/perform-keys.png" alt="Performance keys" loading="lazy"><figcaption>PLAY held</figcaption></figure>
+</div>
+
+<nav class="tabs" id="themes" aria-label="Color theme"></nav>
+<p class="hint">The nine color themes of Setup → General. MANIFOLD is MPL-2.0, built on
+<a href="https://github.com/charlesvestal/fm1-base">fm1-base</a> by Charles Vestal. Not affiliated with M-VAVE.</p>
+
+<script>
+/* the themes, as in the firmware (app.c THEMES) */
+const T = [["Glacier","64,168,232","168,226,255"],["Ember","232,128,32","255,196,96"],["Moss","88,196,108","176,248,184"],
+  ["Rose","228,88,132","255,168,196"],["Violet","148,112,240","208,184,255"],["Sunset","240,100,64","255,208,128"],
+  ["Lagoon","40,168,168","128,236,220"],["Gold","204,164,40","255,228,128"],["Mono","184,184,192","244,244,248"]];
+const nav = document.getElementById("themes"), root = document.documentElement.style;
+let cur = 0;
+try { cur = Math.max(0, T.findIndex(t => t[0] === localStorage.getItem("manifold-theme"))); } catch (e) {}
+function apply(i) {
+  cur = i; root.setProperty("--amb", `rgb(${T[i][1]})`); root.setProperty("--hi", `rgb(${T[i][2]})`);
+  [...nav.children].forEach((b, j) => b.classList.toggle("on", j === i));
+  try { localStorage.setItem("manifold-theme", T[i][0]); } catch (e) {}
+}
+T.forEach((t, i) => { const b = document.createElement("button"); b.textContent = t[0]; b.onclick = () => apply(i); nav.appendChild(b); });
+apply(cur);
+
+/* the Perform page's map: a just lattice (fifths across, thirds at 60 degrees), two layers of points on Lissajous
+   paths, each note lit by the points near it through the same bump the firmware uses, (1 - (d/R)^2)^2 */
+const cv = document.getElementById("map"), g = cv.getContext("2d"), S = cv.width;
+const nodes = [];
+for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let o = 0; o < 2; o++) {
+  if (Math.abs(a + b / 2) > 2.6) continue;                 /* (a rough disc of the lattice) */
+  const r = o * .22, an = o * .381966 * 2 * Math.PI;
+  nodes.push({ x: a + .5 * b + r * Math.cos(an), y: .866 * b + r * Math.sin(an), lv: 0 });
+}
+let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+nodes.forEach(n => { mnx = Math.min(mnx, n.x); mxx = Math.max(mxx, n.x); mny = Math.min(mny, n.y); mxy = Math.max(mxy, n.y); });
+const span = Math.max(mxx - mnx, mxy - mny);
+nodes.forEach(n => { n.x = .5 + (n.x - (mnx + mxx) / 2) / span * .8; n.y = .5 + (n.y - (mny + mxy) / 2) / span * .8; });
+const R = .16, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function col(v) { return getComputedStyle(document.documentElement).getPropertyValue(v); }
+function frame(ms) {
+  const t = still ? 7 : ms / 1000, pts = [];
+  for (let j = 0; j < 3; j++) {                     /* layer 1: Orbit 3:2, crosses */
+    const p = t * .11 + j / 3, e = Math.pow(Math.sin(Math.PI * ((t * .9 + j * .37) % 1)), 4);
+    pts.push({ x: .5 + .36 * Math.sin(2 * Math.PI * p), y: .5 + .36 * Math.sin(2 * Math.PI * (1.5 * p + .12)), e, l: 0 });
+  }
+  for (let j = 0; j < 2; j++) {                     /* layer 2: a slow 5:4, dots */
+    const p = t * .045 + j / 2, e = .5 - .5 * Math.cos(2 * Math.PI * ((t * .23 + j * .5) % 1));
+    pts.push({ x: .5 + .33 * Math.sin(2 * Math.PI * 1.25 * p), y: .5 + .33 * Math.sin(2 * Math.PI * (p + .25)), e, l: 1 });
+  }
+  g.fillStyle = "#000"; g.fillRect(0, 0, S, S);
+  const amb = col("--amb"), hi = col("--hi");
+  nodes.forEach(n => {
+    let u = 0;
+    pts.forEach(q => { const d2 = ((q.x - n.x) ** 2 + (q.y - n.y) ** 2) / (R * R); if (d2 < 1) u += q.e * (1 - d2) ** 2; });
+    n.lv += (Math.min(1, u) - n.lv) * .25;
+    const lv = n.lv, sz = lv > .5 ? 9 : 5;
+    g.fillStyle = lv > .5 ? hi : lv > .15 ? amb : lv > .03 ? "#9c9ca6" : "#4c4c56";
+    g.fillRect(Math.round(n.x * S - sz / 2), Math.round(n.y * S - sz / 2), sz, sz);
+  });
+  pts.forEach(q => {
+    g.fillStyle = q.e > .3 ? "#f4f4f8" : q.e > .05 ? hi : "#9c9ca6";
+    const x = Math.round(q.x * S), y = Math.round(q.y * S);
+    if (q.l === 0) { g.fillRect(x - 7, y - 1, 15, 2); g.fillRect(x - 1, y - 7, 2, 15); }
+    else g.fillRect(x - 3, y - 3, 6, 6);
+  });
+  if (!still) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

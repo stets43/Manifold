@@ -1,0 +1,542 @@
+# MANIFOLD in the host simulator: tools/build.py manifold-fm1 --host, then
+#   build/host/manifold_host tests/basic.txt build/host
+wait 800
+expect page 0
+# the power-on patch: a Groove roll on the 1-3-5-9 hexany, its ding on A1; the battery beside the tempo
+expect style 2
+expect root 33
+expect hexany 1
+expect battery 3
+shot home_boot.png
+# silent at power-on: PLAY starts it
+expect transport 0
+tap PLAY
+wait 300
+expect transport 1
+expect builds 1
+wav boot.wav
+wait 6000
+wavstop
+expect peak_db_min -40
+expect peak_db_max 0.1
+shot home.png
+# a key plays a node
+key 12 down 100
+wait 300
+key 12 up
+wait 100
+# the tempo: SELECT on Perform, a whole BPM a detent, from 10 to 180 BPM (the roll below sets it again)
+turn SELECT -250
+wait 60
+expect tempo 10
+turn SELECT 1
+wait 60
+expect tempo 11
+turn SELECT 250
+wait 60
+expect tempo 180
+# REC: a roll, a section roll, a mutation
+tap REC
+wait 2500
+expect build_req 0
+press REC
+wait 30
+tap FX
+wait 30
+release REC
+wait 1500
+press REC
+wait 900
+release REC
+wait 500
+# PRESET and ALGO: a fast turn is one roll, once the knob rests (eight steps: Groove round to Groove)
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+expect rolls 2
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 1200
+expect style 2
+expect rolls 3
+turn ALGO 1
+wait 40
+turn ALGO 1
+wait 40
+turn ALGO 1
+wait 1500
+expect rolls 4
+expect build_req 0
+# a roll turns freeze off; the Perform page says so
+# pages and sub-pages
+tap SEL
+wait 50
+expect page 1
+shot page_scale.png
+turn K1 3
+wait 1200
+expect build_req 0
+tap FX
+wait 30
+expect page 7
+turn SELECT 6
+wait 30
+expect sub 6
+turn K3 5
+wait 200
+shot page_fx_reverb.png
+press SAVE
+wait 30
+tap FX
+wait 30
+release SAVE
+wait 30
+expect locked_fx 1
+tap GLO
+wait 30
+turn SELECT 4
+wait 30
+shot page_pad_amp.png
+tap ENV
+wait 30
+expect page 2
+shot page_voice1.png
+# Layer 1: every function rises on its own
+tap EDIT
+wait 30
+expect page 3
+turn K1 -12
+wait 600
+expect gen1 0
+shot page_layer1.png
+wait 2500
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 1
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 2
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 3
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 4
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 5
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 6
+expect rises 1
+turn K1 1
+wait 2500
+expect gen1 7
+expect rises 1
+turn K1 1
+wait 6000
+expect gen1 8
+expect rises 1
+turn K1 -6
+wait 300
+turn SELECT 2
+wait 300
+shot page_path.png
+# the drums: on (Mix), the stream's events, hits; then the rhythm (its tab)
+tap SEQ
+wait 30
+expect page 4
+turn SELECT 3
+wait 30
+turn K1 1
+wait 2500
+expect drums_on 1
+expect drum_hits 1
+expect rh_events 1
+shot page_drums_mix.png
+turn SELECT -2
+wait 30
+turn K1 -120
+turn K2 -120
+turn K3 -120
+turn K4 -120
+wait 500
+expect drum_clear 0
+wait 1500
+expect drum_hits 0
+turn K1 60
+wait 5000
+expect drum_hits 1
+shot page_drums.png
+# the drum layer (Mix, K2): Split, layer 2, layer 1, each with hits; shaped by layer 2 (Shape & duck, K1)
+turn SELECT 2
+wait 30
+turn K2 -10
+turn K2 5
+wait 300
+expect drum_layer 2
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+turn K2 -1
+wait 300
+expect drum_layer 1
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+turn K2 -4
+wait 300
+expect drum_layer 0
+turn SELECT 10
+wait 30
+turn K1 2
+wait 300
+expect drum_shape 2
+turn K1 -2
+wait 300
+expect drum_shape 0
+# the other engine: Lock (Rhythm, K2) makes hits too; then back
+turn SELECT -13
+wait 30
+turn SELECT 8
+wait 30
+turn K2 -2
+wait 300
+expect rh_engine 0
+turn K2 1
+wait 600
+expect rh_engine 1
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+turn K2 -1
+wait 300
+expect rh_engine 0
+turn K3 5
+wait 1500
+expect rises 1
+shot page_meter.png
+# layer 2
+tap ARP
+wait 30
+expect page 5
+turn K1 -12
+wait 300
+turn K1 7
+wait 600
+expect gen2 7
+# layer 2 as a Euclidean envelope multiplying layer 1: layer 1 still rises, gated by it
+turn SELECT 2
+wait 30
+turn K1 -12
+turn K1 6
+wait 300
+expect env2 6
+turn K4 3
+wait 2500
+expect route2 3
+expect modulator 2
+expect rises 1
+turn K4 -1
+wait 300
+expect route2 2
+turn K4 -1
+wait 2500
+expect route2 1
+expect rises 1
+turn K4 -1
+wait 300
+expect modulator 0
+turn SELECT -2
+wait 30
+tap ARP
+tap LFO
+wait 30
+expect sub 0
+shot page_lfo.png
+# the matrix, the LFO page's first: route 24 (empty after a roll), LFO 1 onto the Timbre knob, then the Groove knob
+turn K1 30
+wait 30
+expect mx_route 24
+expect mx_src 0
+turn K2 1
+wait 50
+expect mx_src 1
+expect mx_dst 175
+expect mx_depth 25
+turn K4 3
+wait 30
+expect mx_depth 28
+turn K3 1
+wait 30
+expect mx_dst 176
+turn K3 -1
+wait 2000
+expect mx_dst 175
+expect knob_moved0 >0
+shot page_matrix.png
+# a layer's motion onto the Motion knob: the generators on a knob
+turn K2 16
+wait 30
+expect mx_src 17
+turn K3 3
+wait 1000
+expect mx_dst 178
+tap HOME
+wait 300
+shot home_knob_routed.png
+tap LFO
+wait 30
+expect sub 0
+# None clears the route: the knob is the hand's again
+turn K2 -20
+wait 50
+expect mx_src 0
+expect knob_moved0 0
+expect knob_moved3 0
+# performance keys: PLAY held
+tap HOME
+wait 30
+expect page 0
+press PLAY
+wait 300
+shot perform_map.png
+key 7 down
+wait 40
+key 7 up
+wait 460
+key 7 down
+wait 40
+key 7 up
+wait 460
+key 7 down
+wait 40
+key 7 up
+wait 30
+# three taps 500 ms apart: 120 BPM, give or take the 16 ms frames the simulator reads the keys on
+expect tempo 119
+key 11 down
+wait 40
+key 11 up
+wait 40
+expect freeze 1
+key 14 down
+wait 40
+key 14 up
+key 18 down
+wait 40
+key 18 up
+wait 40
+expect mute_bank 1
+expect mute_seq 1
+# scene 1: hold its key a second to store, tap to recall
+key 0 down
+wait 1200
+key 0 up
+wait 40
+expect scenes 1
+release PLAY
+wait 40
+expect transport 1
+shot perform_state.png
+press PLAY
+wait 40
+key 14 down
+wait 40
+key 14 up
+key 18 down
+wait 40
+key 18 up
+key 11 down
+wait 40
+key 11 up
+key 12 down
+wait 40
+key 12 up
+release PLAY
+wait 40
+expect latch 1
+key 20 down
+wait 60
+key 20 up
+wait 500
+shot latch.png
+# drum keys (PLAY + the 15th white key): a key plays a drum; back again
+press PLAY
+wait 40
+key 24 down
+wait 40
+key 24 up
+release PLAY
+wait 40
+expect keys_drums 1
+expect drum_clear 0
+key 2 down
+wait 60
+key 2 up
+wait 40
+expect drum_hits 1
+press PLAY
+wait 40
+key 24 down
+wait 40
+key 24 up
+release PLAY
+wait 40
+expect keys_drums 0
+# undo the last roll
+tap REC
+wait 1500
+press PLAY
+wait 40
+key 21 down
+wait 40
+key 21 up
+release PLAY
+wait 1500
+expect build_req 0
+# Setup: HOME twice; themes; Bluetooth audio (the simulator's stand-in); the profiler
+tap HOME
+wait 40
+expect page 9
+turn K1 2
+wait 40
+expect theme 2
+shot setup_general.png
+turn SELECT 1
+wait 40
+expect sub 1
+turn K1 1
+wait 40
+tap REC
+wait 1800
+turn K3 1
+wait 900
+expect bt 7
+shot setup_bt.png
+turn SELECT 1
+wait 1200
+shot setup_load.png
+turn K1 -2
+turn K2 -1
+turn K3 -1
+wait 600
+expect cap_nodes 4
+expect cap_pad 6
+expect cap_harm 14
+turn SELECT 1
+wait 600
+shot setup_load2.png
+turn SELECT 1
+wait 300
+turn K1 1
+wait 300
+expect keys_to 1
+turn K1 -1
+wait 300
+expect keys_to 0
+# patches: SAVE + key stores, HOME + key loads (with its scenes)
+tap HOME
+wait 40
+press SAVE
+wait 30
+key 0 down
+wait 50
+key 0 up
+wait 30
+release SAVE
+wait 50
+expect patches 1
+tap REC
+wait 1500
+press HOME
+wait 30
+key 0 down
+wait 50
+key 0 up
+wait 30
+release HOME
+wait 2000
+expect page 0
+expect build_req 0
+expect scenes 1
+# MIDI in
+midi USB 90 3C 64
+wait 400
+midi USB 80 3C 00
+wait 100
+tap PLAY
+wait 30
+expect transport 0
+tap PLAY
+wait 30
+expect transport 1
+tap OCT+
+expect oct 1
+wav end.wav
+wait 4000
+wavstop
+expect peak_db_min -45
+# the four rolls: a REC tap the sound (never the scale), REC + FX motion and effects, REC + HOME the knobs, a double
+# tap everything (but the scale)
+tap HOME
+wait 300
+expect changed_scale 1
+expect changed_sound 1
+expect changed_motion 1
+expect changed_knobs 1
+tap REC
+wait 900
+expect changed_scale 0
+expect changed_sound 1
+expect changed_motion 0
+expect changed_knobs 0
+press REC
+wait 30
+tap FX
+release REC
+wait 900
+expect changed_scale 0
+expect changed_sound 0
+expect changed_motion 1
+expect changed_knobs 0
+press REC
+wait 30
+tap HOME
+release REC
+wait 900
+expect changed_scale 0
+expect changed_sound 0
+expect changed_motion 0
+expect changed_knobs 1
+tap REC
+wait 150
+tap REC
+wait 900
+expect changed_scale 0
+expect changed_sound 1
+expect changed_motion 1
+expect changed_knobs 1
+press REC
+wait 30
+tap SEL
+release REC
+wait 900
+expect changed_scale 1
+expect scales 41

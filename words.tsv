@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MPL-2.0
+# MANIFOLD's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
+# url: https://manifold-fm1.invalid/words/
+MANIFOLD	manifold
+SEL	select
+SEQUENCER	sequencer
+ARP / STOCH	arpeggiator and stochastic rhythm
+LFO / MOD	L F O and modulation
+PROFILER	profiler
+WS 2X	waveshaper oversampling
+FB	filter bank
+BPM	B P M
