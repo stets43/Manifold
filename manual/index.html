@@ -304,6 +304,7 @@ try { const T = {Glacier:["64,168,232","168,226,255"],Ember:["232,128,32","255,1
 <p><strong>"OVER" in the header.</strong> The audio ran out of time and a voice was dropped. Lower Setup → Load (voices, partials) for very dense patches.</p>
 <p><strong>The scale did not change on a roll.</strong> Only REC + SEL rolls the scale.</p>
 <p><strong>A Bluetooth speaker says connected but plays nothing, or the screen says REFUSED.</strong> Update to 1.0.2 or later (1.0 refused speakers that set up the stream themselves). Then see <a href="#bluetooth-audio">Bluetooth audio</a> for reading the set-up's log.</p>
+<p><strong>Saved patches or settings are gone after power-off.</strong> FM-1s sold since autumn 2026 carry a different flash chip (UC25HQ80). MANIFOLD before 1.0.3 did not recognise it and kept everything in memory only. Install 1.0.3 or later.</p>
 <p><strong>The battery gauge.</strong> It reads the battery once at power-on and then every 10 s (in a slot of the key scan that no key uses, so playing is never affected), averaged over about 40 s. On USB power it shows USB.</p>
 <hr>
 <h2 id="for-developers">For developers</h2>
@@ -319,7 +320,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.2 # -&gt; build/manifold-1.0.2.fwsc</code></pre>
+python3 tools/build.py ../Manifold --release 1.0.3 # -&gt; build/manifold-1.0.3.fwsc</code></pre>
 <p>MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, and the battery read in the key scan's pot slot); they are in <code>patches/</code>, against the fm1-base and felucca-bsp commits above.</p>
 <p>The device build needs three files from JieLi's AC79 SDK (<code>cpu/wl82/tools/uboot.boot</code>, <code>cfg_tool.bin</code>, <code>cfg/eq_cfg_hw.bin</code>; Apache-2.0). <code>tests/basic.txt</code> is the host test suite (144 checks: every page, rolls, locks, the performance keys, scenes, undo, patches, MIDI, the matrix, the profiler). <code>hosttest/render.c</code> is a desktop render harness (single patches, sweeps, a tour).</p>
 <h3 id="architecture">Architecture</h3>
