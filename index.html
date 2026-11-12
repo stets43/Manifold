@@ -26,6 +26,8 @@ a:hover { color: var(--white); }
 .bar .name { color: var(--white); font-weight: 700; font-size: 26px; letter-spacing: .02em; }
 .bar .sub { color: var(--hi); font-weight: 600; font-size: 20px; }
 .bar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--white); font-weight: 700; font-size: 22px; }
+.bar .src { color: var(--gray); font-weight: 600; font-size: 17px; margin-right: 8px; }
+.bar .src:hover { color: var(--white); }
 .tri { width: 0; height: 0; border-left: 11px solid var(--hi); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
 
 /* hero */
@@ -82,7 +84,7 @@ p + p { margin-top: 10px; }
 
 <header class="bar">
   <span class="name">MANIFOLD</span><span class="sub">for the M-VAVE FM-1</span>
-  <span class="right">v1.0 <span class="tri"></span></span>
+  <span class="right"><a class="src" href="https://github.com/stets43/Manifold">Source</a> v1.0 <span class="tri"></span></span>
 </header>
 
 <section class="hero">
@@ -97,10 +99,10 @@ p + p { margin-top: 10px; }
     drums ride the synth's own notes, and every partial is a whole-number multiple of its note. Steer it with four
     knobs; play into it with the keys.</p>
     <nav class="rows">
-      <a class="row" href="install/"><span class="k">K1</span><span>Install in the browser</span><span class="v">Chrome · Edge</span><span class="b"><i style="--w:72%"></i></span></a>
-      <a class="row" href="firmware/manifold-1.0.fwsc"><span class="k">K2</span><span>Download the firmware</span><span class="v">manifold-1.0.fwsc</span><span class="b"><i style="--w:38%"></i></span></a>
-      <a class="row" href="manual/"><span class="k">K3</span><span>User guide</span><span class="v">every page</span><span class="b"><i style="--w:55%"></i></span></a>
-      <a class="row" href="https://github.com/stets43/Manifold"><span class="k">K4</span><span>Source code</span><span class="v">MPL-2.0</span><span class="b"><i style="--w:86%"></i></span></a>
+      <a class="row" href="emu/"><span class="k">K1</span><span>Play it in the browser</span><span class="v">no FM-1 needed</span><span class="b"><i style="--w:64%"></i></span></a>
+      <a class="row" href="install/"><span class="k">K2</span><span>Install on the FM-1</span><span class="v">Chrome · Edge</span><span class="b"><i style="--w:38%"></i></span></a>
+      <a class="row" href="firmware/manifold-1.0.fwsc"><span class="k">K3</span><span>Download the firmware</span><span class="v">manifold-1.0.fwsc</span><span class="b"><i style="--w:55%"></i></span></a>
+      <a class="row" href="manual/"><span class="k">K4</span><span>User guide</span><span class="v">every page</span><span class="b"><i style="--w:86%"></i></span></a>
     </nav>
   </div>
 </section>
