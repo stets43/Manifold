@@ -1,3 +1,392 @@
+diff --git a/bt/br/bt_acl.c b/bt/br/bt_acl.c
+index fbfa06c..387a6b5 100644
+--- a/bt/br/bt_acl.c
++++ b/bt/br/bt_acl.c
+@@ -44,6 +44,11 @@ static struct {
+     uint8_t paused;                                /* the stream suspended: the FM-1's own output plays (SHIFT + the
+                                                     * volume knob, bt_audio.c bta_output) */
+     uint16_t tid, avdtp_psm;
++    struct bv_sep sep;                             /* our stream end-point, as the device's acceptor (bv_acp) */
++    uint8_t dev_cmd;                               /* the device has sent AVDTP commands: it drives the set-up, our own
++                                                    * commands' rejects end nothing (crossed: both sides at once) */
++    uint8_t streamed;                              /* the stream has started on this link: no BA_SETUP_MS after */
++    uint8_t sbc_new;                               /* the stream (re)started: the encoder set up from ba.conf */
+     uint8_t sdp[BA_SDPMAX];
+     uint32_t sdpn;
+ } ba BA_ATTR;
+@@ -66,6 +71,11 @@ static void ba_reset(void)
+     ba.fresh = 0;
+     ba.rejoin = 0;
+     ba.auth_ms = 0;
++    ba.dev_cmd = 0;
++    ba.streamed = 0;
++    ba.sbc_new = 0;
++    for (i = 0; i < sizeof ba.sep; i++)
++        ((uint8_t *)&ba.sep)[i] = 0;
+     for (i = 0; i < BA_NCH; i++)
+         ba.ch[i].state = 0;
+ }
+@@ -140,7 +150,8 @@ static void ba_sdp_report(void)
+     con_puts(ok ? " bytes, well formed" : " bytes, NOT well formed");
+     bti_kv(", records ", in.records);
+     con_puts("\r\n");
+-    ba.avdtp_psm = 0;
++    if (!ba.ch[BA_CH_SIG].state)
++        ba.avdtp_psm = 0;                          /* (else the device opened it: its PSM kept) */
+     if (ok && in.records) {
+         con_puts("btpage: SDP A2DP sink: class 0x110B ");
+         con_puts(in.has_class ? "yes" : "no");
+@@ -162,7 +173,8 @@ static void ba_sdp_report(void)
+         if (in.has_class && in.proto_uuid == 0x0019u && in.psm)
+             ba.avdtp_psm = in.psm;
+     }
+-    ba.stage = BA_SDP_DONE;
++    if (ba.stage <= BA_SDP)
++        ba.stage = BA_SDP_DONE;                    /* (not when the device has taken the set-up further meanwhile) */
+     {                                              /* our search over: the channel closed, as BlueZ does. The AirPods
+                                                     * opened theirs to us 1.8 s after a Raspberry Pi closed its own
+                                                     * (2026-10-20); the response comes for no channel of ours */
+@@ -209,15 +221,50 @@ static void ba_av_cmd(uint32_t sig, const uint8_t *par, uint32_t n)
+     ba_line("AVDTP command (signal, label)", sig, ba.label);
+ }
+ 
+-static void ba_av_reject(uint32_t label, uint32_t sig)   /* the device's command: rejected (BAD_STATE 0x31) */
++static void ba_ready(void)                        /* the stream started (by our START or the device's) */
+ {
+-    uint8_t f[8];
+-    f[0] = 3, f[1] = 0;
+-    f[2] = (uint8_t)ba.ch[BA_CH_SIG].dcid, f[3] = (uint8_t)(ba.ch[BA_CH_SIG].dcid >> 8);
+-    f[4] = (uint8_t)(label << 4 | BV_REJECT);
+-    f[5] = (uint8_t)sig;
+-    f[6] = 0x31;
+-    ba_send(f, 7);
++    con_puts("btpage: AVDTP STREAM OPEN (signalling and media channels up, stream started)\r\n");
++    ba.stage = BA_AV_READY;
++    ba.paused = 0;                                 /* (a START after a SUSPEND: Bluetooth again) */
++    ba.streamed = 1;
++    ba.sbc_new = 1;
++    ba.sep.started = 1;
++}
++
++/* the device's command: answered as the acceptor (bt_avdtp.c bv_acp). Sinks that take the initiative (DISCOVER,
++ * SET_CONFIGURATION, OPEN, then their media channel and START) were refused every time (the FM-1, 2026-11: "AVDTP
++ * command from the device (signal, label): rejected 1 1", then nothing) */
++static void ba_av_dev(const uint8_t *p, uint32_t n, uint32_t sig)
++{
++    uint8_t f[4 + 16];
++    uint32_t ev, k, i;
++    ba.dev_cmd = 1;
++    ba.sep.media = ba.ch[BA_CH_MEDIA].state == 3u;
++    k = bv_acp(p, n, &ba.sep, f + 4, &ev);
++    ba_line("AVDTP command from the device (signal, answer: 2 accepted, 3 rejected)", sig, k ? f[4] & 3u : 0);
++    if (k) {
++        f[0] = (uint8_t)k, f[1] = 0;
++        f[2] = (uint8_t)ba.ch[BA_CH_SIG].dcid, f[3] = (uint8_t)(ba.ch[BA_CH_SIG].dcid >> 8);
++        ba_send(f, 4u + k);
++    }
++    if (ev == BV_EV_CONF) {
++        for (i = 0; i < 4u; i++)
++            ba.conf[i] = ba.sep.conf[i];
++        ba.acp = ba.sep.peer;
++        ba_line("AVDTP the device's SBC configuration (freq|mode block|sub|alloc, bitpool min|max)",
++                ba.conf[0] << 8 | ba.conf[1], ba.conf[2] << 8 | ba.conf[3]);
++        ba.stage = BA_AV_OPEN;                     /* (its OPEN awaited) */
++    } else if (ev == BV_EV_OPEN) {
++        ba.stage = BA_AV_MEDIA;                    /* (its media channel awaited: ba_sig_in) */
++    } else if (ev == BV_EV_START) {
++        ba_ready();
++    } else if (ev == BV_EV_SUSPEND) {
++        if (ba.stage == BA_AV_READY)
++            ba.stage = BA_AV_START;                /* (nothing sent until its START) */
++    } else if (ev == BV_EV_CLOSE) {
++        if (ba.stage != BA_FAILED)
++            ba.stage = BA_AV_DISC;                 /* (configured again by it, or let go) */
++    }
+ }
+ 
+ static void ba_av_in(const uint8_t *p, uint32_t n)
+@@ -229,15 +276,21 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
+         return;
+     }
+     if (msg == BV_CMD) {
+-        ba_line("AVDTP command from the device (signal, label): rejected", sig, label);
+-        ba_av_reject(label, sig);
++        ba_av_dev(p, n, sig);
+         return;
+     }
+     if (msg != BV_ACCEPT) {
+-        ba_line("AVDTP rejected (signal, error)", sig, n > 2u ? p[2] : 0);
+-        ba.stage = BA_FAILED;
++        ba_line("AVDTP rejected (signal, error)", sig, n > 2u ? p[n - 1u] : 0);
++        if (ba.dev_cmd)
++            con_puts("btpage: ... the device drives the set-up: ours left to it\r\n");
++        else
++            ba.stage = BA_FAILED;
+         return;
+     }
++    if (ba.sep.by_dev && (sig == BV_DISCOVER || sig == BV_GET_CAPS || sig == BV_SET_CONF || sig == BV_OPEN)) {
++        ba_line("AVDTP accepted, the device's set-up kept instead (signal, label)", sig, label);
++        return;                                    /* (ours crossed its own: its configuration stands) */
++    }
+     if (sig == BV_DISCOVER) {
+         ba.acp = (uint8_t)bv_pick_sink(p, n);
+         ba_line("AVDTP DISCOVER accepted (endpoints, the free audio sink's SEID)", (n - 2u) / 2u, ba.acp);
+@@ -259,17 +312,19 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
+                 ba.conf[0] << 8 | ba.conf[1], ba.conf[2] << 8 | ba.conf[3]);
+         ba.stage = BA_AV_CONF;
+     } else if (sig == BV_SET_CONF) {
++        ba.sep.used = 1;                           /* (ours: the device's own SET_CONFIGURATION now "in use") */
++        for (cap[0] = 0; cap[0] < 4u; cap[0]++)
++            ba.sep.conf[cap[0]] = ba.conf[cap[0]];
+         par[0] = (uint8_t)(ba.acp << 2);
+         ba_av_cmd(BV_OPEN, par, 1);
+         ba.stage = BA_AV_OPEN;
+     } else if (sig == BV_OPEN) {
+         con_puts("btpage: AVDTP OPEN accepted: opening the media channel\r\n");
++        ba.sep.opened = 1;
+         ba_open(BA_CH_MEDIA, ba.avdtp_psm);
+         ba.stage = BA_AV_MEDIA;
+     } else if (sig == BV_START) {
+-        con_puts("btpage: AVDTP STREAM OPEN (signalling and media channels up, stream started)\r\n");
+-        ba.stage = BA_AV_READY;
+-        ba.paused = 0;                             /* (a START after a SUSPEND: Bluetooth again) */
++        ba_ready();
+     } else {
+         ba_line("AVDTP accepted (signal, label)", sig, label);
+     }
+@@ -288,8 +343,11 @@ static void ba_chan_open(uint32_t c)               /* both configurations done *
+         ba.stage = BA_SDP;
+         ba_sdp_ask();
+     } else if (c == BA_CH_SIG) {
++        if (ba.dev_cmd)
++            return;                                /* (the device already at it) */
+         ba_av_cmd(BV_DISCOVER, 0, 0);
+-        ba.stage = BA_AV_DISC;
++        if (ba.stage < BA_AV_DISC)
++            ba.stage = BA_AV_DISC;
+     } else {
+         uint8_t par[1];
+         con_puts("btpage: AVDTP media channel open: sending START\r\n");
+@@ -379,10 +437,12 @@ int bt_audio_feed(const int32_t *q15_pcm, uint32_t n)   /* 1: it streams (audio.
+         ba_qavg = (bp_mq.w - bp_mq.r) << 8;        /* (the mean from the depth now) */
+     ba_live = 1;
+     ba_qavg += ((int32_t)((bp_mq.w - bp_mq.r) << 8) - (int32_t)ba_qavg) >> 9;
+-    if (!ba_sbc_init_done) {
++    if (!ba_sbc_init_done || ba.sbc_new) {         /* (each stream from its own configuration: a second link's
++                                                    * bitpool was the first's) */
+         uint8_t bp_max = ba.conf[3] < BA_BITPOOL ? ba.conf[3] : (uint8_t)BA_BITPOOL;   /* (the agreed range) */
+-        bt_sbc_init(&ba_sbc, 44100, bp_max < ba.conf[2] ? ba.conf[2] : bp_max, 1);
++        bt_sbc_init(&ba_sbc, 44100, bp_max < ba.conf[2] ? ba.conf[2] : bp_max, (ba.conf[0] & 0x0Fu) != 0x02u);
+         ba_sbc_init_done = 1;
++        ba.sbc_new = 0;
+     }
+     for (i = 0; i < n; i++) {
+         int32_t l = q15_pcm[2u * i];
+@@ -502,6 +562,13 @@ static void ba_sig_in(const uint8_t *p, uint32_t n)   /* one or more signalling
+             ba_accept(BA_CH_SDPS, id, d, f, "accepted, our SDP server");
+         } else if (code == BL_CONN_REQ && len >= 4u && ba_le16(d) == BL_PSM_AVCTP && !ba.ch[BA_CH_AVC].state) {
+             ba_accept(BA_CH_AVC, id, d, f, "accepted, AVRCP (its control channel: our volume goes there)");
++        } else if (code == BL_CONN_REQ && len >= 4u && ba_le16(d) == 0x0019u && ba.sep.opened &&
++                   !ba.ch[BA_CH_MEDIA].state) {
++            ba_accept(BA_CH_MEDIA, id, d, f, "accepted, AVDTP media (after OPEN)");
++        } else if (code == BL_CONN_REQ && len >= 4u && ba_le16(d) == 0x0019u && !ba.ch[BA_CH_SIG].state) {
++            ba_accept(BA_CH_SIG, id, d, f, "accepted, AVDTP signalling (the device's)");
++            if (!ba.avdtp_psm)
++                ba.avdtp_psm = 0x0019u;
+         } else if (code == BL_CONN_REQ && len >= 4u) {
+             ba_line("L2CAP connection request from the device (PSM, its CID): refused", ba_le16(d), ba_le16(d + 2));
+             ba_send(f, bl_conn_rsp(f, id, 0, ba_le16(d + 2), 2u));
+@@ -598,7 +665,7 @@ static void ba_poll(void)
+             btp_i_encrypt(&bp_ssp);
+         }
+     }
+-    if (ba.stage < BA_AV_READY && ba.stage != BA_FAILED && fm1_ms - bp.conn_ms >= BA_SETUP_MS) {   /* (first, from the link
++    if (ba.stage < BA_AV_READY && ba.stage != BA_FAILED && !ba.streamed && fm1_ms - bp.conn_ms >= BA_SETUP_MS) {   /* (first, from the link
+                                                     * up, whatever the step: a pairing that never ends returns below each
+                                                     * pass. 2026-10-20: SETTING UP for minutes; the device a Mac, "L..O",
+                                                     * whose user was asked to confirm the pairing) */
+@@ -659,14 +726,14 @@ static void ba_poll(void)
+         ba.stage = BA_SDP;
+         ba.t0 = fm1_ms;
+         ba_open(BA_CH_SDP, BL_PSM_SDP);
+-    } else if (ba.stage == BA_SDP_DONE && ba.avdtp_psm && ba.fresh) {
++    } else if (ba.stage == BA_SDP_DONE && ba.avdtp_psm && ba.fresh && !ba.ch[BA_CH_SIG].state) {
+         /* paired on this link: let go and connect again with the key, as a Raspberry Pi did (BlueZ "pair", then
+          * "connect"): the AirPods gave it the audio channel on the second link; on the first, ours stayed "pending" */
+         con_puts("btpage: paired: letting go, connecting again with the key (as BlueZ)\r\n");
+         ba.fresh = 0;
+         ba.rejoin = 1;                             /* (nothing more on this link; the screen pages again: op_bt.c) */
+         bp_leave();
+-    } else if (ba.stage == BA_SDP_DONE && ba.avdtp_psm && !ba.rejoin) {
++    } else if (ba.stage == BA_SDP_DONE && ba.avdtp_psm && !ba.rejoin && !ba.ch[BA_CH_SIG].state) {
+         /* at once, as an Android phone does (developer.apple.com/forums/thread/816622): the AirPods ask their SDP
+          * questions after our request, then answer it. Waiting for them instead, they hung up the idle link after
+          * ~3 s (0x13, twice, 2026-10-20) */
+diff --git a/bt/br/bt_avdtp.c b/bt/br/bt_avdtp.c
+index 8ff9fef..2b4db61 100644
+--- a/bt/br/bt_avdtp.c
++++ b/bt/br/bt_avdtp.c
+@@ -78,3 +78,122 @@ uint32_t bv_setconf_par(uint8_t *out, uint32_t acp, uint32_t intseid, const uint
+         out[k++] = conf[i];
+     return k;
+ }
++
++/* ---- the acceptor */
++static const uint8_t BV_SEP_CAPS[10] = {1, 0, 7, 6, 0x00, 0x00, 0x21, 0x15, 2, 53};   /* media transport; SBC: 44.1 kHz
++                                                    * joint stereo; 16 blocks, 8 subbands, loudness; bitpool 2..53 */
++#define BV_E_BAD_ACP_SEID 0x12u
++#define BV_E_SEP_IN_USE 0x13u
++#define BV_E_NOT_SUPPORTED 0x19u
++#define BV_E_UNSUPPORTED_CONF 0x29u
++#define BV_E_BAD_STATE 0x31u
++
++static uint32_t bv_ans(uint8_t *out, uint32_t label, uint32_t msg, uint32_t sig, const uint8_t *par, uint32_t n)
++{
++    uint32_t i;
++    out[0] = (uint8_t)((label & 15u) << 4 | msg);
++    out[1] = (uint8_t)(sig & 0x3Fu);
++    for (i = 0; i < n && i < 14u; i++)
++        out[2 + i] = par[i];
++    return 2u + i;
++}
++/* a reject: the error, after the service category (SET_CONFIGURATION, RECONFIGURE) or the SEID (START, SUSPEND) */
++static uint32_t bv_rej(uint8_t *out, uint32_t label, uint32_t sig, int pre, uint32_t err)
++{
++    uint8_t par[2];
++    uint32_t k = 0;
++    if (pre >= 0)
++        par[k++] = (uint8_t)pre;
++    par[k++] = (uint8_t)err;
++    return bv_ans(out, label, BV_REJECT, sig, par, k);
++}
++
++uint32_t bv_acp(const uint8_t *p, uint32_t n, struct bv_sep *s, uint8_t *out, uint32_t *ev)
++{
++    uint32_t label, msg, sig, seid, i;
++    uint8_t par[10], sbc[4];
++    *ev = BV_EV_NONE;
++    if (!bv_hdr(p, n, &label, &msg, &sig) || msg != BV_CMD)
++        return 0;
++    seid = n > 2u ? (uint32_t)p[2] >> 2 : 0u;
++    switch (sig) {
++    case BV_DISCOVER:                              /* our end-point: SEID, in use; audio, a source */
++        par[0] = (uint8_t)(BV_SEID << 2 | (s->used ? 2u : 0u));
++        par[1] = 0x00;
++        return bv_ans(out, label, BV_ACCEPT, sig, par, 2);
++    case BV_GET_CAPS:
++    case BV_GET_ALL_CAPS:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_ACP_SEID);
++        return bv_ans(out, label, BV_ACCEPT, sig, BV_SEP_CAPS, sizeof BV_SEP_CAPS);
++    case BV_SET_CONF:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, 0, BV_E_BAD_ACP_SEID);
++        if (s->used)
++            return bv_rej(out, label, sig, 0, BV_E_SEP_IN_USE);
++        if (n < 4u || !bv_caps_sbc(p + 2, n - 2u, sbc))
++            return bv_rej(out, label, sig, 7, BV_E_UNSUPPORTED_CONF);
++        if ((sbc[0] & 0xF0u) != 0x20u || (sbc[0] & 0x0Fu) != 0x01u || (sbc[1] & 0xF0u) != 0x10u ||
++            (sbc[1] & 0x0Cu) != 0x04u || (sbc[1] & 0x03u) != 0x01u || sbc[2] < 2u || sbc[2] > sbc[3])
++            return bv_rej(out, label, sig, 7, BV_E_UNSUPPORTED_CONF);   /* (what the encoder cannot make) */
++        for (i = 0; i < 4u; i++)
++            s->conf[i] = sbc[i];
++        s->peer = (uint8_t)(p[3] >> 2);
++        s->used = s->by_dev = 1;
++        s->opened = s->started = 0;
++        *ev = BV_EV_CONF;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_GET_CONF:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_ACP_SEID);
++        if (!s->used)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_STATE);
++        for (i = 0; i < 6u; i++)
++            par[i] = BV_SEP_CAPS[i];
++        for (i = 0; i < 4u; i++)
++            par[6 + i] = s->conf[i];
++        return bv_ans(out, label, BV_ACCEPT, sig, par, 10);
++    case BV_OPEN:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_ACP_SEID);
++        if (!s->used || s->opened)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_STATE);
++        s->opened = 1;
++        *ev = BV_EV_OPEN;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_START:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, (int)(seid << 2), BV_E_BAD_ACP_SEID);
++        if (!s->used || !s->media)
++            return bv_rej(out, label, sig, (int)(seid << 2), BV_E_BAD_STATE);
++        s->started = 1;
++        *ev = BV_EV_START;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_SUSPEND:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, (int)(seid << 2), BV_E_BAD_ACP_SEID);
++        if (!s->started)
++            return bv_rej(out, label, sig, (int)(seid << 2), BV_E_BAD_STATE);
++        s->started = 0;
++        *ev = BV_EV_SUSPEND;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_CLOSE:
++        if (seid != BV_SEID)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_ACP_SEID);
++        if (!s->used)
++            return bv_rej(out, label, sig, -1, BV_E_BAD_STATE);
++        s->used = s->by_dev = s->opened = s->started = 0;
++        *ev = BV_EV_CLOSE;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_ABORT:                                 /* (never rejected: AVDTP 1.3 §8.16) */
++        s->used = s->by_dev = s->opened = s->started = 0;
++        *ev = BV_EV_CLOSE;
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_DELAY:                                 /* its delay report: taken */
++        return bv_ans(out, label, BV_ACCEPT, sig, 0, 0);
++    case BV_RECONF:
++        return bv_rej(out, label, sig, 7, BV_E_NOT_SUPPORTED);
++    default:                                       /* SECURITY_CONTROL and what we do not know */
++        return bv_rej(out, label, sig, -1, BV_E_NOT_SUPPORTED);
++    }
++}
+diff --git a/bt/br/bt_avdtp.h b/bt/br/bt_avdtp.h
+index 15b8c07..7ede90d 100644
+--- a/bt/br/bt_avdtp.h
++++ b/bt/br/bt_avdtp.h
+@@ -6,7 +6,8 @@
+ #define BT_AVDTP_H
+ #include <stdint.h>
+ 
+-enum { BV_DISCOVER = 1, BV_GET_CAPS = 2, BV_SET_CONF = 3, BV_OPEN = 6, BV_START = 7, BV_CLOSE = 8, BV_SUSPEND = 9 };
++enum { BV_DISCOVER = 1, BV_GET_CAPS = 2, BV_SET_CONF = 3, BV_GET_CONF = 4, BV_RECONF = 5, BV_OPEN = 6, BV_START = 7,
++       BV_CLOSE = 8, BV_SUSPEND = 9, BV_ABORT = 10, BV_SECURITY = 11, BV_GET_ALL_CAPS = 12, BV_DELAY = 13 };
+ enum { BV_CMD = 0, BV_ACCEPT = 2, BV_REJECT = 3 };
+ 
+ /* a single-packet command: label 0-15, signal id, parameters -> its length in out */
+@@ -23,4 +24,23 @@ int bv_sbc_choose(const uint8_t cap[4], uint8_t conf[4]);
+ /* SET_CONFIGURATION's parameters (ACP SEID, INT SEID, media transport, SBC codec) -> their length */
+ uint32_t bv_setconf_par(uint8_t *out, uint32_t acp, uint32_t intseid, const uint8_t conf[4]);
+ 
++/* The acceptor (AVDTP 1.3 §8, the device's own commands): many sinks discover, configure and open the stream
++ * themselves once the signalling channel is up, the source answering, as phones and computers do. Our one stream
++ * end-point, BV_SEID: an audio source of SBC at what the encoder makes (44.1 kHz, joint stereo, 16 blocks, 8
++ * subbands, loudness, bitpool 2..53). */
++#define BV_SEID 1u
++struct bv_sep {
++    uint8_t used;                                  /* configured (by the device, or by our SET_CONFIGURATION) */
++    uint8_t by_dev;                                /* configured by the device: the set-up is its */
++    uint8_t opened;                                /* OPEN accepted: its media channel comes */
++    uint8_t media;                                 /* the media channel is open (the caller's to set) */
++    uint8_t started;                               /* streaming */
++    uint8_t peer;                                  /* the device's SEID (its INT SEID in SET_CONFIGURATION) */
++    uint8_t conf[4];                               /* the SBC configuration */
++};
++enum { BV_EV_NONE, BV_EV_CONF, BV_EV_OPEN, BV_EV_START, BV_EV_SUSPEND, BV_EV_CLOSE };
++/* a command from the device (p, n: the whole PDU) -> our answer's PDU in out (its length, 0: none), the end-point
++ * updated, *ev what changed (BV_EV_*). out: 16 bytes */
++uint32_t bv_acp(const uint8_t *p, uint32_t n, struct bv_sep *s, uint8_t *out, uint32_t *ev);
++
+ #endif
 diff --git a/device/app.ld b/device/app.ld
 index 06002a2..b3c1c5f 100644
 --- a/device/app.ld
@@ -14,10 +403,26 @@ index 06002a2..b3c1c5f 100644
      NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
  }
 diff --git a/device/main_fm1.c b/device/main_fm1.c
-index 89d4069..bfe97f5 100644
+index 89d4069..842f321 100644
 --- a/device/main_fm1.c
 +++ b/device/main_fm1.c
-@@ -776,8 +776,13 @@ static void enter_uboot(const char *why)
+@@ -433,6 +433,7 @@ static int log_frame(const uint8_t *p, uint32_t n)
+         shim_off_max = 0;
+     }
+ #if FM1B_BLE_OWN
++#if !defined(BLE_DIAG) || BLE_DIAG                 /* (its counters compiled out with BLE_DIAG 0: build.py, bt_log) */
+     {   /* the own stack's link layer: advertising events, connections taken / refused, packets good / CRC bad,
+          * links closed : the last reason, the longest BLE interrupt (us) */
+         q = b;
+@@ -456,6 +457,7 @@ static int log_frame(const uint8_t *p, uint32_t n)
+         *q = 0;
+         log_line_send(b);
+     }
++#endif
+ #else
+     {   /* the radio's tasks' deepest stacks and its heap's most, now (the "stacks" lines may have scrolled away) */
+         extern int shim_stack_depth(int task);
+@@ -776,8 +778,13 @@ static void enter_uboot(const char *why)
  {
      fm1_audio_stop();
      lcd_fill(0, 0, 240, 240, C_BLACK);
@@ -33,7 +438,7 @@ index 89d4069..bfe97f5 100644
      usb_detach();
      fm1_delay_ms(30);
      bootguard.pending = 0;                          /* intentional reset: not a failed boot */
-@@ -977,6 +982,12 @@ static void fm1_main(void)
+@@ -977,6 +984,12 @@ static void fm1_main(void)
  #ifdef APP_BOOT
      app_boot();                                     /* the app's own start (a radio), the platform up */
  #endif
@@ -46,7 +451,7 @@ index 89d4069..bfe97f5 100644
      app_ui_init();
  
      for (;;) {
-@@ -996,7 +1007,25 @@ static void fm1_main(void)
+@@ -996,7 +1009,25 @@ static void fm1_main(void)
                  master_pos = mirror_in_master(remote.master >= 0 ? (uint32_t)remote.master : (uint32_t)(knob / 4));
              }
          }
@@ -99,11 +504,84 @@ index f3ff8eb..28235f4 100644
  
  /* lights: bright buttons and keys, and dim ones (a short pulse each scan frame; a bright bit wins); glow 0 the dim
   * ones off, 1 low, 2 high. Bit NB in buttons / dim_buttons is PLAY's second, green LED */
+diff --git a/tests/bt/bt_avdtp_test.c b/tests/bt/bt_avdtp_test.c
+index 025377d..22bba37 100644
+--- a/tests/bt/bt_avdtp_test.c
++++ b/tests/bt/bt_avdtp_test.c
+@@ -41,6 +41,58 @@ int main(void)
+     conf[0] = 0x21, conf[1] = 0x15, conf[2] = 2, conf[3] = 53;
+     check("SET_CONFIGURATION parameters: ACP 3, INT 1, transport, SBC", bv_setconf_par(o, 3, 1, conf) == 12 &&
+                                                                              !memcmp(o, setp, 12));
++    {                                              /* the acceptor: a speaker that sets the stream up itself */
++        struct bv_sep e;
++        uint32_t ev, k;
++        static const uint8_t c_disc[2] = {0x30, 0x01};
++        static const uint8_t c_caps[3] = {0x40, 0x0C, 1 << 2};
++        static const uint8_t c_caps9[3] = {0x40, 0x02, 9 << 2};
++        static const uint8_t c_set[14] = {0x50, 0x03, 1 << 2, 2 << 2, 1, 0, 7, 6, 0, 0, 0x21, 0x15, 2, 35};
++        static const uint8_t c_set48[14] = {0x50, 0x03, 1 << 2, 2 << 2, 1, 0, 7, 6, 0, 0, 0x11, 0x15, 2, 35};
++        static const uint8_t c_open[3] = {0x60, 0x06, 1 << 2}, c_start[3] = {0x70, 0x07, 1 << 2};
++        static const uint8_t c_susp[3] = {0x80, 0x09, 1 << 2}, c_close[3] = {0x90, 0x08, 1 << 2};
++        static const uint8_t c_abort[3] = {0xA0, 0x0A, 1 << 2}, c_delay[5] = {0xB0, 0x0D, 1 << 2, 0, 150};
++        static const uint8_t c_sec[3] = {0xC0, 0x0B, 1 << 2};
++        static const uint8_t r_caps[12] = {0x42, 0x0C, 1, 0, 7, 6, 0, 0, 0x21, 0x15, 2, 53};
++        memset(&e, 0, sizeof e);
++        k = bv_acp(c_disc, 2, &e, o, &ev);
++        check("acceptor DISCOVER: our source SEID 1, free", k == 4 && o[0] == 0x32 && o[1] == 1 && o[2] == 4 && o[3] == 0);
++        k = bv_acp(c_caps, 3, &e, o, &ev);
++        check("... GET_ALL_CAPABILITIES: transport, SBC 21 15 02 35", k == 12 && !memcmp(o, r_caps, 12));
++        k = bv_acp(c_caps9, 3, &e, o, &ev);
++        check("... GET_CAPABILITIES of SEID 9: BAD_ACP_SEID", k == 3 && o[0] == 0x43 && o[2] == 0x12);
++        k = bv_acp(c_start, 3, &e, o, &ev);
++        check("... START before configuration: BAD_STATE after the SEID", k == 4 && o[0] == 0x73 && o[2] == 4 && o[3] == 0x31);
++        k = bv_acp(c_set48, 14, &e, o, &ev);
++        check("... SET_CONFIGURATION 48 kHz: UNSUPPORTED_CONFIGURATION, category 7", k == 4 && o[0] == 0x53 && o[2] == 7 &&
++              o[3] == 0x29 && !e.used);
++        k = bv_acp(c_set, 14, &e, o, &ev);
++        check("... SET_CONFIGURATION 44.1 kHz joint, bitpool 35: accepted", k == 2 && o[0] == 0x52 && ev == BV_EV_CONF &&
++              e.used && e.by_dev && e.peer == 2 && e.conf[0] == 0x21 && e.conf[3] == 35);
++        k = bv_acp(c_set, 14, &e, o, &ev);
++        check("... again: SEP_IN_USE", k == 4 && o[3] == 0x13);
++        k = bv_acp(c_disc, 2, &e, o, &ev);
++        check("... DISCOVER now: in use", k == 4 && o[2] == 6);
++        k = bv_acp(c_open, 3, &e, o, &ev);
++        check("... OPEN: accepted", k == 2 && o[0] == 0x62 && ev == BV_EV_OPEN && e.opened);
++        k = bv_acp(c_start, 3, &e, o, &ev);
++        check("... START before the media channel: BAD_STATE", k == 4 && o[3] == 0x31 && !e.started);
++        e.media = 1;
++        k = bv_acp(c_start, 3, &e, o, &ev);
++        check("... START with it: accepted", k == 2 && o[0] == 0x72 && ev == BV_EV_START && e.started);
++        k = bv_acp(c_delay, 5, &e, o, &ev);
++        check("... DELAY_REPORT: accepted", k == 2 && o[0] == 0xB2 && ev == BV_EV_NONE);
++        k = bv_acp(c_susp, 3, &e, o, &ev);
++        check("... SUSPEND: accepted", k == 2 && o[0] == 0x82 && ev == BV_EV_SUSPEND && !e.started);
++        k = bv_acp(c_sec, 3, &e, o, &ev);
++        check("... SECURITY_CONTROL: NOT_SUPPORTED_COMMAND", k == 3 && o[0] == 0xC3 && o[2] == 0x19);
++        k = bv_acp(c_close, 3, &e, o, &ev);
++        check("... CLOSE: accepted, free", k == 2 && o[0] == 0x92 && ev == BV_EV_CLOSE && !e.used && !e.opened);
++        k = bv_acp(c_abort, 3, &e, o, &ev);
++        check("... ABORT: always accepted", k == 2 && o[0] == 0xA2);
++        k = bv_acp(r_caps, 12, &e, o, &ev);
++        check("... an accept is not a command: no answer", k == 0);
++    }
+     printf(fails ? "bt_avdtp_test: %d FAILED\n" : "bt_avdtp_test: all ok\n", fails);
+     return fails != 0;
+ }
 diff --git a/tools/build.py b/tools/build.py
-index 24011e2..0429adf 100755
+index 24011e2..517b6ae 100755
 --- a/tools/build.py
 +++ b/tools/build.py
-@@ -846,7 +846,7 @@ def check(img, syms, dis, rt):
+@@ -629,7 +629,8 @@ def build_app():
+         if CONF.get("bt_audio"):                   # Bluetooth audio out (A2DP source, bt/br)
+             flags.append("-DFM1B_BT_AUDIO=1")
+             if CONF.get("bt_log"):                 # its step-by-step lines on the radio's log (fm1_remote.py log)
+-                flags.append("-DFM1B_BT_LOG=1")
++                flags += ["-DFM1B_BT_LOG=1", "-DBLE_DIAG=0"]   # (and no 10 s radio summary: it pushed the set-up's
++                                                   # lines out of the log's 32)
+         if CONF.get("ble_pairing"):                # pairing and an encrypted link (LE legacy, Just Works; the bond kept)
+             flags += ["-DBLE_LL_ENC=1", "-DBLE_SMP_LEGACY=1"]
+         GEN.mkdir(parents=True, exist_ok=True)    # the radio's start-up program (fm1_ble_rf.h includes it)
+@@ -846,7 +847,7 @@ def check(img, syms, dis, rt):
          if bt:
              errors.append(f"ble_stack = own links JieLi's Bluetooth code: {bt}")
          rf = re.search(r"^([0-9a-f]+) .*\sfm1_rf_burst_run$", syms, re.M)
@@ -112,7 +590,7 @@ index 24011e2..0429adf 100755
              errors.append("fm1_rf_burst_run is not in .ram_text (the radio's crystal ramp must run from RAM)")
          else:
              notes.append("own Bluetooth stack: nothing of JieLi's linked, the radio's ramp in RAM")
-@@ -869,9 +869,9 @@ def check(img, syms, dis, rt):
+@@ -869,9 +870,9 @@ def check(img, syms, dis, rt):
      def sym(name):
          mm = re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M)
          return int(mm.group(1), 16) if mm else 0
