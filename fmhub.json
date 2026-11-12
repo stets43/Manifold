@@ -1,0 +1,11 @@
+{
+  "what": "Generative just-intonation firmware for the FM-1. Two layers of moving points wander a map of 41 scales and play the notes they pass; a rhythm without a grid drives four drums that follow the synth. Four knobs steer it, the keys play into it, and it can stream to Bluetooth speakers.",
+  "author": "stets43",
+  "kinds": [
+    "synth"
+  ],
+  "play": "https://stets43.github.io/Manifold/emu/",
+  "cheat": "https://stets43.github.io/Manifold/manual/",
+  "image": "docs/card.png",
+  "color": "#40A8E8"
+}
