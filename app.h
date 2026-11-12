@@ -20,6 +20,11 @@ enum { OBJ_SETTINGS, OBJ_PANEL,
        OBJ_P8, OBJ_P9, OBJ_P10, OBJ_P11, OBJ_P12, OBJ_P13, OBJ_P14, OBJ_P15,
        OBJ_BLE,                          /* Bluetooth: the radio's address and the audio devices' keys */
        OBJ_NOBJ };
+/* Bluetooth audio (fm1-base's own stack): the radio's receive queue, between its interrupt and the main loop. A packet
+   acknowledged on air and dropped here when the queue is full is lost for good, and the audio set-up stalls; fm1-base
+   sets 12 for light firmwares. MANIFOLD's main loop is slower (screen updates under a busy audio render): 48, about
+   17 KB of the pool (13 KB more than 12) */
+#define BTI_RING 48u
 #define N_PATCH 16
 #define APP_STORE_MAP {0xFC000u, 0xDC000u, \
     0x97000u, 0x99000u, 0x9B000u, 0x9D000u, 0x9F000u, 0xA1000u, 0xA3000u, 0xA5000u, \

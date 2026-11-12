@@ -11,6 +11,7 @@ words = "words.tsv"
 ble = true                     # Bluetooth MIDI, and the radio Bluetooth audio needs
 ble_stack = "own"              # fm1-base's own stack (bt/): no JieLi library; what bt_audio needs
 bt_audio = true                # Bluetooth audio out to headphones and speakers (A2DP source, SBC)
+bt_log = true                  # the audio set-up step by step on the radio's log (the installer's "Read the crash report")
 tagline = "a manifold of just-intonation resonators, struck, bowed and breathed by a generative rhythm section"
 repo = "https://github.com/stets43/Manifold"
 licence = "MPL-2.0"

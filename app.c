@@ -366,7 +366,7 @@ void app_panic(void)
 #define bta_state plat_bta_state
 static void bta_sim_tick(void) {}
 #else
-static struct { int st, nk; uint32_t t; char known[4][17]; int up; } sim;
+static struct { int st, nk; uint32_t t; char known[4][17]; int up, pages; } sim;
 static void sim_cpy(char *d, const char *s) { int i; for (i = 0; i < 16 && s[i]; i++) d[i] = s[i]; d[i] = 0; }
 static void bta_on(int on) { sim.up = on; sim.st = on ? PLAT_BTA_READY : PLAT_BTA_OFF; }
 static void bta_scan(int on) { if (sim.up && on) { sim.st = PLAT_BTA_SCANNING; sim.t = plat_ms(); } }
@@ -398,6 +398,7 @@ static void bta_pick(int i)
             sim_cpy(sim.known[j], sim.known[j - 1]);
     }
     sim_cpy(sim.known[0], n);
+    sim.pages++;
     sim.st = PLAT_BTA_PAGING;
     sim.t = plat_ms();
 }
@@ -405,6 +406,7 @@ static int bta_reconnect(int i)
 {
     if (!sim.up || i >= sim.nk)
         return -1;
+    sim.pages++;
     sim.st = PLAT_BTA_PAGING;
     sim.t = plat_ms();
     return 0;
@@ -1351,14 +1353,24 @@ static void bt_power(int on)
         ui.bt_sel = 0;
 }
 
-static void bt_connect(void)
+/* a link being made (or made): another connect now would page again and end it */
+static int bt_busy(void)
+{
+    int st = bta_state();
+    return st == PLAT_BTA_PAGING || st == PLAT_BTA_LINKED || st == PLAT_BTA_SETUP || st == PLAT_BTA_STREAMING;
+}
+
+static void bt_connect(void)             /* K3 right: once (the knob's further detents do nothing while it connects) */
 {
     int st = bta_state();
     if (!set.bt_on)
         bt_power(1);
-    if (st == PLAT_BTA_FOUND || st == PLAT_BTA_SCANNING)
+    if (bt_busy())
+        return;
+    if (st == PLAT_BTA_FOUND || st == PLAT_BTA_SCANNING) {
         bta_pick(ui.bt_sel);
-    else
+        ui.bt_sel = 0;                   /* (the device picked is now the first remembered one, the list shown from here) */
+    } else
         bta_reconnect(ui.bt_sel);
 }
 
@@ -2580,11 +2592,27 @@ void app_frame(void)
             map_was = map;
             ui.redraw = 1;
         }
+        /* while a Bluetooth link is being made, the screen goes out a part at a time (header, middle, footer: one a
+           frame) and the surface 4 times a second, so the main loop is never long between its Bluetooth polls: a reply
+           the device sends meanwhile waits in the radio's queue (BTI_RING), and a full queue would lose it */
+        static uint8_t parts;
+        int slow = bt_busy() && bta_state() != PLAT_BTA_STREAMING;
         if (ui.redraw) {
             ui.redraw = 0;
             last_draw = now;
-            draw();
-        } else if ((ui.page == PG_HOME && !map && S.transport && now - last_draw >= 100u) || (hot && now - last_draw >= 100u)) {
+            if (slow)
+                parts = 7;
+            else {
+                parts = 0;
+                draw();
+            }
+        } else if (parts) {
+            if (parts & 1u) draw_header();
+            else if (parts & 2u) draw_main();
+            else draw_footer();
+            parts &= (uint8_t)(parts - 1u);
+        } else if ((ui.page == PG_HOME && !map && S.transport && now - last_draw >= (slow ? 250u : 100u)) ||
+                   (hot && now - last_draw >= 100u)) {
             last_draw = now;
             draw_main();
         }
@@ -2712,6 +2740,12 @@ int app_expect(const char *what, int *got)
         if (f) fclose(f);
         *got = 1;
     }
+#if !(FM1B_BT_AUDIO && !defined(PLAT_HOST))
+    else if (!strcmp(what, "bt_pages"))              /* (the simulator's stand-in) the pages started: one a connect */
+        *got = sim.pages;
+#endif
+    else if (!strcmp(what, "bt_sel"))
+        *got = ui.bt_sel;
     else if (!strcmp(what, "mx_route"))              /* the matrix page: the route shown (1..24), its source, destination, depth % */
         *got = ui.mx_sel + 1;
     else if (!strcmp(what, "mx_src"))
