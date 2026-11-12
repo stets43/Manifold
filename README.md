@@ -9,6 +9,8 @@ just-intonation scale (a Tonnetz: neighbours are fifths, thirds and sevenths), a
 as loud as the points near it. The rhythm is one continuous function of the bar, the drums ride the synth's own notes,
 and every partial is a whole-number multiple of its note. Four performance knobs steer it; the keys play into it.
 
+- **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
+  firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
   [`firmware/manifold-1.0.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
@@ -71,6 +73,7 @@ dsp/mod.c                 LFOs, the matrix, the knobs' paths
 dsp/fx.c                  effects; dsp/params.c parameters, rolls, styles; dsp/synth.c the top level
 docs/MANUAL.md            the user guide;  site/  the website's front page
 firmware/                 the release and the licence texts that ship with it
+emu/                      the firmware compiled for the browser (tools/emcc-zig: no Emscripten needed)
 ```
 
 ## Licence

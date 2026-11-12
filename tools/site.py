@@ -4,13 +4,14 @@
 
   index.html, fonts/, img/        the front page (site/), {{VERSION}}, {{PKG}} and {{REPO}} filled in
   manual/index.html, manual/img/  the user guide (docs/MANUAL.md, rendered by fm1-base's tools/manual_html.py)
+  emu/                            the firmware in the browser (emu/ in this repository), restyled
   install/index.html              fm1-base's web installer (web/installer.html), as tools/make_site.py makes it
   firmware/                       the package, m-bootloader (MIT) and the licence texts that ship with the firmware
 
   python3 tools/site.py FM1_BASE build/manifold-X.Y.fwsc X.Y OUT_DIR
 
-fm1-base's own tools/make_site.py does all this and also the in-browser emulator, which needs Emscripten; this script
-leaves the emulator out and keeps MANIFOLD's own front page."""
+fm1-base's own tools/make_site.py does much the same with Emscripten's emulator build; this one takes the emulator
+built into emu/ (by tools/emcc-zig, no Emscripten needed) and keeps MANIFOLD's own front page."""
 import hashlib
 import json
 import re
@@ -60,6 +61,25 @@ button { border-radius: 2px; font-weight: 700; }
 try { const T = {Glacier:"64,168,232",Ember:"232,128,32",Moss:"88,196,108",Rose:"228,88,132",Violet:"148,112,240",
   Sunset:"240,100,64",Lagoon:"40,168,168",Gold:"204,164,40",Mono:"184,184,192"}[localStorage.getItem("manifold-theme")];
   if (T) document.documentElement.style.setProperty("--accent", `rgb(${T})`); } catch (e) {}
+</script>
+"""
+
+
+# the emulator's page (fm1-base web/emu/index.html): the same black and accents, the device drawn as it is
+DARK_EMU = """<style>
+@font-face { font-family: "Barlow SC"; src: url(../fonts/BarlowSemiCondensed-Medium.ttf); font-weight: 400 500; }
+@font-face { font-family: "Barlow SC"; src: url(../fonts/BarlowSemiCondensed-Bold.ttf); font-weight: 600 700; }
+:root, :root[data-theme], :root:not([data-theme="light"]) { --ground: #000; --ink: #f4f4f8; --muted: #9c9ca6;
+  --rule: #222228; --accent: rgb(64,168,232); --teal: rgb(168,226,255); --card: #111116; --focus: rgb(168,226,255);
+  color-scheme: dark; }
+body { font-family: "Barlow SC", "Barlow Semi Condensed", system-ui, sans-serif; }
+.start button { background: var(--accent); color: #000; border-radius: 2px; font-weight: 700; }
+</style>
+<script>
+try { const T = {Glacier:["64,168,232","168,226,255"],Ember:["232,128,32","255,196,96"],Moss:["88,196,108","176,248,184"],
+  Rose:["228,88,132","255,168,196"],Violet:["148,112,240","208,184,255"],Sunset:["240,100,64","255,208,128"],
+  Lagoon:["40,168,168","128,236,220"],Gold:["204,164,40","255,228,128"],Mono:["184,184,192","244,244,248"]}[localStorage.getItem("manifold-theme")];
+  if (T) { const r = document.documentElement.style; r.setProperty("--accent", `rgb(${T[0]})`); r.setProperty("--teal", `rgb(${T[1]})`); } } catch (e) {}
 </script>
 """
 
@@ -125,6 +145,9 @@ def main(base, pkg, version, out):
     shutil.copytree(APP / "docs" / "img", out / "manual" / "img")
     restyle(out / "manual" / "index.html")
     restyle(out / "install" / "index.html", DARK_INSTALL)
+    if (APP / "emu" / "app.wasm").exists():           # the firmware in the browser (emu/: tools/emcc-zig)
+        shutil.copytree(APP / "emu", out / "emu", ignore=shutil.ignore_patterns("README.md"))
+        restyle(out / "emu" / "index.html", DARK_EMU)
     (out / ".nojekyll").write_text("")
     print(f"site: {out}: index.html, manual/, install/ ({product}), firmware/{name} ({len(raw)} B)")
 

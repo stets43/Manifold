@@ -61,6 +61,10 @@ you can go back to the stock firmware or any other FM-1 firmware the same way.
 python3 tools/fm1_install.py manifold-VERSION.fwsc
 ```
 
+**Try it first in the browser.** The MANIFOLD site has the whole firmware running in WebAssembly on a drawn FM-1
+(the *emu* page): click the buttons, drag the knobs, play the keys with the mouse or the computer keyboard. It
+sounds the same as the FM-1, and patches you store there are kept in the browser.
+
 **After installing**, the FM-1 starts on a fresh patch every time: a Groove-style roll on the 1-3-5-9 hexany with
 its root on A1. It is silent until you press PLAY (the keys play at once).
 
