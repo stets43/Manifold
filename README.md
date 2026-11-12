@@ -12,7 +12,7 @@ and every partial is a whole-number multiple of its note. Four performance knobs
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
-  [`firmware/manifold-1.0.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
+  [`firmware/manifold-1.0.2.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
   It covers every page and setting, and ends with the mathematics of each generator for developers.
 
@@ -35,6 +35,13 @@ and every partial is a whole-number multiple of its note. Four performance knobs
 - Rolls in eight styles, locks, undo, 16 patches with four scenes each, MIDI over USB and Bluetooth, Bluetooth audio
   out to headphones and speakers.
 
+## Releases
+
+- **1.0.2** (2026-11-12): Bluetooth audio to speakers that set up the stream themselves after pairing (1.0 refused
+  them); the set-up's steps on the crash report's log; the SBC encoder set up from each connection's agreement.
+  The sound engine is unchanged.
+- **1.0** (2026-11-10): first release.
+
 ## Building
 
 MANIFOLD is an app on [fm1-base](https://github.com/charlesvestal/fm1-base). It needs a few changes to fm1-base
@@ -52,7 +59,7 @@ python3 tools/build.py ../Manifold --host              # the host simulator (any
 
 tools/get_toolchain.sh                                     # JieLi's clang for the FM-1
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0       # -> build/manifold-1.0.fwsc
+python3 tools/build.py ../Manifold --release 1.0.2     # -> build/manifold-1.0.2.fwsc
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,

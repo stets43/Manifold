@@ -716,6 +716,11 @@ MANIFOLD can **send** its audio to Bluetooth headphones and speakers. It cannot 
 Four devices are remembered. While it streams, the FM-1's own output is muted and the header shows **BT**. Bluetooth
 audio arrives 150–300 ms late (the receiver's buffer), so it suits listening more than playing in time.
 
+The FM-1 sends SBC at 44.1 kHz, joint stereo. It works both with devices that wait for the source to set up the
+stream and with those that set it up themselves after pairing (most speakers do; 1.0 refused those). If a device
+will not connect, put it back in pairing mode, connect again, then open the web installer's **Read the crash report**
+straight away: it lists each step of the Bluetooth set-up and whether the FM-1 or the device turned it down.
+
 ---
 
 ## Recipes
@@ -757,6 +762,10 @@ very dense patches.
 
 **The scale did not change on a roll.** Only REC + SEL rolls the scale.
 
+**A Bluetooth speaker says connected but plays nothing, or the screen says REFUSED.** Update to 1.0.2 or later (1.0
+refused speakers that set up the stream themselves). Then see [Bluetooth audio](#bluetooth-audio) for reading the
+set-up's log.
+
 **The battery gauge.** It reads the battery once at power-on and then every 10 s (in a slot of the key scan that no
 key uses, so playing is never affected), averaged over about 40 s. On USB power it shows USB.
 
@@ -780,7 +789,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0 # -> build/manifold-1.0.fwsc
+python3 tools/build.py ../Manifold --release 1.0.2 # -> build/manifold-1.0.2.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, and the battery read in the
