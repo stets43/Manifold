@@ -50,3 +50,120 @@ index c43e7a8..7206f2b 100644
          rowbit = 0;
      } else {
          ch = fm1_an.phase ? FM1_ADC_ROW_PA8 : FM1_ADC_ROW_PA7;
+diff --git a/chip/fm1_flash.h b/chip/fm1_flash.h
+index c185578..7521a5f 100644
+--- a/chip/fm1_flash.h
++++ b/chip/fm1_flash.h
+@@ -156,7 +156,11 @@ RAMINL int fl_wait_ready(uint32_t max_us, uint32_t *took_us)
+ 
+ /* ---- entry points: IRQs OFF, args/buffers in RAM ---- */
+ 
+-static RAMFN uint32_t fl_jedec_ram(void)                 /* expect 0x856014 */
++/* the FM-1's 1 MiB flash: the Puya P25Q80 (85 60 14), or the UC25HQ80 (B3 60 14) of the units sold since autumn
++ * 2026, the same size and the same plain SPI NOR commands */
++#define FL_JEDEC_OK(id) ((id) == 0x856014u || (id) == 0xB36014u)
++
++static RAMFN uint32_t fl_jedec_ram(void)                 /* expect FL_JEDEC_OK */
+ {
+     fl_saved_t s; uint32_t id;
+     if (fl_enter(&s)) return 0;
+diff --git a/examples/hwtest/hwtest.c b/examples/hwtest/hwtest.c
+index 149a49d..3ac932e 100644
+--- a/examples/hwtest/hwtest.c
++++ b/examples/hwtest/hwtest.c
+@@ -388,7 +388,7 @@ static void app_main(void)
+     uint32_t knob_w = ~0u, batt_w = ~0u;            /* the bars' widths on the screen (~0: not drawn yet) */
+     {
+         uint32_t f = irq_save();
+-        flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;   /* the 1 MiB part every FM-1 has */
++        flash_ok = FL_JEDEC_OK(FL_FAR(fl_jedec_ram)());   /* the 1 MiB part every FM-1 has (either maker) */
+         irq_restore(f);
+         if (flash_ok)
+             ota_boot_cleanup();                 /* what an interrupted update left behind */
+diff --git a/tests/flash_ext_test.c b/tests/flash_ext_test.c
+index a8e37e1..6ab28a9 100644
+--- a/tests/flash_ext_test.c
++++ b/tests/flash_ext_test.c
+@@ -10,6 +10,7 @@ static int fails;
+ int main(void)
+ {
+     CHECK(fm1_flash_size_from_jedec(0x856014u) == 0x100000u);      /* the stock Puya 1 MiB */
++    CHECK(fm1_flash_size_from_jedec(0xB36014u) == 0x100000u);      /* the UC25HQ80 of later units, 1 MiB */
+     CHECK(fm1_flash_size_from_jedec(0xEF4016u) == 0x400000u);      /* Winbond 4 MiB */
+     CHECK(fm1_flash_size_from_jedec(0xEF4018u) == 0x1000000u);     /* 16 MiB */
+     CHECK(fm1_flash_size_from_jedec(0xC84019u) == 0x2000000u);     /* 32 MiB */
+diff --git a/tests/rescue_test.py b/tests/rescue_test.py
+index 99ee102..a04fb8c 100644
+--- a/tests/rescue_test.py
++++ b/tests/rescue_test.py
+@@ -16,8 +16,9 @@ import fm1_rescue as r  # noqa: E402
+ class FakeFM1(r.Uboot):
+     """The loader's commands on a 1 MiB bytearray; everything above the transport is the real code."""
+ 
+-    def __init__(self, flash):
++    def __init__(self, flash, fid=0x856014):
+         self.flash = bytearray(flash)
++        self.fid = fid
+         self.erased, self.ran = [], False
+ 
+     def inquiry(self):
+@@ -27,7 +28,7 @@ class FakeFM1(r.Uboot):
+         pass
+ 
+     def chip(self):
+-        return 0x980F, 3, 0x856014
++        return 0x980F, 3, self.fid
+ 
+     def read(self, addr, n):
+         return bytes(self.flash[addr:addr + n])
+@@ -98,6 +99,16 @@ def main():
+         fails(lambda: run(dev, pkgs=pkgs), "not writing")
+         assert bytes(dev.flash) == before and not dev.erased
+ 
++    # the UC25HQ80 of the units sold since autumn 2026 (B3 60 14): rescued the same; another part refused
++    dev = device(V16)
++    dev.fid = 0xB36014
++    assert run(dev) is True and bytes(dev.flash[:0xA9000]) == V16
++    dev = device(V16)
++    dev.fid = 0xEF4014
++    before = bytes(dev.flash)
++    fails(lambda: run(dev), "not the FM-1's chip")
++    assert bytes(dev.flash) == before and not dev.erased
++
+     # without --write: a check, nothing written
+     dev = device(V16)
+     before = bytes(dev.flash)
+diff --git a/tools/fm1_rescue.py b/tools/fm1_rescue.py
+index 8993302..654b765 100755
+--- a/tools/fm1_rescue.py
++++ b/tools/fm1_rescue.py
+@@ -22,7 +22,8 @@ FM-1-transporter, docs/PROTOCOL.md), which were verified on hardware:
+ 
+   1. JieLi's flash loader (wl82loader.bin, from github.com/kagaimiq/jl-uboot-tool, downloaded
+      and checked against its hash) is loaded into RAM and started;
+-  2. the chip key must be 980F and the flash 856014 (1 MiB), or nothing is done;
++  2. the chip key must be 980F and the flash 856014 or B36014 (1 MiB: Puya P25Q80, or the UC25HQ80 of
++     the units sold since autumn 2026), or nothing is done;
+   3. the whole flash is read and saved as a backup before anything else;
+   4. the package whose head [0, 0x4000) equals the FM-1's is chosen (none: nothing is written);
+   5. only 4 KiB sectors in [0x4000, end of its app area) that differ from it are written (V15's area
+@@ -47,6 +48,7 @@ LOADER_SHA256 = "d41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca537
+ LOADER_ADDR, LOADER_ARG = 0x1C02000, 0x0001
+ 
+ FLASH_SIZE = 0x100000
++FM1_FLASH_IDS = (0x856014, 0xB36014)          # Puya P25Q80; UC25HQ80 (units sold since autumn 2026)
+ APP_MAX = 0xE0000          # the .fwsc flash entry is raw flash [0, end): V15 0x93000, V16 0xA9000
+ WRITE_MIN = 0x4000         # flash header, SPL, isd_config: never written
+ SECTOR = 0x1000
+@@ -249,8 +251,9 @@ def rescue(dev, packages, loader, write, backup_dir, say=print, confirm=None):
+     dev.start_loader(loader)
+     key, typ, fid = dev.chip()
+     say(f"  chip key {key:04X}, flash type {typ}, id {fid:06X}")
+-    if (key, typ, fid) != (0x980F, 3, 0x856014):
+-        raise Fail("this is not the FM-1's chip and flash (expected key 980F, type 3, id 856014); nothing written")
++    if (key, typ) != (0x980F, 3) or fid not in FM1_FLASH_IDS:
++        raise Fail("this is not the FM-1's chip and flash (expected key 980F, type 3, id 856014 or B36014); "
++                   "nothing written")
+     say("  reading the whole flash ...")
+     t0 = time.time()
+     now = dev.read(0, FLASH_SIZE)

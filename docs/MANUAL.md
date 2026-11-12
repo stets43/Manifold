@@ -766,6 +766,9 @@ very dense patches.
 refused speakers that set up the stream themselves). Then see [Bluetooth audio](#bluetooth-audio) for reading the
 set-up's log.
 
+**Saved patches or settings are gone after power-off.** FM-1s sold since autumn 2026 carry a different flash chip
+(UC25HQ80). MANIFOLD before 1.0.3 did not recognise it and kept everything in memory only. Install 1.0.3 or later.
+
 **The battery gauge.** It reads the battery once at power-on and then every 10 s (in a slot of the key scan that no
 key uses, so playing is never affected), averaged over about 40 s. On USB power it shows USB.
 
@@ -789,7 +792,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.2 # -> build/manifold-1.0.2.fwsc
+python3 tools/build.py ../Manifold --release 1.0.3 # -> build/manifold-1.0.3.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, and the battery read in the

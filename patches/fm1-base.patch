@@ -403,7 +403,7 @@ index 06002a2..b3c1c5f 100644
      NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
  }
 diff --git a/device/main_fm1.c b/device/main_fm1.c
-index 89d4069..842f321 100644
+index 89d4069..bf64ad5 100644
 --- a/device/main_fm1.c
 +++ b/device/main_fm1.c
 @@ -433,6 +433,7 @@ static int log_frame(const uint8_t *p, uint32_t n)
@@ -438,6 +438,15 @@ index 89d4069..842f321 100644
      usb_detach();
      fm1_delay_ms(30);
      bootguard.pending = 0;                          /* intentional reset: not a failed boot */
+@@ -894,7 +901,7 @@ static void fm1_main(void)
+                                                      * VDDIO 3.2 V, WiFi's regulator automatic (fm1_sys.h) */
+         fm1_clock_read(clock_boot);
+         clock_fix = (int8_t)fm1_clock_stock();      /* the stock 360 MHz, whichever bootloader started us (fm1_clock.h) */
+-        flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;   /* the expected 1 MiB part, else RAM only */
++        flash_ok = FL_JEDEC_OK(FL_FAR(fl_jedec_ram)());   /* an FM-1's 1 MiB part (either), else RAM only */
+ #if FM1B_WIFI || FM1B_BLE
+         if (flash_ok)
+             FL_FAR(fl_uid_ram)(flash_uid);
 @@ -977,6 +984,12 @@ static void fm1_main(void)
  #ifdef APP_BOOT
      app_boot();                                     /* the app's own start (a radio), the platform up */
