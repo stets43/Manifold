@@ -500,6 +500,41 @@ index 50aa17c..e93870e 100644
  static int8_t batt_bars = -1;
  int plat_battery(void)                           /* (a level moves once the reading is 4 past its threshold) */
  {
+diff --git a/device/storage.c b/device/storage.c
+index 7e6e52a..2141d2c 100644
+--- a/device/storage.c
++++ b/device/storage.c
+@@ -25,6 +25,8 @@
+  * until every one has moved a lookup scans them too (st_pool_scan: the pool's own sectors once they are gone). An
+  * object whose current copy the app calls empty (APP_STORE_POOL_EMPTY(obj, payload, len), its option: a placeholder
+  * the layout before needed and the pool does not) is dropped first instead, wherever its copies are.
++ * APP_STORE_POOL_FOREIGN(obj, payload, len), the app's option: a current copy it does not recognise (another
++ * firmware's record in the data area, the same format) is erased at boot, that copy alone, before anything else.
+  */
+ #define ST_MAGIC 0x30583058u                   /* "X0X0": never mistaken for a Felucca object */
+ #define ST_SECTOR 4096u
+@@ -363,6 +365,21 @@ static int st_load_prev(uint32_t obj, void *dst, uint32_t max)
+ static int st_pool_boot(void)
+ {
+     int left = 0;
++#ifdef APP_STORE_POOL_FOREIGN
++    for (uint32_t o = APP_STORE_POOL_OBJ0; o < ST_POOL_LAST; o++)   /* a current copy the app does not recognise (another
++                                                      * firmware's record of the same format): that copy alone erased,
++                                                      * until the current one is the app's or none is left */
++        for (;;) {
++            st_hdr_t h;
++            int c = st_pool_find(o, &h, 0);           /* (its payload in st_buf) */
++            if (c < 0 || !APP_STORE_POOL_FOREIGN(o, st_buf, h.len))
++                break;
++            if (st_erase(APP_STORE_POOL_BASE + (uint32_t)c * ST_SECTOR)) {
++                left++;
++                break;
++            }
++        }
++#endif
+ #ifdef APP_STORE_POOL_EMPTY
+     for (uint32_t o = APP_STORE_POOL_OBJ0; o < ST_POOL_LAST; o++) {   /* the empty ones dropped, the current copy last */
+         st_hdr_t h;                                   /* (a power cut between: the next boot drops it again, never an */
 diff --git a/include/plat.h b/include/plat.h
 index f3ff8eb..28235f4 100644
 --- a/include/plat.h
@@ -576,6 +611,229 @@ index 025377d..22bba37 100644
      printf(fails ? "bt_avdtp_test: %d FAILED\n" : "bt_avdtp_test: all ok\n", fails);
      return fails != 0;
  }
+diff --git a/tests/run_tests.sh b/tests/run_tests.sh
+index 64797f3..941696f 100755
+--- a/tests/run_tests.sh
++++ b/tests/run_tests.sh
+@@ -34,6 +34,8 @@ run uac-mix sh -c "$CC -std=c99 -O2 -w -Ibsp/chip -Ibsp/boards/fm1 -o $OUT/uac_m
+ run storage sh -c "$CC -O2 -w -o $OUT/storage_test tests/storage_test.c && $OUT/storage_test"
+ run storage-pool sh -c "$CC -O2 -std=c99 -Wall -Wextra -Werror -Wno-unused-function -o $OUT/storage_pool_test \
+     tests/storage_pool_test.c && $OUT/storage_pool_test"     # the pool (APP_STORE_POOL): the move, saves, cuts
++run storage-pool-manifold sh -c "$CC -O2 -std=c99 -Wall -Wextra -Werror -Wno-unused-function -o $OUT/storage_pool_manifold_test \
++    tests/storage_pool_manifold_test.c && $OUT/storage_pool_manifold_test"   # MANIFOLD's 64 slots; foreign records
+ run fastmath sh -c "$CC -O2 -w -o $OUT/fastmath_test tests/fastmath_test.c -lm && $OUT/fastmath_test"
+ run midi-rel sh -c "$CC -O2 -std=c99 -Wall -Wextra -Werror -o $OUT/midi_rel_test tests/midi_rel_test.c && $OUT/midi_rel_test"   # include/midi_rel.h
+ run boot-pack sh tests/boot_pack_test.sh               # the boot's LZMA load images (boot_pack = true)
+diff --git a/tests/storage_pool_manifold_test.c b/tests/storage_pool_manifold_test.c
+new file mode 100644
+index 0000000..8ebb133
+--- /dev/null
++++ b/tests/storage_pool_manifold_test.c
+@@ -0,0 +1,204 @@
++/* SPDX-License-Identifier: MPL-2.0 */
++/* Host test of device/storage.c's pool laid out as MANIFOLD 1.0.4's (app.h): 64 patch slots and Bluetooth's object
++ * pooled in 69 sectors from 0x97000, where 1.0 had 16 slot pairs (the pool's first 32 sectors) and Bluetooth's pair at
++ * 0xDE000 (past the pool: moved in), the panel's pair at 0xDC000 left alone. And APP_STORE_POOL_FOREIGN: another
++ * firmware's records of the same format in the data area, one of them newer than a slot's own copy, never stand in
++ * front of MANIFOLD's.
++ *   - boot: the 16 slots load as before, Bluetooth's moves in (its old pair erased), the panel stays, the foreign
++ *     copies are gone; again: nothing changes
++ *   - every one of the 64 slots saved, three times over: each loads its last, Bluetooth's still loads
++ *   - random saves with power cuts: each slot loads as it was or as saved */
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++
++static uint8_t nor[0x100000];
++static int fail_after = -1;            /* power-cut injection: every program and erase after N fails */
++static uint32_t ops;
++static int st_read(uint32_t off, void *dst, uint32_t n) { memcpy(dst, nor + off, n); return 0; }
++static int cut(void)
++{
++    ops++;
++    if (fail_after == 0)
++        return 1;
++    if (fail_after > 0)
++        fail_after--;
++    return 0;
++}
++static int st_erase(uint32_t off)
++{
++    if (cut())
++        return -9;
++    memset(nor + off, 0xFF, 4096);
++    return 0;
++}
++static int st_prog(uint32_t off, const void *src, uint32_t n)
++{
++    const uint8_t *s = src;
++    uint32_t i;
++    if (cut())
++        return -9;
++    if ((off & 0xFFu) + n > 256u) {
++        printf("page wrap at %#x\n", off);
++        exit(1);
++    }
++    for (i = 0; i < n; i++)
++        nor[off + i] &= s[i];
++    return 0;
++}
++#include "../include/plat.h"
++#define N_PATCH 64
++enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_P0, OBJ_BLE = OBJ_P0 + 16, OBJ_P16, OBJ_NOBJ = OBJ_P16 + N_PATCH - 16 };
++#define APP_STORE_MAP {0xFC000u, 0xDC000u, \
++    0x97000u, 0x99000u, 0x9B000u, 0x9D000u, 0x9F000u, 0xA1000u, 0xA3000u, 0xA5000u, \
++    0xA7000u, 0xA9000u, 0xAB000u, 0xAD000u, 0xAF000u, 0xB1000u, 0xB3000u, 0xB5000u, \
++    0xDE000u}
++#define APP_STORE_POOL
++#define APP_STORE_POOL_BASE 0x97000u
++#define APP_STORE_POOL_N 69u
++#define APP_STORE_POOL_OLD 73u
++#define APP_STORE_POOL_OBJ0 OBJ_P0
++#define APP_STORE_POOL_OBJN (OBJ_NOBJ - OBJ_P0)
++static int patch_magic(const uint8_t *p, uint32_t n)
++{
++    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u);
++}
++#define APP_STORE_POOL_FOREIGN(obj, p, n) ((obj) != OBJ_BLE && !patch_magic((p), (n)))
++#include "../device/storage.c"
++
++static const uint32_t OLD_MAP[OBJ_NOBJ] = APP_STORE_MAP;
++static int bad;
++static void check(const char *what, int ok)
++{
++    printf("%-72s %s\n", what, ok ? "ok" : "FAIL");
++    bad += !ok;
++}
++static void put(uint32_t base, uint32_t obj, uint32_t slot, uint32_t seq, const uint8_t *p, uint32_t len)
++{
++    st_hdr_t h;
++    memset(nor + base, 0xFF, ST_SECTOR);
++    memcpy(nor + base + ST_PAYLOAD_OFF, p, len);
++    memset(&h, 0, sizeof h);
++    h.magic = ST_MAGIC, h.type = (uint16_t)obj, h.slot = (uint16_t)slot, h.seq = seq, h.len = len;
++    h.crc = st_crc32(p, len);
++    h.rsv[0] = h.rsv[1] = 0xFFFFFFFFu;
++    h.hcrc = st_crc32(&h, sizeof h - 4u);
++    memcpy(nor + base, &h, sizeof h);
++}
++#define PLEN 3052u                                   /* a MANIFOLD patch */
++static void patch(uint8_t *p, uint32_t salt)          /* "MNP9", then bytes of its own */
++{
++    p[0] = 0x39, p[1] = 0x50, p[2] = 0x4E, p[3] = 0x4D;
++    for (uint32_t i = 4; i < PLEN; i++)
++        p[i] = (uint8_t)(salt * 131u + i * 7u + (i >> 8));
++}
++static uint8_t want[OBJ_NOBJ][ST_PAYLOAD_MAX];
++static int want_len[OBJ_NOBJ];
++static int loads_as(uint32_t obj, const uint8_t *p, int len)
++{
++    static uint8_t got[ST_PAYLOAD_MAX];
++    int n = st_load(obj, got, sizeof got);
++    return len <= 0 ? n < 0 : n == len && !memcmp(got, p, (size_t)len);
++}
++static int all_load(void)
++{
++    for (uint32_t o = OBJ_PANEL; o < OBJ_NOBJ; o++)
++        if (!loads_as(o, want[o], want_len[o])) {
++            printf("  object %u\n", (unsigned)o);
++            return 0;
++        }
++    return 1;
++}
++static uint32_t slot_obj(uint32_t s) { return s < 16u ? OBJ_P0 + s : OBJ_P16 + s - 16u; }
++
++int main(void)
++{
++    uint8_t old[ST_PAYLOAD_MAX], junk[600];
++    uint32_t s, o, i;
++    /* 1.0's flash: 12 of 16 slots, some with an older copy in the other half; Bluetooth's at 0xDE000; the panel */
++    memset(nor, 0xFF, sizeof nor);
++    st_pool_scan = APP_STORE_POOL_OLD;
++    for (s = 0; s < 16u; s++) {
++        o = OBJ_P0 + s;
++        if (s % 4u == 3u)
++            continue;
++        patch(want[o], o);
++        want_len[o] = PLEN;
++        if (s % 3u == 0u) {
++            patch(old, o + 99u);
++            put(OLD_MAP[o] + (s & 1u) * ST_SECTOR, o, s & 1u, 4u, old, PLEN);
++            put(OLD_MAP[o] + !(s & 1u) * ST_SECTOR, o, !(s & 1u), 5u, want[o], PLEN);
++        } else {
++            put(OLD_MAP[o] + (s & 1u) * ST_SECTOR, o, s & 1u, 1u, want[o], PLEN);
++        }
++    }
++    for (i = 0; i < 200u; i++)
++        want[OBJ_BLE][i] = (uint8_t)(i * 3u + 1u);
++    want_len[OBJ_BLE] = 200;
++    put(0xDE000u, OBJ_BLE, 0, 6u, want[OBJ_BLE], 200);
++    patch(old, 7u);
++    put(0xDF000u, OBJ_BLE, 1, 5u, old, 200);          /* (its older copy) */
++    for (i = 0; i < 64u; i++)
++        want[OBJ_PANEL][i] = (uint8_t)(0xA0u + i);
++    want_len[OBJ_PANEL] = 64;
++    put(0xDC000u, OBJ_PANEL, 0, 2u, want[OBJ_PANEL], 64);
++    /* another firmware's records where 1.0 never wrote: one newer than slot 1's own copy, one in bank C's range,
++     * and a sector of something else entirely */
++    memset(junk, 0x5A, sizeof junk);
++    put(0x97000u + 40u * ST_SECTOR, OBJ_P0 + 1u, 40, 77u, junk, sizeof junk);
++    put(0x97000u + 50u * ST_SECTOR, OBJ_P16 + 20u, 50, 3u, junk, sizeof junk);
++    memset(nor + 0x97000u + 60u * ST_SECTOR, 0x12, 300);
++    check("before the boot: slot 2 reads another firmware's record", !loads_as(OBJ_P0 + 1u, want[OBJ_P0 + 1u], PLEN));
++
++    check("boot: everything moved (st_pool_boot 0)", st_pool_boot() == 0);
++    check("the 12 slots of 1.0 load as before, Bluetooth's and the panel's too", all_load());
++    check("Bluetooth's old pair at 0xDE000 erased", nor[0xDE000u] == 0xFFu && nor[0xDF000u] == 0xFFu);
++    check("the panel's pair at 0xDC000 left where it was", nor[0xDC000u] != 0xFFu);
++    check("the foreign records gone (sectors 40, 50)", nor[0x97000u + 40u * ST_SECTOR] == 0xFFu &&
++          nor[0x97000u + 50u * ST_SECTOR] == 0xFFu);
++    check("boot again: nothing to do, everything still loads", st_pool_boot() == 0 && all_load());
++
++    for (i = 0; i < 3u; i++)                          /* every slot, three times: each loads its last */
++        for (s = 0; s < N_PATCH; s++) {
++            o = slot_obj(s);
++            patch(want[o], o * 7u + i);
++            want_len[o] = PLEN;
++            if (st_save(o, want[o], PLEN)) {
++                printf("  save slot %u round %u failed\n", (unsigned)s, (unsigned)i);
++                bad++;
++            }
++        }
++    check("64 slots saved three times over: each loads its last, Bluetooth's too", all_load());
++    check("room left for a save (a sector to spare)", st_pool_room() >= 1);
++    check("boot again: everything loads", st_pool_boot() == 0 && all_load());
++
++    {   /* random saves, a power cut in some: a slot loads as it was or as saved, the others as they were */
++        uint32_t rng = 12345u, cuts = 0;
++        int ok = 1;
++        for (i = 0; i < 400u && ok; i++) {
++            uint8_t nw[ST_PAYLOAD_MAX];
++            int rc;
++            rng = rng * 1103515245u + 12345u;
++            s = (rng >> 8) % N_PATCH;
++            o = slot_obj(s);
++            patch(nw, rng);
++            fail_after = (rng >> 20) % 4u == 0u ? (int)((rng >> 12) % 16u) : -1;
++            rc = st_save(o, nw, PLEN);
++            fail_after = -1;
++            if (rc == 0) {
++                memcpy(want[o], nw, PLEN);
++            } else {
++                cuts++;
++                st_pool_boot();                       /* (the power back: a boot) */
++                if (loads_as(o, nw, PLEN))
++                    memcpy(want[o], nw, PLEN);        /* (cut after the commit record: saved) */
++            }
++            ok = all_load();
++        }
++        printf("  (%u saves, %u cut)\n", (unsigned)i, (unsigned)cuts);
++        check("400 random saves with power cuts: every slot as it was or as saved", ok);
++    }
++    printf(bad ? "storage_pool_manifold: %d FAILED\n" : "storage_pool_manifold: all ok\n", bad);
++    return bad != 0;
++}
 diff --git a/tools/build.py b/tools/build.py
 index 24011e2..517b6ae 100755
 --- a/tools/build.py

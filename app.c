@@ -93,7 +93,18 @@ static patch_t undo_buf __attribute__((section(".pool")));                 /* th
 static uint8_t undo_ok;
 static uint32_t rolls;                   /* rolls sent to the engine (the host's tests count them) */
 static volatile uint8_t pbuf_busy;       /* 1: the render has a load queued from pbuf */
-static uint16_t patch_here;              /* bit k: slot k holds a patch */
+static uint64_t patch_here;              /* bit k: slot k holds a patch (slots 0..63: bank k / 16, key k % 16) */
+static uint8_t bank;                     /* the active bank (0..3: A..D): SAVE + key and HOME + key use its 16 slots */
+static uint32_t patch_obj(int slot)      /* a slot's store object: 1.0's 16 kept their numbers, Bluetooth's after them */
+{
+    return slot < 16 ? OBJ_P0 + (uint32_t)slot : OBJ_P16 + (uint32_t)slot - 16u;
+}
+static void int_text(int32_t v, char *b);
+static void slot_name(int slot, char *t) /* "B5": the bank's letter, the key's number */
+{
+    t[0] = (char)('A' + slot / 16);
+    int_text(slot % 16 + 1, t + 1);
+}
 
 /* the scenes of the patch playing (RAM; saved with the patch) */
 static uint16_t scene[NSCENE][NUM_PARAMS] __attribute__((section(".pool")));
@@ -452,7 +463,7 @@ static int patch_read(int slot, patch_t *p)
 {
     if (slot < 0 || slot >= N_PATCH)
         return 0;
-    if (plat_store_load(OBJ_P0 + (uint32_t)slot, p, sizeof *p) != (int)sizeof *p)
+    if (plat_store_load(patch_obj(slot), p, sizeof *p) != (int)sizeof *p)
         return 0;
     if (p->nparams != NUM_PARAMS || p->nslots != MOD_SLOTS)
         return 0;
@@ -538,9 +549,11 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(OBJ_P0 + i, &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_8))
-            patch_here |= (uint16_t)(1u << i);
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_8))
+            patch_here |= 1ull << i;
     }
+    if (set.last_patch >= 0)
+        bank = (uint8_t)(set.last_patch / 16);   /* the bank of the patch coming back */
     synth_set_style(&S, set.style);
     if (set.last_patch >= 0 && patch_read(set.last_patch, &pbuf)) {
         for (i = 0; i < NUM_PARAMS; i++)
@@ -986,7 +999,7 @@ static const sub_t SUB_SETUP[] = {
 };
 #undef _
 
-enum { PG_HOME, PG_SCALE, PG_ENGINE, PG_EXCITE, PG_SEQ, PG_ARP, PG_LFO, PG_FX, PG_PAD, PG_SETUP, NPG };
+enum { PG_HOME, PG_SCALE, PG_ENGINE, PG_EXCITE, PG_SEQ, PG_ARP, PG_LFO, PG_FX, PG_PAD, PG_SETUP, PG_PATCH, NPG };
 typedef struct {
     const char *name;
     int btn;
@@ -1006,6 +1019,7 @@ static const page_t PAGES[NPG] = {
     {"Effects", B_FX, 1u << SEC_FX, SUB_FX, NS(SUB_FX)},
     {"Voice 2", B_GLO, 1u << SEC_VOICE2, SUB_VOICE2, NS(SUB_VOICE2)},
     {"Setup", B_HOME, 0, SUB_SETUP, NS(SUB_SETUP)},
+    {"Patches", B_SAVE, 0, 0, 0},        /* a SAVE tap: the banks, the slots, the settings (draw_patches) */
 };
 
 /* the performance keys, on the white keys while PLAY is held */
@@ -1016,7 +1030,7 @@ static const char *const PK_N[] = {"Scene 1", "Scene 2", "Scene 3", "Scene 4", "
 static const uint8_t WK[16] = PLAT_WHITE_KEYS;
 
 static struct {
-    int page, sub[NPG];
+    int page, sub[NPG], prev_page;      /* prev_page: where a SAVE tap on the Patches page goes back to */
     uint32_t btn, keys;
     uint32_t rec_t, home_t, save_t, play_t, rec_tap;   /* rec_tap: a REC tap waiting to see if a second follows */
     uint8_t rec_used, home_used, save_used, play_used;
@@ -1326,6 +1340,13 @@ static void save_settings(void)
         set_dirty = 0;
 }
 
+void app_say(const char *a, const char *b);
+static void keep_settings(void)          /* SAVE + OCT+, or K4 on the Patches page */
+{
+    save_settings();
+    app_say(set_dirty ? "Save failed" : "Settings kept", set_dirty ? "settings" : "theme, MIDI, Bluetooth, keys, load");
+}
+
 static void set_cap(uint32_t which, int32_t v)
 {
     cmd(C_CAP, which, (uint32_t)v, 0.0f, 0);
@@ -1501,10 +1522,10 @@ static void patch_save(int slot)
         return;
     }
     fill_patch(&pbuf);
-    int_text(slot + 1, n);
+    slot_name(slot, n);
     text_cat(t, n);
-    if (plat_store_save(OBJ_P0 + (uint32_t)slot, &pbuf, sizeof pbuf) == 0) {
-        patch_here |= (uint16_t)(1u << slot);
+    if (plat_store_save(patch_obj(slot), &pbuf, sizeof pbuf) == 0) {
+        patch_here |= 1ull << slot;
         set.last_patch = (int8_t)slot;
         save_settings();
         app_say("Patch saved", t);
@@ -1516,7 +1537,7 @@ static void patch_save(int slot)
 static void patch_load(int slot)
 {
     char t[24] = "Slot ", n[8];
-    int_text(slot + 1, n);
+    slot_name(slot, n);
     text_cat(t, n);
     if (pbuf_busy) {
         app_say("Busy", "try again");
@@ -1760,14 +1781,14 @@ static void keys_in(uint32_t keys)
                 perf_key(perf_key_of(k), 1);
                 continue;
             }
-            if (mod_save && k < N_PATCH) {
+            if (mod_save && k < 16u) {             /* SAVE + key: the active bank's slot */
                 ui.save_used = 1;
-                patch_save((int)k);
+                patch_save(bank * 16 + (int)k);
                 continue;
             }
-            if (mod_home && k < N_PATCH) {
+            if (mod_home && k < 16u) {
                 ui.home_used = 1;
-                patch_load((int)k);
+                patch_load(bank * 16 + (int)k);
                 continue;
             }
             if (ui.latch && (latched & bit) && key_node[k] >= 0) {   /* latched: a second press lets it go */
@@ -1808,16 +1829,30 @@ static void keys_in(uint32_t keys)
     ui.keys = keys;
 }
 
+static const char *const BANK_N[N_BANK] = {"Bank A", "Bank B", "Bank C", "Bank D"};
+
 static void go_page(int pg)
 {
     ui.page = pg;
     ui.redraw = 1;
     if (pg == PG_SETUP)
         ui.sub[PG_SETUP] = set.setup_sub % NS(SUB_SETUP);
-    if (pg != PG_HOME && PAGES[pg].sub)
+    if (pg == PG_PATCH)
+        app_say(PAGES[pg].name, BANK_N[bank]);
+    else if (pg != PG_HOME && PAGES[pg].sub)
         app_say(PAGES[pg].name, PAGES[pg].sub[ui.sub[pg]].name);
     else
         app_say(PAGES[pg].name, "");
+}
+
+static void bank_step(int d)             /* OCT - / + or K1 on the Patches page */
+{
+    int b = clamp((int)bank + d, 0, N_BANK - 1);
+    if (b != (int)bank) {
+        bank = (uint8_t)b;
+        ui.redraw = 1;
+    }
+    app_say(BANK_N[bank], "SAVE + key: save   /   HOME + key: load");
 }
 
 static void buttons_in(uint32_t btn)
@@ -1845,6 +1880,17 @@ static void buttons_in(uint32_t btn)
         case B_PLAY: ui.play_t = now; ui.play_used = 0; ui.redraw = 1; break;
         case B_OCTDN: case B_OCTUP: {
             char t[8];
+            if (ui.save_t) {                         /* SAVE + OCT+: keep the settings; SAVE + OCT-: nothing (a slip
+                                                      * never moves the keys) */
+                ui.save_used = 1;
+                if (b == B_OCTUP)
+                    keep_settings();
+                break;
+            }
+            if (ui.page == PG_PATCH) {               /* the Patches page: OCT chooses the bank */
+                bank_step(b == B_OCTUP ? 1 : -1);
+                break;
+            }
             set.oct = (int8_t)clamp(set.oct + (b == B_OCTUP ? 1 : -1), -3, 3);
             set_dirty = 1;
             int_text(set.oct, t);
@@ -1900,10 +1946,14 @@ static void buttons_in(uint32_t btn)
             go_page(ui.page == PG_HOME ? PG_SETUP : PG_HOME);
         ui.home_t = 0;
     }
-    if (up >> B_SAVE & 1u) {
+    if (up >> B_SAVE & 1u) {                         /* a SAVE tap: the Patches page, and back */
         if (!ui.save_used) {
-            save_settings();
-            app_say("Settings kept", "SAVE + key: store a patch");
+            if (ui.page == PG_PATCH)
+                go_page(ui.prev_page);
+            else {
+                ui.prev_page = ui.page;
+                go_page(PG_PATCH);
+            }
         }
         ui.save_t = 0;
     }
@@ -1977,6 +2027,18 @@ static void encoders_in(void)
         if (e[EN_SELECT]) {
             edit_param(P_TEMPO, e[EN_SELECT]);
             item_say(P_TEMPO);
+        }
+        return;
+    }
+    if (ui.page == PG_PATCH) {                       /* K1: the bank; K4 right: keep the settings */
+        if (e[EN_K1]) {
+            bank_step(e[EN_K1] > 0 ? 1 : -1);
+            ui.edit_t[0] = plat_ms();
+        }
+        if (e[EN_K4] > 0) {
+            keep_settings();
+            ui.edit_t[3] = plat_ms();
+            ui.redraw = 1;
         }
         return;
     }
@@ -2098,6 +2160,8 @@ static void draw_header(void)
         x = cv_text(8, 7, &FONT_B, pg->name, C_WHITE);
         if (ui.page != PG_HOME && pg->sub)
             x = cv_text(x + 8, 7, &FONT_S, pg->sub[ui.sub[ui.page]].name, C_HI);
+        if (ui.page == PG_PATCH)
+            x = cv_text(x + 8, 7, &FONT_S, BANK_N[bank], C_HI);
         if (pg->secs && pg->secs != SEC_ALL && S.locked[__builtin_ctz(pg->secs)])
             cv_text(x + 8, 10, &FONT_T, "LOCKED", C_AMB);
         if (ui.page == PG_HOME && overloads) {               /* the audio ran out of time: how often (Setup > Load has the rest) */
@@ -2188,6 +2252,50 @@ static void draw_items(const sub_t *sb)
     cv_blit(0, 36);
 }
 
+/* the Patches page: the banks (K1), the active bank's 16 slots on their keys, the settings (K4) */
+static void draw_patches(void)
+{
+    uint32_t now = plat_ms();
+    int i, hot1 = now - ui.edit_t[0] < 600u, hot4 = now - ui.edit_t[3] < 600u;
+    char t[16];
+    cv_begin(240, 144, C_BLACK);
+    cv_rect(6, 5, 18, 13, hot1 ? C_HI : C_LINE);
+    cv_text(9, 5, &FONT_T, "K1", hot1 ? C_BLACK : C_GRAY);
+    cv_text(32, 3, &FONT_XS, "Bank", hot1 ? C_WHITE : C_GRAY);
+    for (i = 0; i < N_BANK; i++) {                   /* A..D, each with how many of its slots hold a patch */
+        int32_t x = 92 + i * 36, n = __builtin_popcountll(patch_here >> (i * 16) & 0xFFFFull);
+        int on = i == (int)bank;
+        if (on)
+            cv_rect(x, 2, 34, 20, C_HI);
+        else {
+            cv_rect(x, 2, 34, 1, C_LINE); cv_rect(x, 21, 34, 1, C_LINE);
+            cv_rect(x, 2, 1, 20, C_LINE); cv_rect(x + 33, 2, 1, 20, C_LINE);
+        }
+        t[0] = (char)('A' + i);
+        t[1] = 0;
+        cv_text(x + 5, 3, &FONT_XS, t, on ? C_BLACK : C_GRAY);
+        int_text(n, t);
+        rtext(x + 30, 7, &FONT_T, t, on ? C_BLACK : C_DIM);
+    }
+    for (i = 0; i < 16; i++) {                       /* the slots: a patch lit, the one playing bright */
+        int slot = bank * 16 + i, here = (int)(patch_here >> slot & 1u), cur = slot == set.last_patch;
+        int32_t x = 4 + (i & 3) * 59, y = 28 + (i >> 2) * 23;
+        uint16_t bg = cur ? C_HI : here ? C_LINE : C_BLACK, fg = cur ? C_BLACK : here ? C_HI : C_DIM;
+        cv_rect(x, y, 56, 20, bg);
+        if (!here && !cur) {
+            cv_rect(x, y, 56, 1, C_LINE); cv_rect(x, y + 19, 56, 1, C_LINE);
+            cv_rect(x, y, 1, 20, C_LINE); cv_rect(x + 55, y, 1, 20, C_LINE);
+        }
+        slot_name(slot, t);
+        cv_text(x + 6, y + 1, &FONT_XS, t, fg);
+    }
+    cv_rect(6, 126, 18, 13, hot4 ? C_HI : C_LINE);
+    cv_text(9, 126, &FONT_T, "K4", hot4 ? C_BLACK : C_GRAY);
+    cv_text(32, 124, &FONT_XS, "Keep settings", hot4 ? C_WHITE : C_GRAY);
+    rtext(234, 124, &FONT_XS, set_dirty ? "unsaved: turn right" : "kept", set_dirty ? C_AMB : C_DIM);
+    cv_blit(0, 36);
+}
+
 static void draw_home(void)
 {
     int i;
@@ -2252,7 +2360,7 @@ static void draw_home(void)
     if (set.last_patch >= 0) {
         char u[8];
         text_cat(t, "patch ");
-        int_text(set.last_patch + 1, u);
+        slot_name(set.last_patch, u);
         text_cat(t, u);
     } else {
         char u[12];
@@ -2429,6 +2537,17 @@ static void draw_footer(void)
         cv_blit(0, 180);
         return;
     }
+    if (ui.page == PG_PATCH) {
+        char t[48] = "SAVE + key:  save to ";
+        text_cat(t, BANK_N[bank]);
+        cv_text(6, 4, &FONT_XS, t, C_GRAY);
+        text_cpy(t, "HOME + key:  load from ", sizeof t);
+        text_cat(t, BANK_N[bank]);
+        cv_text(6, 20, &FONT_XS, t, C_GRAY);
+        cv_text(6, 36, &FONT_XS, "OCT - / +: bank   /   SAVE + OCT+: settings", C_DIM);
+        cv_blit(0, 180);
+        return;
+    }
     if (ui.page == PG_HOME) {
         cv_text(6, 4, &FONT_XS, "Hold PLAY: performance keys", C_GRAY);
         cv_text(6, 20, &FONT_XS, "REC roll   /   hold REC mutate   /   ALGO seed", C_DIM);
@@ -2454,7 +2573,7 @@ static void draw_footer(void)
         if (ui.page == PG_SETUP && ui.sub[PG_SETUP] == SS_BT)
             cv_text(6, 30, &FONT_XS, "REC: scan   /   K3 right: connect, left: hang up", C_DIM);
         else if (ui.page == PG_SETUP)
-            cv_text(6, 30, &FONT_XS, "SELECT: pages   /   SAVE keeps the settings", C_DIM);
+            cv_text(6, 30, &FONT_XS, "SELECT: pages   /   SAVE + OCT+: keep settings", C_DIM);
         else if (ui.page == PG_LFO && ui.sub[PG_LFO] == 0)
             cv_text(6, 30, &FONT_XS, "None clears   /   SAVE + LFO keeps routes", C_DIM);
         else
@@ -2476,6 +2595,8 @@ static void draw_main(void)
         draw_home();
     else if (ui.page == PG_SETUP && (ui.sub[PG_SETUP] == SS_LOAD || ui.sub[PG_SETUP] == SS_LOAD2))
         draw_load();
+    else if (ui.page == PG_PATCH)
+        draw_patches();
     else
         draw_items(&PAGES[ui.page].sub[ui.sub[ui.page]]);
 }
@@ -2510,8 +2631,8 @@ static void lights(void)
             else
                 dimk |= 1u << WK[k];
         }
-    } else if (ui.btn >> B_SAVE & 1u || ui.btn >> B_HOME & 1u) {
-        keys |= patch_here;              /* the slots that hold a patch */
+    } else if (ui.btn >> B_SAVE & 1u || ui.btn >> B_HOME & 1u || ui.page == PG_PATCH) {
+        keys |= (uint32_t)(patch_here >> (bank * 16) & 0xFFFFu);   /* the active bank's slots that hold a patch */
     } else {
         for (k = 0; k < NKEYS; k++) {
             int nd = key_to_node(k);
@@ -2639,8 +2760,12 @@ int app_expect(const char *what, int *got)
         *got = S.style;
     else if (!strcmp(what, "builds"))
         *got = (int)builds;
-    else if (!strcmp(what, "patches"))
-        *got = patch_here;
+    else if (!strcmp(what, "patches"))               /* the active bank's slots (bit = key) */
+        *got = (int)(patch_here >> (bank * 16) & 0xFFFFu);
+    else if (!strcmp(what, "patches_all"))           /* how many of the 64 hold a patch */
+        *got = __builtin_popcountll(patch_here);
+    else if (!strcmp(what, "bank"))
+        *got = bank;
     else if (!strcmp(what, "cap_pad"))
         *got = S.cap_pad_voices;
     else if (!strcmp(what, "cap_uni"))

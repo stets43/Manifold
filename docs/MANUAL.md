@@ -80,7 +80,8 @@ its root on A1. It is silent until you press PLAY (the keys play at once).
 4. **Tap REC** for a new sound (the scale stays). **Double-tap REC** to roll everything.
 5. **Turn PRESET** to choose a style (Wild, Tongue drum, Groove, Ambient, Cosmic, Drum circle, Machine, Breaks); it
    rolls a new patch in that style once the knob rests.
-6. **Hold SAVE and press a key (1–16)** to store the patch. **Hold HOME and press the key** to load it again.
+6. **Hold SAVE and press a key (1–16)** to store the patch. **Hold HOME and press the key** to load it again. A tap
+   on **SAVE** shows the Patches page: four banks of 16.
 7. **Hold PLAY** to see the performance keys: scenes, tap tempo, fill, freeze, latch, mutes, undo and panic.
 
 That is enough to play. The rest of this guide explains what each part does, so you can shape it.
@@ -189,12 +190,13 @@ what the buttons do on this page.
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
 | REC + HOME | roll the performance knobs' paths |
 | REC + SEL | roll the scale (the only way a roll changes it) |
-| SAVE (tap) | keep the settings (theme, octave, MIDI, Bluetooth, load, keys) |
+| SAVE (tap) | the Patches page: the banks and their slots (tap again: back to the page you were on) |
 | SAVE + a page button | lock / unlock that page: rolls leave a locked page alone |
 | SAVE + HOME | lock / unlock the performance knobs |
-| SAVE + key 1–16 | store the patch in that slot |
-| HOME + key 1–16 | load the patch in that slot |
-| OCT − / OCT + | move the keys down / up a scale period (−3 to +3) |
+| SAVE + key 1–16 | store the patch in that slot of the active bank |
+| HOME + key 1–16 | load the patch in that slot of the active bank |
+| SAVE + OCT+ | keep the settings (theme, octave, MIDI, Bluetooth, load, keys); SAVE + OCT− does nothing |
+| OCT − / OCT + | move the keys down / up a scale period (−3 to +3); on the Patches page, choose the bank |
 
 ---
 
@@ -322,15 +324,39 @@ the map (scale, rotation, root, octaves, surface) cause a short silence of about
 
 ## Patches and scenes
 
-**Patches.** 16 slots, one per key. **SAVE + key** stores everything: every setting, the matrix, the knobs' paths and
-positions, the locks and the four scenes. **HOME + key** loads it. The Perform page shows "patch N" while a loaded
-patch is unchanged by rolls. If a patch was the last thing you loaded, it comes back at power-on; otherwise the
-FM-1 starts on a fresh roll.
+![Patches](img/manual/patches.png)
+
+**Patches.** 64 slots: four banks (A–D) of 16, one slot per key. **SAVE + key** stores everything in that slot of
+the active bank: every setting, the matrix, the knobs' paths and positions, the locks and the four scenes. **HOME +
+key** loads it. While SAVE or HOME is held, the keys that hold a patch in the active bank light up. The Perform page
+shows "patch B5" while a loaded patch is unchanged by rolls. If a patch was the last thing you loaded, it comes back
+at power-on, with its bank active; otherwise the FM-1 starts on a fresh roll.
+
+**The Patches page.** A tap on **SAVE** opens it; another tap goes back to the page you were on (HOME and the page
+buttons leave it too). It shows the four banks with how many patches each holds, and the active bank's 16 slots:
+a stored patch lit, the one playing bright.
+
+| On the Patches page | |
+|---|---|
+| K1, or OCT − / OCT + | choose the bank (A–D) |
+| SAVE + key 1–16 | store in that slot of the bank shown |
+| HOME + key 1–16 | load from it |
+| K4 (turn right) | keep the settings; the row says "unsaved" when there is something to keep |
+
+The bank stays active when you leave the page, so SAVE + key and HOME + key work on it from any page. Storing over a
+slot that holds a patch replaces it, without asking.
+
+**Patches and firmware updates.** Updates keep the patches and the settings. 1.0.4 moved the patches into a shared
+area of the flash to make room for 64: the 16 slots of earlier versions become bank A by themselves at the first
+power-on. Do not go back to a version before 1.0.4 afterwards: it would miss some patches and forget the Bluetooth
+speakers, and storing a patch there could overwrite others.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
 
-**Settings** (theme, key octave, MIDI channel and output, Bluetooth, load caps, keys) are kept with a tap on **SAVE**.
+**Settings** (theme, key octave, MIDI channel and output, Bluetooth, load caps, keys, the style) are kept with
+**SAVE + OCT+** (hold SAVE first), or K4 on the Patches page. The SAVE button lights while there are changes not kept
+yet; without keeping them, the next power-on brings back the settings as they were. Storing a patch keeps them too.
 
 ---
 
@@ -651,7 +677,7 @@ past. Patches come out loud (about −14 dBFS on average) without distorting.
 
 ## Setup (HOME twice)
 
-From the Perform page, press **HOME** again for Setup. **SAVE** keeps these settings.
+From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps these settings.
 
 ![General](img/manual/setup-1.png) ![Bluetooth audio](img/manual/setup-2.png) ![Load](img/manual/setup-3.png)
 
@@ -792,11 +818,18 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.3 # -> build/manifold-1.0.3.fwsc
+python3 tools/build.py ../Manifold --release 1.0.4 # -> build/manifold-1.0.4.fwsc
 ```
 
-MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, and the battery read in the
-key scan's pot slot); they are in `patches/`, against the fm1-base and felucca-bsp commits above.
+MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key
+scan's pot slot, Bluetooth audio's acceptor role, both flash chips, and the store's `APP_STORE_POOL_FOREIGN`); they are
+in `patches/`, against the fm1-base and felucca-bsp commits above.
+
+**The store.** The 64 patch slots and the Bluetooth record share fm1-base's pool (`APP_STORE_POOL`, app.h): 69
+sectors from 0x97000, one copy per sector, the newest valid copy of an object winning, so a power cut during a save
+leaves the previous copy. 1.0's 16 slot pairs sat at the pool's first 32 sectors and are read as pool copies as they
+are; the Bluetooth record's pair at 0xDE000 moves in at the first boot. A slot's current copy that is not a MANIFOLD
+patch (another firmware's record of the same format) is erased at boot. A patch is 3052 bytes.
 
 The device build needs three files from JieLi's AC79 SDK (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,
 `cfg/eq_cfg_hw.bin`; Apache-2.0). `tests/basic.txt` is the host test suite (144 checks: every page, rolls, locks,

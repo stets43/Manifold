@@ -486,6 +486,112 @@ wait 2000
 expect page 0
 expect build_req 0
 expect scenes 1
+# the Patches page: a SAVE tap opens it and keeps nothing (the load above left the settings unsaved), a second goes
+# back; OCT - / + and K1 choose the bank, never the keys' octave; SAVE + key and HOME + key use the bank
+expect dirty 1
+tap SAVE
+wait 40
+expect page 10
+expect dirty 1
+expect bank 0
+expect patches 1
+tap OCT+
+wait 30
+expect bank 1
+expect oct 0
+expect patches 0
+turn K1 2
+wait 300
+expect bank 3
+turn K1 5
+wait 500
+expect bank 3
+turn K1 -2
+wait 300
+expect bank 1
+press SAVE
+wait 30
+key 0 down
+wait 50
+key 0 up
+wait 30
+key 4 down
+wait 50
+key 4 up
+wait 30
+key 9 down
+wait 50
+key 9 up
+wait 30
+release SAVE
+wait 50
+expect page 10
+expect patches 529
+expect patches_all 4
+press HOME
+wait 30
+key 4 down
+wait 50
+key 4 up
+wait 30
+release HOME
+wait 1500
+expect page 10
+expect build_req 0
+shot patches.png
+# the settings: SAVE + OCT+ keeps them (the page stays), SAVE + OCT- does nothing; K4 right on the page keeps them
+expect dirty 1
+press SAVE
+wait 30
+tap OCT+
+wait 30
+release SAVE
+wait 50
+expect dirty 0
+expect page 10
+expect oct 0
+press SAVE
+wait 30
+tap OCT-
+wait 30
+release SAVE
+wait 50
+expect oct 0
+expect page 10
+expect bank 1
+tap SAVE
+wait 40
+expect page 0
+tap OCT+
+wait 30
+expect oct 1
+expect dirty 1
+tap SAVE
+wait 40
+expect page 10
+turn K4 1
+wait 100
+expect dirty 0
+turn K4 -1
+wait 100
+tap SAVE
+wait 40
+expect page 0
+tap OCT-
+wait 30
+expect oct 0
+# a SAVE tap from another page goes back to it
+tap FX
+wait 30
+tap SAVE
+wait 40
+expect page 10
+tap SAVE
+wait 40
+expect page 7
+tap HOME
+wait 40
+expect page 0
 # MIDI in
 midi USB 90 3C 64
 wait 400
@@ -550,3 +656,9 @@ release REC
 wait 900
 expect changed_scale 1
 expect scales 41
+# power off and on: the 64 slots and the bank of the patch last loaded (B5) come back
+reboot
+wait 800
+expect bank 1
+expect patches_all 4
+expect patches 529
