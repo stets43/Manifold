@@ -97,3 +97,5 @@ Kuroshita (Felucca), Chris Farrell and others (see fm1-base's LICENSING.md). The
 stack, which includes Apache-2.0 and BSD-2-Clause code: their texts are in [`firmware/`](firmware/). The screen font is
 Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their owners; this project is not affiliated
 with M-VAVE.
+
+You can also try Manifold in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
