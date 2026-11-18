@@ -1199,8 +1199,8 @@ spread without breaking the lattice. The plane scales the lattice into [0.1, 0.9
 way, thirds the other); the sphere uses a Fibonacci layout with low pitches to the south.
 
 A note's tonal weight is its harmonicity to the ding (Tenney height: 1.15 − 0.1 log₂(*nd*), from 1 down to 0.45),
-times a bass-voicing factor: an interval over the ding is clear only above a frequency limit that rises as the
-interval gets more complex (about 58 Hz for a fifth, 100 Hz for a major third, 150 Hz for a second).
+as 0.7 + 0.3 of it. (Before 1.0.5 a bass-voicing factor also turned the low notes over the ding down to an eighth;
+with it the lowest octave played at 40 % of its share. Clarity keeps the low octaves clear instead.)
 
 ### Effects
 

@@ -5,7 +5,7 @@
  *     u_n(t) = wt_n * sum over points j of  e_j(t) * w(|q_j(t) - node_n| / Reach)
  *
  * with w a smooth bump of the point's distance to the node on the surface (the Tonnetz: neighbours are fifths, thirds,
- * sixths) and wt_n the note's tonal weight and bass voicing (engine.c). So pitch is where a point is, and loudness is
+ * sixths) and wt_n the note's tonal weight (engine.c). So pitch is where a point is, and loudness is
  * its envelope where it is: there is no grid, no sequence and no event anywhere. Polyphony is the number of points
  * (Points), spread along the same motion (Spread).
  *

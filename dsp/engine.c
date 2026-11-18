@@ -212,13 +212,11 @@ void engine_build(Synth *s) {
             /* exact logs here too (the fast log is good to a few cents: not good enough for a tuning) */
             nd->lrj = fm_log2f(s->scale.ratio[d]) + (float)o;
             nd->lre = floorf(12.f * fm_log2f(s->scale.et[d]) + .5f) / 12.f + (float)o;
-            /* the bass voicing (the arranger's low interval limits): an interval over the ding is clear only when
-               the ding under it is high enough, the simpler the interval the lower: about 58 Hz for a fifth, 100
-               for a major third, 150 for a second. Below its limit a note is still there, but the generators
-               barely reach it (the keys always play it) */
-            float w = s->scale.wt[d], lim = 58.f + (.89f - w) * 250.f, fr = root * fexp2((float)o), vw = 1.f;
-            if (d != 0 && lim > 1.f) { float x = fclamp((fr - .85f * lim) / (.3f * lim), 0.f, 1.f); vw = .12f + .88f * x * x * (3.f - 2.f * x); }
-            nd->wt = (.7f + .3f * w) * vw;
+            /* the note's tonal weight (its place in the scale). (Up to 1.0.5 a bass voicing turned the low notes over
+               the ding down to an eighth, the arranger's low interval limits: Clarity keeps the low octaves clear now,
+               and that rule had left the bass octaves at 40 % of their share) */
+            float w = s->scale.wt[d];
+            nd->wt = .7f + .3f * w;
         }
         lattice_of(s->scale.num[d], s->scale.den[d], nd->lat, &nd->lx, &nd->ly);
     }
