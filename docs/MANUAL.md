@@ -232,7 +232,7 @@ the knob as you turn it.
 
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
-| **Timbre** | both voices (their Colour too), the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices |
+| **Timbre** | both voices (their Colour too), both layers' Balance, the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices; Balance |
 | **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
@@ -387,7 +387,7 @@ yet; without keeping them, the next power-on brings back the settings as they we
 | Tuning | K1 | **Scale** | 41 scales | the set of notes (below) |
 | | K2 | **Rotation (the ding)** | each note of the scale | which note is the root: the same notes, another mode (named "/2", "/3"…) |
 | | K3 | **Root** | A0–A3 | the ding's pitch |
-| | K4 | **Octaves** | 1–6 | how far the scale extends above the ding |
+| | K4 | **Octaves** | 1–6 | how far the scale extends above the ding (at most 32 notes: a 7-note scale reaches 4 octaves, a 5-note one 6). Rolls give 4–6, six most often |
 | Temper & surface | K1 | **Temper** | Just … Equal (12-tone) | moves every note continuously from its just ratio to the nearest equal-tempered pitch, to play along with other instruments |
 | | K2 | **Surface** | Plane, Torus, Sphere | the shape of the map: the plane reflects at its edges, the torus wraps around, the sphere has no edge (a path over a pole comes down the other side) |
 
@@ -407,8 +407,8 @@ map (a moment of silence). Temper retunes without a rebuild.
 - **Other**: Blues, Major hexatonic, Whole tone, Diminished, Chromatic.
 
 Every note is a whole-number ratio of the ding. Notes that hold the key more strongly (the ding, its fifth, its
-third) have more **tonal weight**: the motions lean toward them. Low notes far from the ding are kept quieter in the
-bass, as an arranger would voice them, so low chords stay clear.
+third) have more **tonal weight**: the motions lean toward them. Each layer's **Balance** (Layer → Notes) decides how
+its loudness spreads over the notes' range: evenly, toward the bass, or toward the middle.
 
 ---
 
@@ -474,9 +474,10 @@ The two layers are the same, except that **Path view** is on Layer 1's page and 
 | Path view | K1 | **Path scale** | how much of the map the motions cover (1.0 = all the notes) |
 | | K2 | **Path rotation** | turns every motion on the map: a different set of neighbours along the same path |
 | | K3, K4 | **Path x, Path y** | slides the motions across the map |
-| Keys (Layer 1) | K1 | **Keys pull the points** | **On**: a key sounds its note and pulls the nearest point toward it (the music bends round what you play). **Off**: a key plays just its note, the points carry on around it: for melodic lines |
+| Notes | K1 | **Balance** | **Dark** … **Balanced** … **Bright**. How the layer's loudness spreads over its notes. A motion visits some notes more than others (some the frame's edge, some its centre, some the low notes); Balanced divides that out, so over a long run every note of the range sounds about as much. Dark leans toward the bass (at 100 %, about 4 dB an octave), Bright toward the middle of the range (its ends down). The layer's loudness is kept. On the Timbre knob |
+| Notes (Layer 1) | K2 | **Keys pull the points** | **On**: a key sounds its note and pulls the nearest point toward it (the music bends round what you play). **Off**: a key plays just its note, the points carry on around it: for melodic lines |
 
-![Layer 1: Keys](img/manual/layer1-5.png)
+![Layer 1: Notes](img/manual/layer1-5.png)
 
 **Keys pull the points** is part of the patch, and rolls switch it off in a share of patches (half in the beat
 styles). It applies to both layers.
@@ -948,7 +949,7 @@ Each layer has points *j* = 1…*n* at positions **q**ⱼ(*t*) with envelopes *e
 the surface with tonal weight *w*ᵢ. The note's drive is
 
 ```
-u_i(t) = w_i · Σ_j  A · e_j(t) · g(t) · φ(|q_j(t) − p_i|)
+u_i(t) = w_i · b_i · Σ_j  A · e_j(t) · g(t) · φ(|q_j(t) − p_i|)
 
 φ(d) = (1 − (d/R)²)²  for d < R,  else 0          R = s · (0.6 + 1.2 · Reach)
 ```
@@ -1197,6 +1198,14 @@ x = e₃ + 0.5 e₅ + 0.45 e₇,     y = 0.866 e₅ − 0.78 e₇
 get a direction of their own). Each octave of a degree is offset by a small step at the golden angle, so registers
 spread without breaking the lattice. The plane scales the lattice into [0.1, 0.9]²; the torus wraps it (fifths one
 way, thirds the other); the sphere uses a Fibonacci layout with low pitches to the south.
+
+*b*ᵢ is Balance's gain. Over long runs each motion gives a note a typical share of the energy by where it sits: its
+distance from the motion's frame centre (five rings) and its place among the notes in pitch (four quarters). Those
+shares, trained offline per motion from rolls of every curated style (`tools/balance/train.c`, a fixed table in
+flash), are divided out: *b*ᵢ = √(10^(*t*ᵢ/10) / *E*ᵢ), with *E*ᵢ the trained share and *t*ᵢ the target in dB: 0
+(Balanced); Dark −*B* · 4 dB an octave from the middle of the range; Bright *B* · (3 − 12 *z*²) dB with *z* the
+distance from 55 % of the range in units of 45 % (clamped ±9 dB). The gains are then scaled to keep the layer's energy
+and clamped to 0.35–2.8; they are worked out again only when the motion, the notes or Balance (in steps of 1 %) change.
 
 A note's tonal weight is its harmonicity to the ding (Tenney height: 1.15 − 0.1 log₂(*nd*), from 1 down to 0.45),
 as 0.7 + 0.3 of it. (Before 1.0.5 a bass-voicing factor also turned the low notes over the ding down to an eighth;

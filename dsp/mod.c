@@ -72,6 +72,7 @@ DSP_CTL int knob_of_r(int id) {
     if (id >= P_D1_DENS && id < P_D1_DENS + NUM_DRUMS * DR_STRIDE && (id - P_D1_DENS) % DR_STRIDE == P_D1_BRIGHT - P_D1_DENS)
         return 0;                                                          /* a drum's Bright (dark .. bright): Timbre */
     if (id == P_V1_CLARITY || id == P_V2_CLARITY) return -1;               /* (Clarity: by hand; it switches partials) */
+    if (id == P_G1_BAL || id == P_G2_BAL) return 0;                        /* the notes' balance (dark .. bright): Timbre */
     switch (g_param_meta[id].section) {
     case SEC_VOICE1: case SEC_VOICE2: return 0;
     case SEC_METER: case SEC_DRUMS: return (id >= P_D1_DENS && (id - P_D1_DENS) % DR_STRIDE == P_D1_LEVEL - P_D1_DENS) ? -1 : 1;

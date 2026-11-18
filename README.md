@@ -55,7 +55,10 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   tilts its hit toward the undertones (a kick's or tom's fall, without a pitch sweep), Bright toward the top, at half
   the old range, the fundamental never more than 6 dB down; on the Timbre knob. Wave's harmonics now sit under Tone. **The reverb** no
   longer folds its top back into the tail (a 9 kHz input low-pass), its Damp really darkens the tail (now on the Space
-  knob, rolled darker), and its tails decay as set (their 16-bit lines were truncated, which cut them short). **Reverb Size** moves without clicks (turned or modulated). Older patches load with the
+  knob, rolled darker), and its tails decay as set (their 16-bit lines were truncated, which cut them short). **Reverb Size** moves without clicks (turned or modulated). Each layer's **Balance** (Layer → Notes): the motions
+  visit some notes more than others, and a table trained per motion divides that out (Balanced: every note of the
+  range about equally), or leans it toward the bass (Dark) or the middle (Bright); rolled per style, on the Timbre knob.
+  The bass voicing rule is retired. Rolls span **4–6 octaves** (six most often, where the scale's notes allow). Older patches load with the
   patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with

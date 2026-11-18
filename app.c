@@ -72,7 +72,8 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5045u          /* "MNPE" (1.0.5): MNP9 with the patterns' 20, the colour's 12 and the undertones' 4 parameters after */
+#define PATCH_MAGIC 0x4D4E5046u          /* "MNPF" (1.0.5): MNP9 with the patterns' 20, the colour's 12, the undertones' 4 and Balance's 2 parameters after */
+#define PATCH_MAGIC_E 0x4D4E5045u        /* "MNPE": a 1.0.5 test build's, before Balance: read, it at its default */
 #define PATCH_MAGIC_D 0x4D4E5044u        /* "MNPD": a 1.0.5 test build's, before the undertones: read, those at their defaults */
 #define PATCH_MAGIC_C 0x4D4E5043u        /* "MNPC": a 1.0.5 test build's, before the hits' colour: read, those at their defaults */
 #define PATCH_MAGIC_A 0x4D4E5041u        /* "MNPA": the 1.0.5 test builds' before the voices' colour: read, those at their defaults */
@@ -106,6 +107,7 @@ PATCH_OLD(patch9_t, NUM_PARAMS_9);
 PATCH_OLD(patchA_t, NUM_PARAMS_A);
 PATCH_OLD(patchC_t, NUM_PARAMS_C);
 PATCH_OLD(patchD_t, NUM_PARAMS_D);
+PATCH_OLD(patchE_t, NUM_PARAMS_E);
 #undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
@@ -514,6 +516,7 @@ PATCH_UP(patch_up9, patch9_t, NUM_PARAMS_9)
 PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
 PATCH_UP(patch_upC, patchC_t, NUM_PARAMS_C)
 PATCH_UP(patch_upD, patchD_t, NUM_PARAMS_D)
+PATCH_UP(patch_upE, patchE_t, NUM_PARAMS_E)
 #undef PATCH_UP
 
 typedef struct {                         /* MNPB's layout */
@@ -569,6 +572,9 @@ static int patch_read(int slot, patch_t *p)
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchD_t) && p->magic == PATCH_MAGIC_D && p->nparams == NUM_PARAMS_D && p->nslots == MOD_SLOTS) {
         patch_upD(p);                    /* (a later one's still: the undertones at their defaults) */
+        p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchE_t) && p->magic == PATCH_MAGIC_E && p->nparams == NUM_PARAMS_E && p->nslots == MOD_SLOTS) {
+        patch_upE(p);                    /* (the one before Balance: Balanced) */
         p->magic = PATCH_MAGIC;
     } else if (n != (int)sizeof *p)
         return 0;
@@ -662,7 +668,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -870,6 +876,7 @@ static void param_name(int id, char *b, int max)
     case P_V1_PLUCK: case P_V2_PLUCK: n = "Pluck"; break;
     case P_V1_DEPTH: case P_V2_DEPTH: n = "Depth (undertones)"; break;
     case P_V1_CLARITY: case P_V2_CLARITY: n = "Clarity"; break;
+    case P_G1_BAL: case P_G2_BAL: n = "Balance"; break;
     case P_D1_HPLUCK: case P_D2_HPLUCK: case P_D3_HPLUCK: case P_D4_HPLUCK: n = "Pluck"; break;
     case P_D1_OE: case P_D2_OE: case P_D3_OE: case P_D4_OE: n = drum_name(id - P_D1_OE); break;
     }
@@ -1005,6 +1012,10 @@ static void value_text(int id, float n, char *b, int max)
     } else if (id == P_RV_DAMP) {                    /* how long the top rings, of the rest's decay */
         text_cpy(t, "Top ", sizeof t); { char u[6]; int_text((int32_t)((1.f - .75f * n) * 100.0f + 0.5f), u); text_cat(t, u); }
         text_cat(t, "% as long");
+    } else if (id == P_G1_BAL || id == P_G2_BAL) {  /* (dark .. balanced .. bright) */
+        int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);
+        if (pc < 3) text_cpy(t, "Balanced", sizeof t);
+        else { text_cpy(t, n < .5f ? "Dark " : "Bright ", sizeof t); { char u[6]; int_text(pc, u); text_cat(t, u); } text_cat(t, "%"); }
     } else if (id == P_V1_CLARITY || id == P_V2_CLARITY) {
         if (n <= .001f) text_cpy(t, "Open", sizeof t);
         else { int_text((int32_t)(n * 100.0f + 0.5f), t); text_cat(t, "%"); }
@@ -1105,7 +1116,7 @@ static const sub_t SUB_GEN1[] = {
     {"Points", {P_G1_POINTS, P_G1_SPREAD, P_G1_REACH, P_G1_ENERGY}},
     {"Envelope", {P_G1_ENV, P_G1_ERATE, P_G1_CONTOUR, P_G1_ROUTE}},
     {"Path view", {P_PATH_SCALE, P_PATH_ROT, P_PATH_X, P_PATH_Y}},
-    {"Keys", {P_KEY_PULL, _, _, _}},
+    {"Notes", {P_G1_BAL, P_KEY_PULL, _, _}},     /* (1.0.5: Balance; the keys' pull) */
 };
 static const sub_t SUB_METER[] = {           /* the rhythm and the drums it plays */
     {"Groove", {P_RH_DENS, P_RH_SWING, P_RH_THREES, P_RH_FINE}},
@@ -1138,6 +1149,7 @@ static const sub_t SUB_GEN2[] = {
     {"Motion", {P_G2_FUNC, P_G2_A, P_G2_B, P_G2_RATE}},
     {"Points", {P_G2_POINTS, P_G2_SPREAD, P_G2_REACH, P_G2_ENERGY}},
     {"Envelope", {P_G2_ENV, P_G2_ERATE, P_G2_CONTOUR, P_G2_ROUTE}},
+    {"Notes", {P_G2_BAL, _, _, _}},             /* (1.0.5) */
 };
 static const sub_t SUB_LFO[] = {             /* the matrix first: a route at a time (K1), what (K2), where (K3), how much (K4) */
     {"Matrix", {V_MX_ROUTE, V_MX_SRC, V_MX_DST, V_MX_DEPTH}},
@@ -2998,6 +3010,7 @@ MAKE_OLD(make_oldA, patchA_t, NUM_PARAMS_A, PATCH_MAGIC_A, NUM_PARAMS_A)
 MAKE_OLD(make_oldB, patchB_t, NUM_PARAMS_B, PATCH_MAGIC_B, NUM_PARAMS_A)
 MAKE_OLD(make_oldC, patchC_t, NUM_PARAMS_C, PATCH_MAGIC_C, NUM_PARAMS_C)
 MAKE_OLD(make_oldD, patchD_t, NUM_PARAMS_D, PATCH_MAGIC_D, NUM_PARAMS_D)
+MAKE_OLD(make_oldE, patchE_t, NUM_PARAMS_E, PATCH_MAGIC_E, NUM_PARAMS_E)
 #undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
@@ -3037,6 +3050,8 @@ int app_expect(const char *what, int *got)
         *got = make_oldB(atoi(what + 6));
     } else if (!strcmp(what, "first_route"))       /* the first matrix slot's source (0: cleared) */
         *got = S.slot[0].src;
+    else if (!strcmp(what, "bal1"))                  /* layer 1's Balance, 0 (dark) .. 100 (bright) */
+        *got = (int)(S.base[P_G1_BAL] * 100.0f + 0.5f);
     else if (!strcmp(what, "keys_pull"))
         *got = pint(&S, P_KEY_PULL);
     else if (!strcmp(what, "swlev"))
@@ -3049,6 +3064,8 @@ int app_expect(const char *what, int *got)
         *got = make_oldC(atoi(what + 6));
     else if (!strncmp(what, "makeD_", 6))           /* and the one before the undertones (MNPD) */
         *got = make_oldD(atoi(what + 6));
+    else if (!strncmp(what, "makeE_", 6))           /* and the one before Balance (MNPE) */
+        *got = make_oldE(atoi(what + 6));
     else if (!strncmp(what, "pmask_", 6))           /* layer 1's Clarity mask on note n */
         *got = S.layer[0].pmask[atoi(what + 6)];
     else if (!strcmp(what, "nodes"))                 /* how many notes */

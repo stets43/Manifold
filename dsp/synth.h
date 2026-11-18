@@ -140,8 +140,12 @@ typedef enum {
     /* each voice's reach below its pitch: Depth, how much of its energy goes to its undertones (an octave, two, three
        below: in tune), and Clarity, how many partials of all the notes each octave may hold (0: any) */
     P_V1_DEPTH, P_V2_DEPTH, P_V1_CLARITY, P_V2_CLARITY,
+    /* each layer's Balance: how its motion's energy is shared among the notes, Dark (toward the bass) .. Balanced
+       (every note alike, whatever the motion favours) .. Bright (toward the middle) */
+    P_G1_BAL, P_G2_BAL,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_E (P_V2_CLARITY + 1)                  /* the 1.0.5 test build's before Balance ("MNPE") */
 #define NUM_PARAMS_D (P_D4_HPLUCK + 1)                   /* the 1.0.5 test build's before the undertones ("MNPD") */
 #define NUM_PARAMS_C (P_V2_PLUCK + 1)                    /* the 1.0.5 test build's with the voices' colour ("MNPC") */
 #define NUM_PARAMS_A (P_KEY_PULL + 1)                    /* the 1.0.5 test builds' patches before the voices' colour ("MNPA") */
@@ -366,6 +370,8 @@ typedef struct {
     float a[MAX_NODES];            /* loudness: the drive through the consonance gain, the voices' target */
     float upv[MAX_NODES];          /* last tick's drive (its slope ranks rising notes; rises are counted) */
     float kage[MAX_NODES][4], kvel[MAX_NODES][4];  /* the keys' pushes: age (s) and velocity */
+    float gw[MAX_NODES];           /* Balance: each note's share of the drive (gen.c, balance_tab.h) */
+    float gwkey[4]; uint8_t gwtick;                /* (what it was worked out for) */
     float kin[MAX_NODES];          /* the keys' input signal: the pushes' kernels plus what is held */
     uint8_t held[MAX_NODES]; float held_v[MAX_NODES], hlev[MAX_NODES];
     float px, py, pxs, pys;        /* the path shown: point 0, generator coordinates */

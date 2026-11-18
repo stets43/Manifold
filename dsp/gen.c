@@ -120,6 +120,50 @@ void gen_reset(GenSt *g, uint32_t seed) {
 
 /* set a function up; what is sounding and the keys carry over */
 #include "ctl_off.h"   /* (setup runs from the flash, when the motion changes) */
+#include "balance_tab.h"
+/* Balance (1.0.5): each note's share of this layer's drive. Each motion favours some notes over a long run (Drift
+   and Lorenz the frame's centre, Orbit and Billiard its edge, Gravity and Motif the bass, Chords and Loops the
+   upper notes: BAL_EXP, measured from rolls). The gain divides that out, so every note gets alike (Balanced, 0), or
+   then leans the share toward the bass (Dark, -1: +4 dB an octave down) or the middle of the notes' span (Bright, 1:
+   up to +3 dB there, the ends down). The layer's whole energy is kept; no note goes past -9 / +9 dB. A table, worked
+   out when the motion, the notes or Balance move, in the flash; the drive reads a gain a note */
+static void balance_gains(Synth *s, int l, const float *key) {
+    GenSt *g = &s->layer[l].g; const Engine *e = &s->eng;
+    int N = e->n_nodes, func = (int)key[0]; float b = key[1];
+    for (int k = 0; k < 4; k++) g->gwkey[k] = key[k];
+    if (N <= 0) return;
+    if (func < 0 || func >= NUM_GENS) func = 0;
+    float lo = 1e9f, hi = -1e9f;
+    for (int i = 0; i < N; i++) { float x = e->node[i].lr; if (x < lo) lo = x; if (x > hi) hi = x; }
+    float span = hi - lo > .1f ? hi - lo : 1.f, ex[MAX_NODES], se = 0.f, sg = 0.f;
+    for (int i = 0; i < N; i++) {
+        const Node *nd = &e->node[i];
+        float p = (nd->lr - lo) / span, dx = nd->x - e->fcx, dy = nd->y - e->fcy;
+        float rd = sqrtf(dx * dx + dy * dy) / (e->fext > 1e-4f ? e->fext : 1.f);
+        int pb = (int)(p * 4.f); if (pb > 3) pb = 3; if (pb < 0) pb = 0;
+        int rb = (int)(rd * 5.f); if (rb > 4) rb = 4;
+        float E = BAL_EXP[func][rb][pb]; if (E < .05f) E = .05f;
+        float db;                                                  /* the share wanted, in dB */
+        if (b < 0.f) db = -b * 4.f * (.5f * span - (nd->lr - lo));
+        else { float z = (p - .55f) / .45f; db = b * (3.f - 12.f * z * z); }
+        if (db > 9.f) db = 9.f; if (db < -9.f) db = -9.f;
+        float gw = fexp2(db * .16610f) / sqrtf(E);                 /* 10^(dB/20) (energy goes as the drive squared) */
+        ex[i] = E; g->gw[i] = gw; se += E; sg += E * gw * gw;
+    }
+    float c = sg > 1e-9f ? sqrtf(se / sg) : 1.f;                  /* the layer's energy as it was */
+    for (int i = 0; i < N; i++) g->gw[i] = fclamp(g->gw[i] * c, .35f, 2.8f);
+    for (int i = N; i < MAX_NODES; i++) g->gw[i] = 1.f;
+    (void)ex;
+}
+/* again only when the motion, Balance or the notes moved: the notes or the motion now; Balance alone every fourth
+   tick at most (a fast LFO on it costs a quarter as much) */
+static void balance_check(Synth *s, int l, int func, int N) {
+    GenSt *g = &s->layer[l].g;
+    float bk = pval(s, P_G1_BAL + l);
+    float key[4] = {(float)func, (float)(int)(bk * 50.f) * .02f, (float)(N + 1000), N > 0 ? s->eng.node[0].lr + 7.f * s->eng.node[N - 1].lr + 3.f * s->eng.fext : 0.f};
+    if (key[0] != g->gwkey[0] || key[2] != g->gwkey[2] || key[3] != g->gwkey[3]
+        || (key[1] != g->gwkey[1] && !(++g->gwtick & 3))) balance_gains(s, l, key);
+}
 static void setup(GenSt *g, int func, int n) {
     GenSt k = *g;
     memset(g, 0, sizeof *g);
@@ -444,6 +488,7 @@ DSP_CTL void gen_tick(Synth *s, int l, float dt) {
     float depth = mi >= 0 ? pval(s, LP(mi, P_G1_ENERGY)) : 0.f;
 
     for (int i = 0; i < N; i++) { g->upv[i] = g->u[i]; g->u[i] = 0.f; }
+    DSP_FAR(balance_check)(s, l, func, N);   /* Balance's gains (from the flash: a few compares a tick, the work rare) */
 
     /* the keys: a push is a kernel in time, a held key a level: one continuous input signal per node. Both take
        the patch's own envelope: a sharp Contour is a struck note (a 2 ms rise, a short fall, little held, a quick
@@ -588,7 +633,7 @@ DSP_CTL void gen_tick(Synth *s, int l, float dt) {
         SurfPt qp; surf_pt(s->eng.surface, qx, qy, &qp);
         for (int i = 0; i < N; i++) {
             float w = surf_d2(s->eng.surface, &qp, &s->eng.node[i]) * iR; if (w >= 1.f) continue;
-            w = 1.f - w; g->u[i] += amp * w * w * s->eng.node[i].wt;
+            w = 1.f - w; g->u[i] += amp * w * w * s->eng.node[i].wt * g->gw[i];
         }
     }
     if (func == GEN_SWARM) for (int j = 0; j < npts; j++) { g->sx[j] = g->sw[j] - floorf(g->sw[j]); }

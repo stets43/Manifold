@@ -158,6 +158,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  /* (Clarity is structural: it takes effect at a rebuild, under its duck, never glided: a glide would switch partials
     tick by tick, and work the mask out each time) */
  M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,1, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,1, 0,1, .5f,0,1,0),
+ M(P_G1_BAL,"balance",SEC_GEN1,CURVE_LIN,1,0, -1,1, .5f,0,1,0), M(P_G2_BAL,"balance",SEC_GEN2,CURVE_LIN,1,0, -1,1, .5f,0,1,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -201,8 +202,8 @@ static float disc(int id, int i) { return ((float)i + 0.5f) / g_param_meta[id].h
 /* a route that would feed a layer back into itself: its own motion's envelope (or layer 1's rises, or the path) moving
    its own motion or path. It oscillates at the control rate (hundreds of notes a second): never rolled */
 static int mod_loop(int src, int dst) {
-    int g1 = (dst >= P_G1_FUNC && dst <= P_G1_ROUTE) || (dst >= P_PATH_SCALE && dst <= P_PATH_Y) || dst == P_KEY_PULL;
-    int g2 = dst >= P_G2_FUNC && dst <= P_G2_ROUTE;
+    int g1 = (dst >= P_G1_FUNC && dst <= P_G1_ROUTE) || (dst >= P_PATH_SCALE && dst <= P_PATH_Y) || dst == P_KEY_PULL || dst == P_G1_BAL;
+    int g2 = (dst >= P_G2_FUNC && dst <= P_G2_ROUTE) || dst == P_G2_BAL;
     return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
 }
 static int rand_moddable(uint32_t *r) {
@@ -257,10 +258,10 @@ void params_roll_knobs_part(Synth *s, int i0, int i1) {    /* (the knobs' paths 
         int8_t *w = s->kpath[i];
         w[0] = w[1] = w[2] = w[3] = 0;
         /* the ones a player reaches for are always on their knob: the filter, the reverb and delay, the bank's centre,
-           band and tilt and the voices' Depth (the low end: Timbre), the rhythm's density and swing, the motions' rates */
+           band and tilt, the voices' Depth and the notes' Balance (the low end: Timbre), the rhythm's density and swing, the motions' rates */
         int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_RV_DAMP || i == P_DL_SEND || i == P_DL_FB
                 || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH
-                || i == P_V1_DEPTH || i == P_V2_DEPTH;
+                || i == P_V1_DEPTH || i == P_V2_DEPTH || i == P_G1_BAL || i == P_G2_BAL;
         if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
         const ParamMeta *m = &g_param_meta[i];
         float span = m->rhi - m->rlo + .15f; if (span < .45f) span = .45f; if (span > 1.f) span = 1.f;
@@ -459,7 +460,8 @@ static void apply_style(Synth *s) {
         if (g == 4 && pick == hi - 1 && frand(r) < .8f) pick = lo;   /* (chromatic: rarely) */
         s->target[P_SCALE] = ((float)pick + .5f) / g_param_meta[P_SCALE].hi;
         TD(s, P_ROTATE, 0);
-        TD(s, P_OCTAVES, 3);                                  /* four octaves, or as many as 32 notes allow */
+        /* four to six octaves (1.0.5: six often), or as many as 32 notes allow (a scale of 7 notes: four) */
+        { const float w[6] = {0, 0, 0, 3, 3, 4}; TP(s, P_OCTAVES, w); }
         { const float w[3] = {5, 2, 3}; TP(s, P_SURFACE, w); }
         TR(s, P_ROOT, 28, T ? 38 : 36);                       /* E1 to D2: the ding is a bass note */
     }
@@ -545,6 +547,16 @@ static void apply_style(Synth *s) {
             }
             if (ro == ROUTE_MOVE) TR(s, P_G2_ENERGY, .2f, .6f); else TR(s, P_G2_ENERGY, .6f, 1.f);
         } else TD(s, P_G2_ROUTE, ROUTE_PLAY);
+    }
+    /* Balance (1.0.5), each layer its own: a bass layer (register 0) leans dark; the rest from a little dark to fairly
+       bright (Ambient near the middle, Cosmic anywhere, Machine either way) */
+    for (int l = 0; l < NUM_LAYERS; l++) if (!s->locked[l ? SEC_GEN2 : SEC_GEN1]) {
+        int id = P_G1_BAL + l, rg = l ? P_V2_REG : P_V1_REG;
+        if (s->target[rg] * g_param_meta[rg].hi < 1.f) TR(s, id, -.8f, -.3f);
+        else if (A) TR(s, id, -.3f, .2f);
+        else if (C) TR(s, id, -.8f, .8f);
+        else if (MA) TR(s, id, -.5f, .5f);
+        else TR(s, id, -.3f, .5f);
     }
     /* the voices' colour (1.0.5), each layer its own: Odd/even often left as it is, else toward hollow or even (Ambient
        gently); Pluck in about half the rhythmic rolls (Hip-hop's slower), Machine's fast, a slow one sometimes in Ambient */
