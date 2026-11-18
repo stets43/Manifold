@@ -143,7 +143,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
             float dens = pval(s, DP(d, P_D1_DENS)), place = pval(s, DP(d, P_D1_PLACE));
             int src = pint(s, DP(d, P_D1_SRC));
             DrumV *v = &D->v[d];
-            if (dens < .01f || src < DSRC_L1) continue;
+            if (dens < .01f || src < DSRC_L1 || pint(s, P_D1_PAT + d) > 0) continue;   /* (a pattern: rhythm.c's) */
             const GenSt *g = &s->layer[src - DSRC_L1].g;
             int np = g->npts > 0 ? g->npts : 1, j = (int)(place * (float)(np - 1) + .5f);
             float e = g->e[j], th = 1.f - .95f * dens;

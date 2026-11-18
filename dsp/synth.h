@@ -121,8 +121,18 @@ typedef enum {
     P_RV_TUNED, P_RV_FREEZE, P_DL_TO_RV,
     P_CMP_THRESH, P_CMP_RATIO, P_CMP_ATT, P_CMP_REL, P_CMP_MIX, P_CMP_PUMP,
     P_MASTER,
+    /* the patterns (1.0.5), after everything older so a patch's parameter numbers keep their meaning: each drum's
+       line from the trained library (0: linear, the stream's own choice), its rotation in steps, its loop's length
+       (0: the line's own), the drum it mutes on the steps it plays; how much the patterned drums also take the
+       linear layer's events (ghosts), the phrase fills, the level the swing bends (8ths or 16ths); the keys' pull */
+    P_D1_PAT, P_D2_PAT, P_D3_PAT, P_D4_PAT,
+    P_D1_ROT, P_D2_ROT, P_D3_ROT, P_D4_ROT,
+    P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN,
+    P_D1_MUTE, P_D2_MUTE, P_D3_MUTE, P_D4_MUTE,
+    P_RH_GHOST, P_RH_FILL, P_RH_SWLEV, P_KEY_PULL,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_9 (P_MASTER + 1)                      /* the parameters of the patches before 1.0.5 ("MNP9") */
 
 #define LAYER_STRIDE (P_V2_CENTER - P_V1_CENTER)
 #define LP(l, p) ((p) + (l) * LAYER_STRIDE)             /* layer l's copy of a layer-1 parameter */
@@ -198,7 +208,8 @@ void scale_series_n(Scale *sc, int n);        /* a series scale's partials, n of
 /* The surface                                                         */
 /* ------------------------------------------------------------------ */
 enum { SURF_PLANE, SURF_TORUS, SURF_SPHERE, NUM_SURFACES };
-enum { STYLE_WILD, STYLE_TONGUE, STYLE_GROOVE, STYLE_AMBIENT, STYLE_COSMIC, STYLE_CIRCLE, STYLE_MACHINE, STYLE_BREAKS, NUM_STYLES };
+/* (1.0.5: Hip-hop took Tongue drum's place, House Drum circle's; Breaks became Breakbeat) */
+enum { STYLE_WILD, STYLE_HIPHOP, STYLE_GROOVE, STYLE_AMBIENT, STYLE_COSMIC, STYLE_HOUSE, STYLE_MACHINE, STYLE_BREAKS, NUM_STYLES };
 
 typedef struct {
     float x, y;            /* surface coords, [0,1)^2 */
@@ -259,6 +270,7 @@ typedef struct {
     float ev_s;                    /* the last event's strength (the screen) */
     float ev_flash;                /* ... and its light */
     float lk[4], lkm;              /* Lock: each drum's oscillator phase (cycles), the master's */
+    float w0[RH_NH], top0;         /* the patterns: the stream's weights without swing (a step's place in the metre) */
     float lkq[4];                  /* ... and how well it is locked, 0..1 (the screen) */
 } Rhythm;
 const char *rh_engine_name(int e);
@@ -584,6 +596,18 @@ int  gen_modulator(const Synth *s);
 int  gen_modulator_r(const Synth *s);   /* (the same, in RAM: the tick's) */   /* the layer that modulates the other, or -1 */
 const char *route_name(int r);
 void path_view(const Synth *s, float px, float py, float *x, float *y);   /* a projection -> surface coords */
+
+/* the patterns (patterns.c, trained from tools/patterns/corpus.py; rhythm.c plays them, params.c rolls them) */
+typedef struct { uint32_t hit, ghost; uint8_t len; } PatLine;   /* a line: its steps (16ths, 16 or 32), the ghosts among them */
+typedef struct { uint8_t genre, line[4], bpm_lo, bpm_hi, sw_lo, sw_hi, lev, w; } PatEntry;   /* a corpus entry */
+enum { PG_HOUSE, PG_BREAKS, PG_DNB, PG_HIPHOP };
+enum { PMUTE_NONE, PMUTE_KICK, PMUTE_SNARE, PMUTE_HAT, PMUTE_TOM, PMUTE_LINEAR, NUM_PMUTE };
+extern const PatLine PAT_LIB[];
+extern const uint8_t PAT_OFF[], PAT_CNT[];
+extern const PatEntry PAT_ENT[];
+extern const int PAT_NENT;
+const PatLine *pat_line(const struct Synth *s, int d);   /* drum d's line now, or 0 (linear) */
+const char *pmute_name(int m);
 
 /* drums (drums.c) */
 void drums_tick(Synth *s, float dt);        /* per control tick: the triggers */

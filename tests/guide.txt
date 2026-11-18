@@ -54,6 +54,7 @@ wait 120
 shot layer1-4.png
 turn SELECT 1
 wait 120
+shot layer1-5.png
 turn SELECT -6
 wait 60
 tap SEQ
@@ -115,7 +116,20 @@ wait 120
 shot drums-19.png
 turn SELECT 1
 wait 120
-turn SELECT -21
+shot drums-20.png
+turn SELECT 1
+wait 120
+shot drums-21.png
+turn SELECT 1
+wait 120
+shot drums-22.png
+turn SELECT 1
+wait 120
+shot drums-23.png
+turn SELECT 1
+wait 120
+shot drums-24.png
+turn SELECT -26
 wait 60
 tap ARP
 wait 300
@@ -277,3 +291,24 @@ wait 30
 release HOME
 wait 2500
 shot patches.png
+# the patterns (1.0.5): a House roll, its Patterns, Pattern feel and Mutes pages
+tap HOME
+wait 300
+turn PRESET 3
+wait 2500
+tap SEQ
+wait 300
+turn SELECT -30
+wait 60
+turn SELECT 1
+wait 1500
+shot drums-patterns.png
+turn SELECT 1
+wait 1200
+shot drums-feel.png
+turn SELECT 15
+wait 1200
+shot drums-rotate.png
+turn SELECT 2
+wait 1200
+shot drums-mutes.png

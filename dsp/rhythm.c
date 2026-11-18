@@ -27,6 +27,16 @@
  *            strong ones left; the count starts again at each event of full strength, so the kick keeps its anchor.
  * A drum set to follow a layer is outside this: it fires from that layer's point (drums.c).
  *
+ * Patterns (1.0.5): a drum may play a line from the trained library (patterns.c) instead of taking part in the
+ * choice above. Its steps are the metre's 16ths, bent by Swing (at the 8ths or the 16ths: within each pair the second
+ * moves from 1/2 of the pair to 2/3 .. 3/4), so they lie where the stream's own pulses are and move with them. A step
+ * sounds if the stream without swing is strong enough there: R0 >= Th / 2 (a ghost step: R0 >= Th), so Density thins
+ * a pattern from its weakest steps (16ths first, the downbeat last). Rotate delays the line by steps, Length loops it
+ * over its first n steps (against the bar: polymeter), Fills put a busier neighbour (the library is ordered sparse to
+ * busy) on the second half of a phrase's last bar, Ghosts let the patterned drums also take the linear layer's events,
+ * quietly. Every hit of a tick, the patterns' and the linear layer's, is collected first: a drum that plays mutes its
+ * target's hits on the same tick (kick, snare, tom, hat in that order of precedence), or the linear layer's.
+ *
  * Lock (the other engine): four phase oscillators, one a drum, each a little off a whole-number rate (kick 2, snare 2
  * half a cycle round, hat 8, tom 3 a bar). Pull couples each to its exact rate, d(theta) = r (1 + detune) + Pull r
  * sin 2 pi (r x - theta): above its detune it locks, below it slips and drifts and catches again; every hit also
@@ -44,8 +54,31 @@ const char *rh_engine_name(int e) { return e == RH_LOCK ? "Lock" : "Threshold"; 
 const char *rh_assign_name(int a) { return a == RH_COUNT ? "Count" : "Select"; }
 
 void drums_trigger(Synth *s, int d, int node, float vel, int32_t t);
+static const char *const PMUTE_N[NUM_PMUTE] = {"Nothing", "The kick", "The snare", "The hat", "The tom", "The linear drums"};
+const char *pmute_name(int m) { return m >= 0 && m < NUM_PMUTE ? PMUTE_N[m] : "?"; }
+const PatLine *pat_line(const Synth *s, int d) {
+    int i = (int)(s->mod[P_D1_PAT + d] * (float)(PAT_CNT[d] + 1)); if (i > PAT_CNT[d]) i = PAT_CNT[d];
+    if (i <= 0 && s->base[P_D1_PAT + d] * (float)(PAT_CNT[d] + 1) >= 1.f) i = 1;   /* (as pat_idx) */
+    return i > 0 ? &PAT_LIB[PAT_OFF[d] + i - 1] : 0;
+}
 
 #include "ctl_on.h"
+/* this tick's hits, the patterns' and the linear layer's, before the mutes */
+typedef struct { int8_t d, lin; float v; int32_t t; } Cand;
+#define NCAND 16
+static Cand cand[NCAND];
+static int ncand;
+DSP_INL void emit(int d, float v, int32_t t, int lin) {
+    if (ncand < NCAND) { cand[ncand].d = (int8_t)d; cand[ncand].lin = (int8_t)lin; cand[ncand].v = v; cand[ncand].t = t; ncand++; }
+}
+/* a drum's line now: the knob or the matrix may move a set line among its relatives, never to Linear (a line set
+   stays a line); a drum set to Linear stays linear */
+DSP_INL int pat_idx(const Synth *s, int d) {
+    int i = pint(s, P_D1_PAT + d);
+    if (i <= 0 && s->base[P_D1_PAT + d] * (float)(PAT_CNT[d] + 1) >= 1.f) i = 1;
+    return i > 0 && i <= PAT_CNT[d] ? i : 0;
+}
+DSP_INL int bits(uint32_t x) { int n = 0; while (x) { x &= x - 1u; n++; } return n; }   /* (no library call in RAM) */
 DSP_INL float sm01(float x) { x = fclamp(x, 0.f, 1.f); return x * x * (3.f - 2.f * x); }
 DSP_INL float bump(float z) { return fexp2(7.2135f * (fsin(z + .25f) - 1.f)); }   /* exp(5 (cos 2 pi z - 1)) */
 
@@ -83,6 +116,14 @@ DSP_CTL static void weights(Synth *s) {
     m->ph[11] = .5f + .25f * pval(s, P_RH_SWING);
     float top = 0.f; for (int i = 0; i < RH_NH; i++) top += w[i];
     m->top = top;
+    {   /* the same without swing: a pattern step's place in the metre (its gate and its strength) */
+        float *v = m->w0, t0 = 0.f;
+        for (int i = 0; i < RH_NH; i++) v[i] = w[i];
+        v[3] = .45f * a * g1; v[4] = .24f * a * g2 * (1.f + Fm * .6f * rhythm_slow(s, 8, .9f)); v[5] = .12f * a * g3;
+        v[8] = .28f * b * g2; v[9] = .13f * b * g3; v[11] = 0.f;
+        for (int i = 0; i < RH_NH; i++) t0 += v[i];
+        m->top0 = t0;
+    }
     /* the threshold: Density, the long form, a generator's motion */
     float d = 1.f - pval(s, P_RH_DENS), th = .03f + .6f * d * d;
     th += Fm * (-.043f * rhythm_slow(s, 4, .9f) - .026f * rhythm_slow(s, 16, .95f) + .03f * rhythm_slow(s, 64, 0.f) + .017f * rhythm_slow(s, 3, 0.f));
@@ -97,12 +138,13 @@ DSP_CTL static void weights(Synth *s) {
 
 /* Select: the drum this event plays */
 DSP_CTL static void assign_select(Synth *s, float st, int delay) {
-    Rhythm *m = &s->meter; float acc = pval(s, P_DR_ACCENT), fb = pval(s, P_RH_FEED);
+    Rhythm *m = &s->meter; float acc = pval(s, P_DR_ACCENT), fb = pval(s, P_RH_FEED), gh = pval(s, P_RH_GHOST);
     static const float POL[NUM_DRUMS] = {.5f, -.6f, 0.f, 0.f};
     float best = -1e9f; int bd = -1, hat_in = 0;
     for (int d = 0; d < NUM_DRUMS; d++) {
         float dens = pval(s, DP(d, P_D1_DENS));
         if (pint(s, DP(d, P_D1_SRC)) != DSRC_STREAM || dens < .01f) continue;
+        if (pat_idx(s, d) && gh < .01f) continue;          /* (a patterned drum: only as a ghost) */
         if (d == 2) hat_in = dens >= .35f;
         float c = 1.f - pval(s, DP(d, P_D1_PLACE)), df = st - c; if (df < 0.f) df = -df;
         float sc = 1.f - 1.6f * df + POL[d] * m->sel + (d == 3 ? m->tomb : 0.f) + (dens - .5f) * .8f - fb * m->tired[d];
@@ -110,8 +152,9 @@ DSP_CTL static void assign_select(Synth *s, float st, int delay) {
         if (sc > best) { best = sc; bd = d; }
     }
     if (bd < 0) return;
-    drums_trigger(s, bd, -1, (1.f - acc) + acc * st, delay);
-    if (bd != 2 && hat_in && st > .25f) drums_trigger(s, 2, -1, ((1.f - acc) + acc * st) * .6f, delay);
+    float gb = pat_idx(s, bd) ? gh * .6f : 1.f, gt = pat_idx(s, 2) ? gh * .6f : 1.f;   /* (patterned: quiet) */
+    emit(bd, ((1.f - acc) + acc * st) * gb, delay, 1);
+    if (bd != 2 && hat_in && st > .25f) emit(2, ((1.f - acc) + acc * st) * .6f * gt, delay, 1);
     for (int d = 0; d < NUM_DRUMS; d++) m->tired[d] *= .55f;
     if (bd != 2) m->tired[bd] += 1.f;
 }
@@ -122,12 +165,15 @@ DSP_CTL static void assign_count(Synth *s, float st, int delay) {
     int n = 2 + pint(s, P_RH_COUNT);
     if (st > .9f) m->count = 0;                              /* the strongest event: the count starts again */
     uint32_t c = m->count++;
-    #define IN(d) (pint(s, DP(d, P_D1_SRC)) == DSRC_STREAM && pval(s, DP(d, P_D1_DENS)) >= .01f)
-    if (c % (uint32_t)(2 * n) == (uint32_t)n) { if (IN(1)) drums_trigger(s, 1, -1, vel, delay); }
-    else if (c % (uint32_t)n == 0) { if (IN(0)) drums_trigger(s, 0, -1, vel, delay); }
-    else if (st > .3f && c % (uint32_t)n == (uint32_t)(n - 1)) { if (IN(3)) drums_trigger(s, 3, -1, vel, delay); }
+    float gh = pval(s, P_RH_GHOST);
+    #define IN(d) (pint(s, DP(d, P_D1_SRC)) == DSRC_STREAM && pval(s, DP(d, P_D1_DENS)) >= .01f && (!pat_idx(s, d) || gh >= .01f))
+    #define GV(d) (pat_idx(s, d) ? gh * .6f : 1.f)
+    if (c % (uint32_t)(2 * n) == (uint32_t)n) { if (IN(1)) emit(1, vel * GV(1), delay, 1); }
+    else if (c % (uint32_t)n == 0) { if (IN(0)) emit(0, vel * GV(0), delay, 1); }
+    else if (st > .3f && c % (uint32_t)n == (uint32_t)(n - 1)) { if (IN(3)) emit(3, vel * GV(3), delay, 1); }
     int hn = n / 4 < 1 ? 1 : n / 4;
-    if (IN(2) && c % (uint32_t)hn == 0) drums_trigger(s, 2, -1, .4f + .6f * vel, delay);
+    if (IN(2) && c % (uint32_t)hn == 0) emit(2, (.4f + .6f * vel) * GV(2), delay, 1);
+    #undef GV
     #undef IN
 }
 
@@ -151,10 +197,10 @@ DSP_CTL static void lock_tick(Synth *s, float dx, int run) {
         if (nw < old) nw = old;
         if (nw >= 1.f) {
             nw -= 1.f;
-            if (run && pint(s, DP(d, P_D1_SRC)) == DSRC_STREAM && pval(s, DP(d, P_D1_DENS)) >= .01f) {
+            if (run && pint(s, DP(d, P_D1_SRC)) == DSRC_STREAM && pval(s, DP(d, P_D1_DENS)) >= .01f && !pat_idx(s, d)) {
                 float fr = (1.f - old) / (nw + 1.f - old + 1e-9f);
                 float st = fclamp(.55f + .4f * q, .25f, 1.f);
-                drums_trigger(s, d, -1, (1.f - acc) + acc * st, (int32_t)(fr * (float)SUB));
+                emit(d, (1.f - acc) + acc * st, (int32_t)(fr * (float)SUB), 1);
                 m->nev++; m->ev_s = st; m->ev_flash = 1.f;
                 for (int j = 0; j < NUM_DRUMS; j++) if (j != d) m->lk[j] -= .06f * K * fsin(m->lk[j]) * (1.f / PI_F);
             }
@@ -162,6 +208,81 @@ DSP_CTL static void lock_tick(Synth *s, float dx, int run) {
         m->lk[d] = nw;
     }
     for (int d = 0; d < NUM_DRUMS; d++) { if (m->lk[d] < 0.f) m->lk[d] += 1.f; if (m->lk[d] >= 1.f) m->lk[d] -= 1.f; }
+}
+
+/* a step's place in the bar (0..1), Swing bending it: within each pair (two 16ths, or two 8ths) the second moves
+   from half way to f = 1/2 + Swing / 4 of the pair (the stream's own off-beat moves the same way) */
+DSP_INL float pat_pos(int n, float f, int lev16) {
+    if (lev16) return (float)(n >> 1) * .125f + ((n & 1) ? f * .125f : 0.f);
+    int q = n & 3; float u = q == 0 ? 0.f : q == 1 ? f * .5f : q == 2 ? f : f + (1.f - f) * .5f;
+    return (float)(n >> 2) * .25f + u * .25f;
+}
+/* the patterns: the steps that fall in this tick's window (1.5 ticks back, as the stream's events land) */
+DSP_CTL static void pat_tick(Synth *s, float dx) {
+    Rhythm *m = &s->meter;
+    float lag = 1.5f * dx, t1 = m->tau - lag, t0 = t1 - dx;
+    float f = .5f + .25f * pval(s, P_RH_SWING), thn = m->th / (m->top > 1e-6f ? m->top : 1.f), acc = pval(s, P_DR_ACCENT), fill = pval(s, P_RH_FILL);
+    int lev16 = pint(s, P_RH_SWLEV);
+    int a0 = (int)floorf(t0 * 16.f) - 2, a1 = (int)floorf(t1 * 16.f) + 1;   /* (a step moves less than a 16th) */
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int pi = pat_idx(s, d);
+        if (!pi || pval(s, DP(d, P_D1_DENS)) < .01f) continue;
+        for (int a = a0; a <= a1; a++) {
+            int n = a & 15, bo = (a - n) / 16;                 /* the step in its bar, the bar relative to this one */
+            float pos = (float)bo + pat_pos(n, f, lev16);
+            if (!(pos > t0 && pos <= t1)) continue;
+            int32_t bar = (int32_t)m->bar + bo; if (bar < 0) continue;
+            int li = pi;
+            if (n >= 8 && fill > .01f && (bar & 3) == 3) {      /* a phrase's last half-bar: sometimes a busier relative */
+                uint32_t h = ((uint32_t)(bar >> 2) * 2654435761u) ^ ((uint32_t)d * 40503u) ^ ((uint32_t)pi * 97u);
+                h ^= h >> 15; h *= 2246822519u; h ^= h >> 13;
+                float u = (float)(h & 0xFFFF) * (1.f / 65536.f);
+                if (u < fill * (d == 0 ? .4f : 1.f)) {       /* the first busier relative within five steps' change */
+                    const PatLine *P = &PAT_LIB[PAT_OFF[d] + pi - 1];
+                    for (int k = pi + 1 + (int)(h >> 16 & 1u); k <= pi + 4 && k <= PAT_CNT[d]; k++) {
+                        const PatLine *Q = &PAT_LIB[PAT_OFF[d] + k - 1];
+                        if (bits((P->hit ^ Q->hit) & 0xFFFFu) <= 5 && bits(Q->hit & 0xFFFFu) >= bits(P->hit & 0xFFFFu)) { li = k; break; }
+                    }
+                }
+            }
+            const PatLine *L = &PAT_LIB[PAT_OFF[d] + li - 1];
+            int len = pint(s, P_D1_LEN + d); len = len > 0 ? len + 1 : L->len;
+            int rot = pint(s, P_D1_ROT + d);
+            int g = (int)((uint32_t)bar * 16u + (uint32_t)n) - rot; g %= len; if (g < 0) g += len;
+            int bit = g % L->len;
+            if (!(L->hit >> bit & 1u)) continue;
+            int gh = (int)(L->ghost >> bit & 1u);
+            /* the gate: the stream without swing at the step's straight place */
+            float u = (float)n * (1.f / 16.f), r0 = 0.f;
+            for (int i = 0; i < RH_NH; i++) if (m->w0[i] > 1e-4f) r0 += m->w0[i] * bump((float)RH_K[i] * u - m->ph[i]);
+            r0 = m->top0 > 1e-6f ? r0 / m->top0 : 0.f;
+            float gate = gh ? thn : .5f * thn;
+            if (r0 < gate) continue;
+            float st = fclamp((r0 - gate) / (1.f - gate + 1e-6f), 0.f, 1.f);
+            float v = (gh ? .42f : 1.f) * ((1.f - .55f * acc) + .55f * acc * st);
+            int32_t t = (int32_t)((pos - t0) / dx * (float)SUB);
+            emit(d, v, t < 0 ? 0 : t, 0);
+            m->nev++; m->ev_s = st; m->ev_flash = 1.f;
+        }
+    }
+}
+/* the tick's hits: the mutes (a drum that plays mutes its target this tick; kick, snare, tom, hat in that order), then
+   the drums */
+DSP_CTL static void cand_flush(Synth *s) {
+    static const int8_t ORD[NUM_DRUMS] = {0, 1, 3, 2};
+    uint8_t gone[NCAND] = {0};
+    for (int k = 0; k < NUM_DRUMS; k++) {
+        int d = ORD[k], tgt = pint(s, P_D1_MUTE + d), plays = 0;
+        if (tgt == PMUTE_NONE) continue;
+        for (int c = 0; c < ncand; c++) if (!gone[c] && cand[c].d == d) plays = 1;
+        if (!plays) continue;
+        for (int c = 0; c < ncand; c++) {
+            if (gone[c] || cand[c].d == d) continue;
+            if (tgt == PMUTE_LINEAR ? cand[c].lin : cand[c].d == tgt - PMUTE_KICK) gone[c] = 1;
+        }
+    }
+    for (int c = 0; c < ncand; c++) if (!gone[c]) drums_trigger(s, cand[c].d, -1, cand[c].v, cand[c].t);
+    ncand = 0;
 }
 
 DSP_CTL void rhythm_tick(Synth *s, float dt) {
@@ -185,8 +306,10 @@ DSP_CTL void rhythm_tick(Synth *s, float dt) {
     m->Rn = m->top > 1e-6f ? m->R / m->top : 0.f;
     m->ev_flash *= .95f;
     int on = pint(s, P_DR_ON) && s->transport;
-    if (pint(s, P_RH_ENGINE) == RH_LOCK) { lock_tick(s, dx, on); return; }
-    if (dx <= 0.f) return;
+    ncand = 0;
+    if (on && dx > 0.f) pat_tick(s, dx);
+    if (pint(s, P_RH_ENGINE) == RH_LOCK) { lock_tick(s, dx, on); cand_flush(s); return; }
+    if (dx <= 0.f) { cand_flush(s); return; }
     /* an event: R peaked at the tick before (R1 above both neighbours) and over the threshold. A parabola through
        the three values puts the peak within the tick; the hit lands a fixed 1.5 ticks (96 samples) after it */
     if (m->R1 > m->R && m->R1 >= m->R2 && m->R1 > th1) {
@@ -197,4 +320,5 @@ DSP_CTL void rhythm_tick(Synth *s, float dt) {
         m->nev++; m->ev_s = st; m->ev_flash = 1.f;
         if (on) { if (pint(s, P_RH_ASSIGN) == RH_COUNT) assign_count(s, st, delay); else assign_select(s, st, delay); }
     }
+    cand_flush(s);
 }

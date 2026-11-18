@@ -162,7 +162,7 @@ shot page_path.png
 tap SEQ
 wait 30
 expect page 4
-turn SELECT 3
+turn SELECT 5
 wait 30
 turn K1 1
 wait 2500
@@ -278,17 +278,17 @@ expect mx_src 0
 turn K2 1
 wait 50
 expect mx_src 1
-expect mx_dst 175
+expect mx_dst 195
 expect mx_depth 25
 turn K4 3
 wait 30
 expect mx_depth 28
 turn K3 1
 wait 30
-expect mx_dst 176
+expect mx_dst 196
 turn K3 -1
 wait 2000
-expect mx_dst 175
+expect mx_dst 195
 expect knob_moved0 >0
 shot page_matrix.png
 # a layer's motion onto the Motion knob: the generators on a knob
@@ -297,7 +297,7 @@ wait 30
 expect mx_src 17
 turn K3 3
 wait 1000
-expect mx_dst 178
+expect mx_dst 198
 tap HOME
 wait 300
 shot home_knob_routed.png
@@ -455,7 +455,8 @@ wait 600
 shot setup_load2.png
 turn SELECT 1
 wait 300
-turn K1 1
+expect keys_to 2
+turn K1 -1
 wait 300
 expect keys_to 1
 turn K1 -1
@@ -662,3 +663,90 @@ wait 800
 expect bank 1
 expect patches_all 4
 expect patches 529
+# 1.0.5: a patch saved by 1.0.4 (MNP9) loads: its sound, the patterns off (their defaults), the keys' pull on, and its
+# matrix route to the Groove knob moved past the new parameters (176 -> 196)
+expect make9_28 1
+press HOME
+wait 30
+key 12 down
+wait 50
+key 12 up
+wait 30
+release HOME
+wait 1500
+expect pat0 0
+expect pat1 0
+expect pat2 0
+expect pat3 0
+expect last_route 196
+expect keys_pull 1
+# the genre styles: PRESET to House (5), Hip-hop (1), Breakbeat (7): each roll puts a trained pattern on the kick, and
+# the drums play
+tap PLAY
+wait 100
+expect transport 1
+turn PRESET 3
+wait 1500
+expect style 5
+expect kick_pat_on 1
+expect drums_on 1
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+turn PRESET -4
+wait 1500
+expect style 1
+expect kick_pat_on 1
+expect drums_on 1
+turn PRESET 6
+wait 1500
+expect style 7
+expect kick_pat_on 1
+expect drums_on 1
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+# Seq, Patterns (the second sub-page): K1 moves the kick's line, all the way down is Linear; Mutes (K3: the hat mutes)
+tap SEQ
+wait 30
+turn SELECT -30
+wait 30
+turn SELECT 1
+wait 1200
+expect sub 1
+shot seq_patterns.png
+turn K1 -60
+wait 300
+expect pat0 0
+turn K1 3
+wait 300
+expect pat0 3
+expect drum_clear 0
+wait 4000
+expect drum_hits 1
+turn SELECT 1
+wait 1200
+shot seq_feel.png
+turn SELECT 17
+wait 1200
+shot seq_mutes.png
+turn K3 1
+wait 300
+expect mute2 1
+turn K3 -1
+wait 300
+expect mute2 0
+# Layer 1 (EDIT), Keys: the keys' pull off and on
+tap EDIT
+wait 30
+turn SELECT 30
+wait 1200
+shot layer1_keys.png
+turn K1 -1
+wait 300
+expect keys_pull 0
+turn K1 1
+wait 300
+expect keys_pull 1
+tap HOME
+wait 40

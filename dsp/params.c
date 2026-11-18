@@ -34,11 +34,11 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(G##_FUNC,"function",SG,CURVE_DISC,0,0, 0,NUM_GENS, fn,0,1,0), \
  M(G##_A,"a",SG,CURVE_LIN,1,0, 0,1, .5f,0,1,0), \
  M(G##_B,"b",SG,CURVE_LIN,1,0, 0,1, .4f,0,1,1), \
- M(G##_RATE,"rate",SG,CURVE_LOG,1,0, .015f,4, rt,.3f,.8f,1), \
- M(G##_POINTS,"points",SG,CURVE_DISC,0,0, 0,MAX_PTS, .3f,.12f,.75f,0), \
+ M(G##_RATE,"rate",SG,CURVE_LOG,1,0, .015f,4, rt,.12f,.8f,1), \
+ M(G##_POINTS,"points",SG,CURVE_DISC,0,0, 0,MAX_PTS, .3f,0,.75f,0), \
  M(G##_SPREAD,"spread",SG,CURVE_LIN,1,0, 0,1, .5f,.1f,1,0), \
  M(G##_ENV,"envelope",SG,CURVE_DISC,0,0, 0,NUM_ENVS, ev,0,1,0), \
- M(G##_ERATE,"envelope rate",SG,CURVE_DISC,0,0, 0,NUM_ERATES, er,.2f,.9f,0), \
+ M(G##_ERATE,"envelope rate",SG,CURVE_DISC,0,0, 0,NUM_ERATES, er,0,.9f,0), \
  M(G##_CONTOUR,"contour",SG,CURVE_LIN,1,0, 0,1, ct,0,1,1), \
  M(G##_REACH,"reach",SG,CURVE_LIN,1,0, 0,1, .2f,0,.5f,0), \
  M(G##_ENERGY,"energy",SG,CURVE_LIN,1,0, 0,1, .6f,.35f,.85f,1), \
@@ -51,9 +51,9 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_PATH_X,"path x",SEC_GEN1,CURVE_LIN,1,0, 0,1, .5f,.35f,.65f,1),
  M(P_PATH_Y,"path y",SEC_GEN1,CURVE_LIN,1,0, 0,1, .5f,.35f,.65f,1),
 
- M(P_TEMPO,"tempo",SEC_METER,CURVE_LIN,0,0, 10,180, .5294118f,.4f,.6823529f,1),   /* 10..180 BPM (default 100; rolls 78..126) */
+ M(P_TEMPO,"tempo",SEC_METER,CURVE_LIN,0,0, 10,180, .5294118f,.2058824f,.9117647f,1),   /* 10..180 BPM (default 100; Wild rolls 45..165) */
  M(P_RH_ENGINE,"rhythm engine",SEC_METER,CURVE_DISC,0,0, 0,NUM_RH_ENGINES, 0,0,1,0),
- M(P_RH_DENS,"density",SEC_METER,CURVE_LIN,1,0, 0,1, .5f,.35f,.7f,1),
+ M(P_RH_DENS,"density",SEC_METER,CURVE_LIN,1,0, 0,1, .5f,.12f,.7f,1),
  M(P_RH_THREES,"threes",SEC_METER,CURVE_LIN,1,0, 0,1, 0,0,1,0),
  M(P_RH_FINE,"fine",SEC_METER,CURVE_LIN,1,0, 0,1, .55f,.3f,.85f,0),
  M(P_RH_SWING,"swing",SEC_METER,CURVE_LIN,1,0, 0,1, 0,0,1,0),
@@ -66,7 +66,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_RH_COUNT,"count",SEC_METER,CURVE_DISC,0,0, 0,7, .36f,.15f,.7f,0),
  M(P_RH_PULL,"pull",SEC_METER,CURVE_LIN,1,0, 0,1, .6f,.2f,1,0),
  M(P_RH_GRIP,"grip",SEC_METER,CURVE_LIN,1,0, 0,1, .5f,.2f,.9f,0),
- M(P_EVOLVE,"evolve",SEC_METER,CURVE_LIN,1,0, 0,1, .15f,0,.45f,0),
+ M(P_EVOLVE,"evolve",SEC_METER,CURVE_LIN,1,0, 0,1, .15f,0,.7f,0),
  M(P_DR_ON,"drums",SEC_DRUMS,CURVE_DISC,0,0, 0,2, .25f,0,1,0),
  M(P_DR_LAYER,"drum layer",SEC_DRUMS,CURVE_DISC,1,0, 0,NUM_DLAYERS, .84f,0,1,0),
  M(P_DR_LEVEL,"drum level",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .7f,.55f,.85f,0),
@@ -134,11 +134,29 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_CMP_MIX,"comp mix",SEC_FX,CURVE_LIN,1,0, 0,1, 1,.75f,1,0),
  M(P_CMP_PUMP,"pump",SEC_FX,CURVE_LIN,1,0, 0,1, 0,0,.45f,0),
  M(P_MASTER,"master",SEC_FX,CURVE_LIN,1,0, 0,1.5f, .66f,.66f,.66f,0),
+/* the patterns: off (linear) unless a style rolls them; a line's count is the library's (params_init_meta) */
+#define PAT_P(n) M(P_D##n##_PAT,"pattern",SEC_DRUMS,CURVE_DISC,1,0, 0,2, 0,0,0,0)
+ PAT_P(1), PAT_P(2), PAT_P(3), PAT_P(4),
+#define ROT_P(n) M(P_D##n##_ROT,"rotate",SEC_DRUMS,CURVE_DISC,1,0, 0,16, 0,0,0,0)
+ ROT_P(1), ROT_P(2), ROT_P(3), ROT_P(4),
+#define LEN_P(n) M(P_D##n##_LEN,"length",SEC_DRUMS,CURVE_DISC,1,0, 0,32, 0,0,0,0)
+ LEN_P(1), LEN_P(2), LEN_P(3), LEN_P(4),
+#define MUTE_P(n) M(P_D##n##_MUTE,"mutes",SEC_DRUMS,CURVE_DISC,0,0, 0,NUM_PMUTE, 0,0,0,0)
+ MUTE_P(1), MUTE_P(2), MUTE_P(3), MUTE_P(4),
+ M(P_RH_GHOST,"ghosts",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .3f,.1f,.6f,0),
+ M(P_RH_FILL,"fills",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .3f,.1f,.5f,0),
+ M(P_RH_SWLEV,"swing on",SEC_METER,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
+ M(P_KEY_PULL,"keys pull",SEC_GEN1,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
+#undef PAT_P
+#undef ROT_P
+#undef LEN_P
+#undef MUTE_P
 };
 
 void params_init_meta(void) {
     for (int i = 0; i <= 1024; i++) g_sin_tab[i] = sinf(TWO_PI * (float)i / 1024.f);
     g_param_meta[P_SCALE].hi = (float)scale_count();
+    for (int d = 0; d < NUM_DRUMS; d++) g_param_meta[P_D1_PAT + d].hi = (float)PAT_CNT[d] + 1.f;   /* linear, then the lines */
 }
 
 /* ---------------- value mapping (cached: pval / pint read val / ival) ---------------- */
@@ -169,10 +187,18 @@ static float roll_one(const ParamMeta *m, uint32_t *r) {
 }
 static float disc(int id, int i) { return ((float)i + 0.5f) / g_param_meta[id].hi; }
 
+/* a route that would feed a layer back into itself: its own motion's envelope (or layer 1's rises, or the path) moving
+   its own motion or path. It oscillates at the control rate (hundreds of notes a second): never rolled */
+static int mod_loop(int src, int dst) {
+    int g1 = (dst >= P_G1_FUNC && dst <= P_G1_ROUTE) || (dst >= P_PATH_SCALE && dst <= P_PATH_Y) || dst == P_KEY_PULL;
+    int g2 = dst >= P_G2_FUNC && dst <= P_G2_ROUTE;
+    return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
+}
 static int rand_moddable(uint32_t *r) {
     for (;;) {
         int id = (int)(frand(r) * NUM_PARAMS) % NUM_PARAMS;
-        if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL) return id;
+        if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL
+            && !(id >= P_D1_PAT && id <= P_D4_LEN)) return id;   /* (a pattern moves only where a style puts it) */
     }
 }
 
@@ -180,7 +206,7 @@ void params_roll_mod(Synth *s) {
     uint32_t *r = &s->rng;
     if (!s->locked[SEC_LFO]) {
         memset(s->slot, 0, sizeof s->slot);
-        int n = 5 + (int)(frand(r) * 8.f);
+        int n = 6 + (int)(frand(r) * 9.f);
         for (int i = 0; i < n && i < MOD_SLOTS; i++) {
             float u = frand(r); int src;
             if (u < .70f) src = SRC_LFO1 + (int)(frand(r) * 6) % 6;
@@ -190,8 +216,9 @@ void params_roll_mod(Synth *s) {
             else if (u < .98f) src = frand(r) < .5f ? SRC_PATHX : SRC_PATHY;
             else src = SRC_VEL;
             s->slot[i].src = (uint8_t)src;
-            s->slot[i].dst = (uint8_t)rand_moddable(r);
-            float d = 0.05f + 0.3f * 0.5f * (frand(r) + frand(r));
+            for (int t = 0; t < 8; t++) { s->slot[i].dst = (uint8_t)rand_moddable(r); if (!mod_loop(src, s->slot[i].dst)) break; }
+            if (mod_loop(src, s->slot[i].dst)) { s->slot[i].src = 0; continue; }
+            float d = 0.08f + 0.55f * 0.5f * (frand(r) + frand(r));   /* (1.0.5: deeper) */
             s->slot[i].depth = frand(r) < .5f ? -d : d;
         }
         /* the generators on the drums: with the drums on, often one or two routes from a layer's motion to a drum's
@@ -221,7 +248,7 @@ void params_roll_knobs(Synth *s) {
            band and tilt, the rhythm's density and swing, the motions' rates */
         int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_DL_SEND || i == P_DL_FB
                 || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH;
-        if (knob_of(i) < 0 || (frand(r) > .8f && !must)) continue;
+        if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
         const ParamMeta *m = &g_param_meta[i];
         float span = m->rhi - m->rlo + .15f; if (span < .45f) span = .45f; if (span > 1.f) span = 1.f;
         float dir = frand(r) < .5f ? -1.f : 1.f;              /* the two ends go opposite ways, mostly: a turn is a journey */
@@ -256,8 +283,119 @@ static int pickw(uint32_t *r, const float *w, int n) {        /* weighted choice
 }
 static void TP(Synth *s, int id, const float *w) { TD(s, id, pickw(&s->rng, w, (int)g_param_meta[id].hi)); }
 
-static const uint8_t FRIENDLY[] = {P_V1_TILT, P_V1_CENTER, P_V1_BAND, P_V2_TILT, P_V2_CENTER, P_V1_WIDTH, P_FLT_CUT,
-    P_RV_SEND, P_RV_MOD, P_DL_SEND, P_G1_REACH, P_G1_ENERGY, P_G2_B, P_PATH_SCALE, P_V1_WAVE, P_V2_BAND};
+
+/* ---------------- the patterns' roll: a decision tree trained on the corpus (patterns.c) ----------------
+   The tree: an entry of the genre by its weight (the root); then each role in turn, kick, snare, hat, the fourth part,
+   from an entry drawn by its weight times a kernel exp(-D / 4) of how far its earlier roles are from the ones already
+   chosen (D: the Hamming distance over two bars, a ghost half a hit): the conditional distribution the corpus implies,
+   P(snare | kick), P(hat | kick, snare) and so on, smoothed so that combinations the corpus never has, but that keep
+   its rules, come up. Then now and then a step to a library neighbour (a close variation). Tempo comes from the root,
+   swing from the hats' entry (swing belongs to the hats). */
+static int pat_d(int d, int a, int b) {                   /* two lines' distance, x2 (0: linear, far from any line) */
+    if (!a || !b) return a == b ? 0 : 16;
+    const PatLine *A = &PAT_LIB[PAT_OFF[d] + a - 1], *B = &PAT_LIB[PAT_OFF[d] + b - 1];
+    uint32_t ha = A->hit, hb = B->hit, ga = A->ghost, gb = B->ghost;
+    if (A->len == 16) { ha |= ha << 16; ga |= ga << 16; }
+    if (B->len == 16) { hb |= hb << 16; gb |= gb << 16; }
+    return 2 * __builtin_popcount(ha ^ hb) + __builtin_popcount(ga ^ gb);
+}
+static int pat_in(int e, int genre) {                     /* breakbeat's tree holds its drum'n'bass entries too */
+    int g = PAT_ENT[e].genre;
+    return g == genre || (genre == PG_BREAKS && g == PG_DNB);
+}
+static int pat_pick(Synth *s, int genre, int dnb, int upto, const int *chosen) {
+    float w[128], tot = 0.f;                              /* (the corpus is under 128 entries) */
+    int n = PAT_NENT < 128 ? PAT_NENT : 128;
+    for (int e = 0; e < n; e++) {
+        w[e] = 0.f;
+        if (!pat_in(e, genre)) continue;
+        float x = (float)PAT_ENT[e].w * (genre == PG_BREAKS ? (PAT_ENT[e].genre == PG_DNB ? (dnb ? 1.f : .02f) : (dnb ? .02f : 1.f)) : 1.f);
+        int D = 0;
+        for (int r = 0; r < upto; r++) D += pat_d(r, PAT_ENT[e].line[r], chosen[r]);
+        w[e] = x * fexp2(-(float)D * .5f / 4.f * 1.4427f);
+        tot += w[e];
+    }
+    float u = frand(&s->rng) * tot;
+    for (int e = 0; e < n; e++) { u -= w[e]; if (u <= 0.f && w[e] > 0.f) return e; }
+    for (int e = n - 1; e >= 0; e--) if (w[e] > 0.f) return e;
+    return 0;
+}
+/* a close variation: another line of the genre's own corpus within three hits of this one (nearer: likelier) */
+static int pat_near(Synth *s, int d, int li, int genre) {
+    float w[64], tot = 0.f; int n = PAT_CNT[d] < 64 ? PAT_CNT[d] : 64;
+    for (int k = 1; k <= n; k++) {
+        w[k - 1] = 0.f;
+        if (k == li) continue;
+        int used = 0;
+        for (int e = 0; e < PAT_NENT && !used; e++) if (pat_in(e, genre) && PAT_ENT[e].line[d] == k) used = 1;
+        int D = pat_d(d, li, k);
+        if (!used || D > 6) continue;
+        w[k - 1] = fexp2(-(float)D * .25f * 1.4427f); tot += w[k - 1];
+    }
+    if (tot <= 0.f) return li;
+    float u = frand(&s->rng) * tot;
+    for (int k = 1; k <= n; k++) { u -= w[k - 1]; if (u <= 0.f && w[k - 1] > 0.f) return k; }
+    return li;
+}
+static void roll_patterns(Synth *s, int genre, int meter, int drums) {
+    uint32_t *r = &s->rng; float *t = s->target;
+    int dnb = genre == PG_BREAKS && frand(r) < .3f;       /* breakbeat: a third of the rolls at drum'n'bass tempo */
+    int ch[NUM_DRUMS] = {0, 0, 0, 0}, root = pat_pick(s, genre, dnb, 0, ch), hat_e = root;
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int e = d == 0 && frand(r) < .5f ? root : pat_pick(s, genre, dnb, d, ch);
+        int li = PAT_ENT[e].line[d];
+        if (li && frand(r) < (d == 0 ? .15f : .2f)) li = pat_near(s, d, li, genre);   /* a close variation */
+        if (d == 3 && li && frand(r) < .2f) li = 0;        /* (the fourth part sometimes left to the stream) */
+        ch[d] = li;
+        if (d == 2) hat_e = e;
+    }
+    const PatEntry *E0 = &PAT_ENT[root], *EH = &PAT_ENT[hat_e];
+    if (meter) {
+        if (genre == PG_BREAKS && E0->genre != PG_DNB) TR(s, P_TEMPO, 124.f, 140.f);   /* (the breaks at breakbeat tempo) */
+        else TR(s, P_TEMPO, (float)E0->bpm_lo - 2.f, (float)E0->bpm_hi + 2.f);
+        float sw = ((float)EH->sw_lo + frand(r) * (float)(EH->sw_hi - EH->sw_lo)) * .01f;
+        t[P_RH_SWING] = sw;
+        TD(s, P_RH_SWLEV, EH->lev == 8 ? 0 : 1);
+    }
+    if (drums) {
+        for (int d = 0; d < NUM_DRUMS; d++) {
+            TD(s, P_D1_PAT + d, ch[d]);
+            TD(s, P_D1_ROT + d, 0); TD(s, P_D1_LEN + d, 0); TD(s, P_D1_MUTE + d, PMUTE_NONE);
+            if (ch[d] && t[DP(d, P_D1_DENS)] < .3f) TR(s, DP(d, P_D1_DENS), .35f, .7f);
+        }
+        if (!ch[1] && genre == PG_HOUSE) TR(s, P_D2_DENS, .02f, .15f);   /* (techno without a snare: the stream's only rarely) */
+        /* the fourth part's twists: rotated, or looped against the bar (polymeter), now and then */
+        if (ch[3]) {
+            float u = frand(r);
+            if (u < .18f) TD(s, P_D4_ROT, 2 * (1 + (int)(frand(r) * 6.f)));
+            else if (u < .3f) { static const int L[4] = {12, 10, 6, 14}; TD(s, P_D4_LEN, L[(int)(frand(r) * 4.f) & 3] - 1); }
+        }
+        if (genre == PG_HOUSE && ch[2] && frand(r) < .06f) TD(s, P_D3_LEN, 11);   /* (a 12-step hat: rarely) */
+        /* the mutes: house, the fourth part (an open hat) chokes the hat; the breaks, the kick clears the hat; the snare
+           sometimes clears the linear layer under it */
+        if (genre == PG_HOUSE) { if (ch[3] && frand(r) < .4f) TD(s, P_D4_MUTE, PMUTE_HAT); if (frand(r) < .12f) TD(s, P_D1_MUTE, PMUTE_HAT); }
+        else { if (frand(r) < .25f) TD(s, P_D1_MUTE, PMUTE_HAT); if (frand(r) < .2f) TD(s, P_D2_MUTE, PMUTE_LINEAR); }
+        /* ghosts and fills */
+        if (genre == PG_HOUSE) { if (frand(r) < .3f) t[P_RH_GHOST] = 0.f; else TR(s, P_RH_GHOST, .05f, .35f); }
+        else if (genre == PG_HIPHOP) TR(s, P_RH_GHOST, .25f, .65f);
+        else TR(s, P_RH_GHOST, .35f, .8f);
+        TR(s, P_RH_FILL, .1f, .6f);
+        /* the knobs: Groove moves each line to its busier or sparser relatives (a few lines along the library), Motion
+           turns the hat's and the fourth part's rotation (by 8ths) */
+        if (!s->locked[SEC_KNOBS]) for (int d = 0; d < NUM_DRUMS; d++) {
+            int8_t *w = s->kpath[P_D1_PAT + d], *q = s->kpath[P_D1_ROT + d];
+            w[0] = w[1] = w[2] = w[3] = q[0] = q[1] = q[2] = q[3] = 0;
+            if (!ch[d]) continue;
+            float span = 127.f / (float)(PAT_CNT[d] + 1), far = (2.f + 3.f * frand(r)) * span;
+            if (far > 127.f) far = 127.f;
+            w[3] = (int8_t)far; w[2] = (int8_t)(far * .45f); w[0] = (int8_t)-far; w[1] = (int8_t)(-far * .45f);
+            if (d >= 2 && frand(r) < .5f) {
+                float st = 2.f * 127.f / 16.f * (1.f + (float)(int)(frand(r) * 2.f));
+                q[3] = (int8_t)st; q[2] = (int8_t)(st * .5f); q[0] = (int8_t)-st; q[1] = (int8_t)(-st * .5f);
+            }
+        }
+    }
+}
 
 /* what every roll does, whatever the style: choices that only make sense together are made together */
 static void roll_together(Synth *s) {
@@ -292,10 +430,12 @@ static void roll_together(Synth *s) {
 static void apply_style(Synth *s) {
     uint32_t *r = &s->rng; int st0 = s->style;
     if (st0 == STYLE_WILD || st0 >= NUM_STYLES) return;
-    /* Drum circle rolls the synth as Tongue drum does, Machine and Breaks as Groove: they differ in the rhythm */
-    int CI = st0 == STYLE_CIRCLE, MA = st0 == STYLE_MACHINE, BR = st0 == STYLE_BREAKS;
-    int st = CI ? STYLE_TONGUE : (MA || BR) ? STYLE_GROOVE : st0;
-    int T = st == STYLE_TONGUE, G = st == STYLE_GROOVE, A = st == STYLE_AMBIENT, C = st == STYLE_COSMIC;
+    /* Machine, House, Breakbeat and Hip-hop roll the synth as Groove does: they differ in the rhythm. House, Breakbeat and
+       Hip-hop (the genre styles) take their drums from the trained patterns (roll_patterns) */
+    int HO = st0 == STYLE_HOUSE, HH = st0 == STYLE_HIPHOP, MA = st0 == STYLE_MACHINE, BR = st0 == STYLE_BREAKS;
+    int GEN = HO || HH || BR, CI = 0;
+    int st = (MA || GEN) ? STYLE_GROOVE : st0;
+    int T = 0, G = st == STYLE_GROOVE, A = st == STYLE_AMBIENT, C = st == STYLE_COSMIC;   /* (T: Tongue drum's sound, 1.0..1.0.4) */
     if (!s->locked[SEC_SCALE]) {
         /* the groups: harmonic (0..), pentatonic, modes, other. Tongue: the series and the pentatonics; groove: the
            pentatonics and modes; ambient: the series, pentatonics, the gentler modes; cosmic: anything */
@@ -344,18 +484,22 @@ static void apply_style(Synth *s) {
         const float we[4][NUM_ENVS] = {{6, 0, 1, 3, 0, 0, 3, 0}, {6, 0, 1, 2, 1, 0, 6, 0}, {1, 4, 3, 2, 2, 1, 0, 0}, {3, 1, 2, 4, 3, 0, 3, 0}};
         TP(s, P_G1_ENV, we[st - 1]);
         TR(s, P_G1_A, 0.f, 1.f); TR(s, P_G1_B, 0.f, 1.f);
-        TD(s, P_G1_POINTS, T ? 1 + (int)(frand(r) * 3.f) : G ? 2 + (int)(frand(r) * 3.f) : A ? 2 + (int)(frand(r) * 4.f) : 2 + (int)(frand(r) * 5.f));
+        TD(s, P_G1_POINTS, T ? 1 + (int)(frand(r) * 3.f) : G ? 2 + (int)(frand(r) * 3.f) : A ? (int)(frand(r) * 5.f) : (int)(frand(r) * 6.f));   /* (ambient, cosmic: from one point) */
         TR(s, P_G1_SPREAD, .2f, 1.f);
         if (T) { TR(s, P_G1_RATE, .25f, 1.f); TD(s, P_G1_ERATE, frand(r) < .5f ? 10 : 8); TR(s, P_G1_CONTOUR, .7f, .92f); TR(s, P_G1_ENERGY, .5f, .75f); }
         if (G) { TR(s, P_G1_RATE, .33f, 1.5f); TD(s, P_G1_ERATE, frand(r) < .5f ? 10 : frand(r) < .5f ? 12 : 11); TR(s, P_G1_CONTOUR, .8f, 1.f); TR(s, P_G1_ENERGY, .6f, .85f); }
-        if (A) { TR(s, P_G1_RATE, 0.f, .22f); TD(s, P_G1_ERATE, (int)(frand(r) * 5.f)); TR(s, P_G1_CONTOUR, 0.f, .3f); TR(s, P_G1_ENERGY, .4f, .7f); }
-        if (C) { TR(s, P_G1_RATE, .16f, 1.f); TD(s, P_G1_ERATE, 3 + (int)(frand(r) * 8.f)); TR(s, P_G1_CONTOUR, .2f, .9f); TR(s, P_G1_ENERGY, .5f, .8f); }
+        /* ambient and cosmic: down to one slow point and an envelope over 16 bars (sparse, slow, evolving) */
+        if (A) { TR(s, P_G1_RATE, .015f, .3f); TD(s, P_G1_ERATE, (int)(frand(r) * 6.f)); TR(s, P_G1_CONTOUR, 0.f, .3f); TR(s, P_G1_ENERGY, .4f, .7f); }
+        if (C) { TR(s, P_G1_RATE, .04f, 1.f); TD(s, P_G1_ERATE, (int)(frand(r) * 11.f)); TR(s, P_G1_CONTOUR, .2f, .9f); TR(s, P_G1_ENERGY, .5f, .8f); }
         if (pint(s, P_G1_ENV) == ENV_STREAM || (int)(s->target[P_G1_ENV] * NUM_ENVS) == ENV_STREAM) TR(s, P_G1_CONTOUR, .1f, .6f);
         {   int fn = (int)(s->target[P_G1_FUNC] * NUM_GENS);  /* Loops and Erode shape their own notes; Chords are held or swell */
-            if (fn == GEN_LOOPS || fn == GEN_ERODE) { TD(s, P_G1_ENV, ENV_HOLD); if (fn == GEN_LOOPS) TR(s, P_G1_RATE, 0.f, .3f); TD(s, P_G1_POINTS, 3 + (int)(frand(r) * 4.f)); }
-            if (fn == GEN_CHORDS) { TD(s, P_G1_ENV, frand(r) < .5f ? ENV_HOLD : G || T ? ENV_PULSE : ENV_SWELL); TR(s, P_G1_RATE, .1f, .4f); TD(s, P_G1_POINTS, 2 + (int)(frand(r) * 2.f)); } }
+            int sp = A || C;                                  /* (ambient, cosmic: fewer, slower: down to one note at a time) */
+            if (fn == GEN_LOOPS || fn == GEN_ERODE) { TD(s, P_G1_ENV, ENV_HOLD); if (fn == GEN_LOOPS) TR(s, P_G1_RATE, 0.f, .3f); TD(s, P_G1_POINTS, sp ? 1 + (int)(frand(r) * 3.f) : 3 + (int)(frand(r) * 4.f)); }
+            if (fn == GEN_CHORDS) { TD(s, P_G1_ENV, frand(r) < .5f ? ENV_HOLD : G || T ? ENV_PULSE : ENV_SWELL); TR(s, P_G1_RATE, sp ? .03f : .1f, sp ? .2f : .4f); TD(s, P_G1_POINTS, (sp ? 1 : 2) + (int)(frand(r) * 2.f)); } }
         TR(s, P_G1_REACH, .05f, A ? .45f : .25f);
         TR(s, P_PATH_SCALE, .7f, 1.f); TR(s, P_PATH_ROT, 0.f, 1.f);
+        /* the keys' pull: off in a share of the rolls (a key plays just its note), most in the beat styles */
+        TD(s, P_KEY_PULL, frand(r) < (GEN || MA ? .5f : A ? .3f : .4f) ? 0 : 1);
     }
     if (!s->locked[SEC_GEN2]) {
         /* the second layer: slow points that swell (a bed), or for groove a low counter-motion */
@@ -365,20 +509,21 @@ static void apply_style(Synth *s) {
         const float we[4][NUM_ENVS] = {{0, 5, 2, 1, 1, 2, 1, 0}, {4, 1, 1, 2, 1, 0, 3, 0}, {0, 5, 2, 1, 2, 2, 0, 0}, {1, 3, 2, 2, 3, 1, 2, 0}};
         TP(s, P_G2_ENV, we[st - 1]);
         TR(s, P_G2_A, 0.f, 1.f); TR(s, P_G2_B, 0.f, 1.f);
-        TD(s, P_G2_POINTS, 1 + (int)(frand(r) * 3.f));
+        TD(s, P_G2_POINTS, A ? (int)(frand(r) * 3.f) : 1 + (int)(frand(r) * 3.f));   /* (ambient: from one point) */
         TR(s, P_G2_SPREAD, .3f, 1.f);
-        TR(s, P_G2_RATE, G ? .16f : .03f, G ? .67f : .25f);
-        TD(s, P_G2_ERATE, G ? 8 : A ? (int)(frand(r) * 4.f) : 2 + (int)(frand(r) * 5.f));
+        TR(s, P_G2_RATE, G ? .16f : .015f, G ? .67f : .25f);
+        TD(s, P_G2_ERATE, G ? 8 : A ? (int)(frand(r) * 4.f) : (int)(frand(r) * 7.f));
         TR(s, P_G2_CONTOUR, G ? .6f : 0.f, G ? .9f : .3f);
         TR(s, P_G2_REACH, .1f, .45f); TR(s, P_G2_ENERGY, .4f, .7f);
         {   int fn = (int)(s->target[P_G2_FUNC] * NUM_GENS);
-            if (fn == GEN_LOOPS || fn == GEN_ERODE) { TD(s, P_G2_ENV, ENV_HOLD); if (fn == GEN_LOOPS) TR(s, P_G2_RATE, 0.f, .3f); TD(s, P_G2_POINTS, 3 + (int)(frand(r) * 3.f)); }
-            if (fn == GEN_CHORDS) { TD(s, P_G2_ENV, frand(r) < .6f ? ENV_HOLD : ENV_SWELL); TR(s, P_G2_RATE, .08f, .35f); TD(s, P_G2_POINTS, 2 + (int)(frand(r) * 2.f)); } }
+            int sp = A || C;
+            if (fn == GEN_LOOPS || fn == GEN_ERODE) { TD(s, P_G2_ENV, ENV_HOLD); if (fn == GEN_LOOPS) TR(s, P_G2_RATE, 0.f, .3f); TD(s, P_G2_POINTS, sp ? 1 + (int)(frand(r) * 3.f) : 3 + (int)(frand(r) * 3.f)); }
+            if (fn == GEN_CHORDS) { TD(s, P_G2_ENV, frand(r) < .6f ? ENV_HOLD : ENV_SWELL); TR(s, P_G2_RATE, sp ? .03f : .08f, sp ? .15f : .35f); TD(s, P_G2_POINTS, (sp ? 1 : 2) + (int)(frand(r) * 2.f)); } }
         /* sometimes layer 2 modulates layer 1 instead of playing: the stream's envelope gating or accenting a
            chaotic one, or one path carried on another */
         TD(s, P_G1_ROUTE, ROUTE_PLAY);
         const float pm[4] = {.12f, .35f, .1f, .3f};
-        if (frand(r) < (MA ? .7f : CI ? .2f : pm[st - 1])) {
+        if (frand(r) < (MA ? .7f : GEN ? .2f : pm[st - 1])) {
             const float wr[NUM_ROUTES] = {0, 1, 1.5f, 2.5f};
             int ro = pickw(&s->rng, wr, NUM_ROUTES); TD(s, P_G2_ROUTE, ro);
             if (ro != ROUTE_MOVE && frand(r) < .65f) {
@@ -392,18 +537,17 @@ static void apply_style(Synth *s) {
         /* the rhythm: tempo, how many of the stream's peaks pass, the twos or the threes, how fine, the swing, how
            much the long form moves it, and what picks the drum */
         float p3 = T ? .3f : G ? .2f : A ? .3f : C ? .55f : 0.f, psw = G ? .4f : T ? .2f : C ? .25f : .1f, plock = .08f;
-        if (T) { TR(s, P_TEMPO, 68, 96); TR(s, P_RH_DENS, .35f, .55f); TR(s, P_RH_FINE, .3f, .6f); TR(s, P_RH_FORM, .4f, .8f); }
-        if (G) { TR(s, P_TEMPO, 88, 122); TR(s, P_RH_DENS, .5f, .7f); TR(s, P_RH_FINE, .5f, .85f); TR(s, P_RH_FORM, .5f, 1.f); }
-        if (A) { TR(s, P_TEMPO, 60, 78); TR(s, P_RH_DENS, .25f, .45f); TR(s, P_RH_FINE, .2f, .5f); TR(s, P_RH_FORM, .4f, .9f); }
-        if (C) { TR(s, P_TEMPO, 84, 118); TR(s, P_RH_DENS, .4f, .65f); TR(s, P_RH_FINE, .4f, .8f); TR(s, P_RH_FORM, .6f, 1.f); }
-        if (CI) { p3 = .6f; psw = .15f; TR(s, P_RH_DENS, .5f, .7f); TR(s, P_RH_FINE, .5f, .8f); }
-        if (MA) { p3 = .5f; psw = .2f; plock = .45f; TR(s, P_TEMPO, 84, 140); TR(s, P_RH_FINE, .6f, 1.f); TR(s, P_RH_FORM, .7f, 1.f); }   /* IDM */
-        if (BR) { p3 = .1f; psw = .15f; plock = 0.f; TR(s, P_TEMPO, 164, 176); TR(s, P_RH_DENS, .55f, .75f); TR(s, P_RH_FINE, .55f, .8f); }   /* drum'n'bass */
+        /* (1.0.5: every tempo range wider; ambient and cosmic down to a sparse, slow stream) */
+        if (G) { TR(s, P_TEMPO, 80, 132); TR(s, P_RH_DENS, .5f, .7f); TR(s, P_RH_FINE, .5f, .85f); TR(s, P_RH_FORM, .5f, 1.f); }
+        if (A) { TR(s, P_TEMPO, 40, 90); TR(s, P_RH_DENS, .08f, .5f); TR(s, P_RH_FINE, .1f, .5f); TR(s, P_RH_FORM, .4f, 1.f); }
+        if (C) { TR(s, P_TEMPO, 60, 135); TR(s, P_RH_DENS, .15f, .65f); TR(s, P_RH_FINE, .3f, .8f); TR(s, P_RH_FORM, .6f, 1.f); }
+        if (MA) { p3 = .5f; psw = .2f; plock = .45f; TR(s, P_TEMPO, 80, 170); TR(s, P_RH_FINE, .6f, 1.f); TR(s, P_RH_FORM, .7f, 1.f); }   /* IDM */
+        if (GEN) { p3 = 0.f; psw = 0.f; plock = 0.f; TR(s, P_RH_DENS, HH ? .55f : .6f, .85f); TR(s, P_RH_FINE, .7f, .95f); TR(s, P_RH_FORM, .3f, .8f); }
         float u = frand(r);
         if (u < p3) { if (frand(r) < (CI ? .7f : .35f)) TR(s, P_RH_THREES, 1.f, 1.f); else TR(s, P_RH_THREES, .38f, .62f); }
         else TR(s, P_RH_THREES, 0.f, 0.f);
-        if (u >= p3 && frand(r) < psw) TR(s, P_RH_SWING, .45f, BR ? .7f : .9f); else TR(s, P_RH_SWING, 0.f, 0.f);
-        TR(s, P_RH_TURN, 0.f, (C || MA) ? 1.f : .15f);
+        if (u >= p3 && frand(r) < psw) TR(s, P_RH_SWING, .45f, .9f); else TR(s, P_RH_SWING, 0.f, 0.f);
+        TR(s, P_RH_TURN, 0.f, (C || MA) ? 1.f : GEN ? 0.f : .15f);
         TR(s, P_RH_MOTION, MA ? .3f : 0.f, MA ? .8f : C ? .5f : .3f);
         TD(s, P_RH_ENGINE, frand(r) < plock ? RH_LOCK : RH_THRESHOLD);
         TR(s, P_RH_PULL, MA ? .15f : .35f, MA ? .7f : 1.f);
@@ -413,25 +557,27 @@ static void apply_style(Synth *s) {
         TR(s, P_RH_FEED, (MA || BR) ? .5f : .25f, (MA || BR) ? .9f : .6f);
         TD(s, P_RH_COUNT, 1 + (int)(frand(r) * 4.f));
         TR(s, P_RH_GRIP, A ? 0.f : C ? .15f : .35f, A ? .15f : C ? .7f : .9f);   /* (ambient: the notes do not pulse with the stream) */
-        TR(s, P_EVOLVE, .05f, G ? .2f : .35f);
+        TR(s, P_EVOLVE, (A || C) ? .1f : .05f, (A || C) ? .6f : G ? .2f : .35f);   /* (ambient, cosmic: evolving) */
         if (MA) TR(s, P_EVOLVE, .25f, .55f);
+        if (GEN) { TD(s, P_RH_ASSIGN, RH_SELECT); TR(s, P_RH_MOTION, 0.f, .12f); }
     }
     if (!s->locked[SEC_DRUMS]) {
         /* the drums: how likely they play, the layer they ride, a kit (a character for each drum's envelope and
            sound), how readily each is chosen, the strength of event it wants, whether it follows a layer */
-        float pon = (CI || MA || BR) ? 1.f : G ? .85f : T ? .45f : C ? .4f : .12f;
+        float pon = (GEN || MA) ? 1.f : G ? .85f : C ? .4f : .12f;
         int on = frand(r) < pon;
         TD(s, P_DR_ON, on);
         {   /* the drum layer: Split mostly (the kick on the bass notes of any roll); Ambient and Cosmic sometimes one */
             const float wl[NUM_DLAYERS] = {(A || C) ? 1.5f : .6f, (A || C) ? 1.5f : .6f, 4.f};
-            TP(s, P_DR_LAYER, wl); }
+            TP(s, P_DR_LAYER, wl);
+            if (GEN) TD(s, P_DR_LAYER, NUM_DLAYERS - 1); }      /* (the genres: Split, the kick on the bass notes) */
         TR(s, P_DR_LEVEL, .6f, .8f); TR(s, P_DR_ACCENT, .4f, .9f);
         /* Shape by a layer's envelope (the synth's generator as the drums' volume): often, most in Machine and Cosmic */
         float psh = MA ? .6f : C ? .5f : A ? .5f : .3f;
         if (frand(r) < psh) { TD(s, P_DR_SHAPE, frand(r) < .5f ? DSHAPE_L1 : DSHAPE_L2); TR(s, P_DR_DEPTH, .4f, .9f); }
         else TD(s, P_DR_SHAPE, DSHAPE_NONE);
         /* the kick's duck: Machine, Breaks and Groove, sometimes Drum circle and Cosmic; never Ambient */
-        float pdk = (MA || G || BR) ? .7f : (CI || C) ? .3f : 0.f;
+        float pdk = (MA || G || GEN) ? .7f : C ? .3f : 0.f;
         if (frand(r) < pdk) TR(s, P_DR_DUCK, .25f, .7f); else TR(s, P_DR_DUCK, 0.f, 0.f);
         /* the kits, as characters: decay's scale, curve, bright, settle, snap (each a lo..hi; the last three unused) */
         enum { K_SKIN, K_BOOM, K_808, K_WOOD, K_METAL, K_GLITCH, NUM_K };
@@ -444,21 +590,21 @@ static void apply_style(Synth *s) {
             {1.5f, 0, .2f,   .5f, .9f,  0, .25f,   .1f, .4f,  0, .1f, 1.f},       /* metal: bright and ringing */
             {.35f, .5f, 1.f, .6f, 1.f,  .8f, 1.f,  .6f, 1.f,  .2f, .7f, .4f},     /* glitch: short tuned clicks and zaps */
         };
-        static const float WK[7][NUM_K] = {{4, 1, 0, 3, 2, 0},    /* tongue */
+        static const float WK[7][NUM_K] = {{1, 4, 5, 1, 0, 0},    /* hip-hop: boom and 808 */
                                           {1, 3, 5, 1, 0, 0},     /* groove */
                                           {2, 1, 1, 1, 3, 0},     /* ambient */
                                           {2, 1, 2, 1, 2, 1},     /* cosmic */
-                                          {5, 1, 0, 4, 1, 0},     /* drum circle */
+                                          {0, 3, 6, 1, 1, 0},     /* house: 808, boom */
                                           {0, 1, 3, 1, 1, 4},     /* machine (IDM) */
-                                          {2, 3, 3, 1, 0, 1}};    /* breaks */
-        int row = CI ? 4 : MA ? 5 : BR ? 6 : st - 1;
+                                          {3, 2, 2, 2, 0, 1}};    /* breakbeat: skin, wood, boom, 808 */
+        int row = HH ? 0 : HO ? 4 : MA ? 5 : BR ? 6 : st - 1;
         const float *K = KT[pickw(r, WK[row], NUM_K)];
         /*                         kick        snare       hat         tom    (density lo, hi) */
-        static const float DN[7][8] = {{.45f, .6f, .3f, .5f, .3f, .55f, .45f, .7f},     /* tongue */
+        static const float DN[7][8] = {{.45f, .6f, .45f, .6f, .4f, .6f, .3f, .5f},     /* hip-hop */
                                        {.5f, .65f, .45f, .6f, .45f, .7f, .3f, .5f},    /* groove */
                                        {.4f, .55f, .2f, .4f, .2f, .45f, .35f, .55f},   /* ambient */
                                        {.4f, .6f, .35f, .55f, .35f, .65f, .35f, .65f}, /* cosmic */
-                                       {.5f, .65f, .4f, .6f, .35f, .6f, .55f, .8f},    /* drum circle */
+                                       {.5f, .65f, .45f, .6f, .45f, .7f, .35f, .6f},   /* house */
                                        {.45f, .65f, .45f, .65f, .45f, .75f, .35f, .65f},/* machine */
                                        {.5f, .62f, .5f, .62f, .5f, .75f, .3f, .45f}};  /* breaks */
         static const float PL[4][2] = {{0.f, .1f}, {.36f, .48f}, {.74f, .88f}, {.5f, .68f}};
@@ -485,12 +631,21 @@ static void apply_style(Synth *s) {
             TR(s, DP(d, P_D1_SETTLE), fclamp(K[5] + hb, 0.f, 1.f), fclamp(K[6] + hb, 0.f, 1.f));
             TR(s, DP(d, P_D1_SNAP), K[7], K[8]);
         }
+        /* the genres' drum sounds: hip-hop a long, deep kick and short hats; house a punchy kick, a clap, a fourth part
+           high and open (an open hat, a shaker); breakbeat a tight kick, a bright snare */
+        if (HH) { TR(s, P_D1_DECAY, .6f, 1.4f); TR(s, P_D1_CURVE, 0.f, .15f); TR(s, P_D1_VOICE, 0.f, .05f);
+                  TR(s, P_D3_DECAY, .025f, .06f); TR(s, P_D3_HOLD, 0.f, 0.f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); }
+        if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .5f, .8f);
+                  TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); TR(s, P_D4_BRIGHT, .6f, .9f); TR(s, P_D4_SNAP, .2f, .6f); }
+        if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .45f, .8f); TR(s, P_D3_DECAY, .03f, .1f); }
         /* and the other way: in Machine, sometimes layer 1 swells with the kick (its Drums envelope) */
         if (on && MA && !s->locked[SEC_GEN1] && frand(r) < .3f) { TD(s, P_G1_ENV, ENV_DRUMS); TD(s, P_G1_ERATE, 0); TR(s, P_G1_CONTOUR, .1f, .5f); }
     }
+    if (GEN && (!s->locked[SEC_METER] || !s->locked[SEC_DRUMS]))   /* the genres' patterns, tempo and swing: the tree */
+        roll_patterns(s, HO ? PG_HOUSE : HH ? PG_HIPHOP : PG_BREAKS, !s->locked[SEC_METER], !s->locked[SEC_DRUMS]);
     if (!s->locked[SEC_LFO]) {
         for (int k = 0; k < 6; k++) {
-            TR(s, P_LFO1_RATE + 3 * k, A ? .01f : .02f, A ? .08f : .35f);
+            TR(s, P_LFO1_RATE + 3 * k, A ? .005f : C ? .01f : .02f, A ? .12f : C ? 1.2f : MA ? 3.f : .6f);   /* (1.0.5: wider) */
             const float w[9] = {4, 2, 0, 0, 0, 3, 0, 0, 0}; TP(s, P_LFO1_SHAPE + 3 * k, w);
             TD(s, P_LFO1_SYNC + 3 * k, 0);
         }
@@ -513,22 +668,70 @@ static void apply_style(Synth *s) {
         TR(s, P_RV_DAMP, .15f, .4f); TR(s, P_RV_MOD, .45f, .8f); TD(s, P_RV_TUNED, 0); TR(s, P_DL_TO_RV, .1f, .4f);
         TR(s, P_CMP_THRESH, -18.f, -8.f);
         TR(s, P_CMP_RATIO, G ? 2.f : 1.3f, G ? 3.5f : 2.f);
-        TR(s, P_CMP_PUMP, 0.f, G ? .3f : 0.f);
+        TR(s, P_CMP_PUMP, HO ? .15f : 0.f, HO ? .45f : G ? .3f : 0.f);
         TR(s, P_CMP_ATT, G ? 6.f : 12.f, G ? 15.f : 40.f);   /* (slow enough for a 40 Hz note) */
         TR(s, P_CMP_MIX, .75f, 1.f);
     }
 }
 
-/* gentle, slow modulation for the curated styles */
-static void tame_mod(Synth *s) {
+/* the curated styles' matrix (1.0.5: more routes, more places, deeper): each route a source (the LFOs mostly, the
+   bar's random, a motion's envelope, the trigger, the follower, the path) to a place from a list of the musical ones,
+   each with the most it may move (a filter never shuts, nothing runs away); how many and how deep by the style.
+   The genres sometimes move a pattern too (a slow walk among its relatives, a rotation); Machine moves its own
+   rhythm: density, threes, turn, swing, the selector, pull, feedback, fine, form, count */
+static const uint8_t MOD_DST[][2] = {     /* the place, its most (hundredths) */
+    {P_V1_TILT, 60}, {P_V1_CENTER, 50}, {P_V1_BAND, 50}, {P_V1_WAVE, 70}, {P_V1_PHASE, 80}, {P_V1_SPIN, 70}, {P_V1_TONE, 40},
+    {P_V1_BLOOM, 60}, {P_V1_STRIDE, 40}, {P_V1_WIDTH, 70}, {P_V2_TILT, 60}, {P_V2_CENTER, 50}, {P_V2_BAND, 50}, {P_V2_WAVE, 70},
+    {P_V2_PHASE, 80}, {P_V2_SPIN, 70}, {P_V2_TONE, 40}, {P_V2_WIDTH, 70}, {P_G1_A, 70}, {P_G1_B, 70}, {P_G1_REACH, 50},
+    {P_G1_ENERGY, 40}, {P_G1_SPREAD, 60}, {P_G1_CONTOUR, 50}, {P_G2_A, 70}, {P_G2_B, 70}, {P_G2_REACH, 50}, {P_G2_SPREAD, 60},
+    {P_PATH_SCALE, 40}, {P_PATH_ROT, 80}, {P_PATH_X, 50}, {P_PATH_Y, 50}, {P_RH_DENS, 35}, {P_RH_SWING, 40}, {P_RH_FINE, 40},
+    {P_RH_THREES, 40}, {P_RH_TURN, 50}, {P_RH_GRIP, 60}, {P_D1_DECAY, 40}, {P_D3_DECAY, 50}, {P_D2_SNAP, 50}, {P_D3_BRIGHT, 50},
+    {P_D2_BRIGHT, 50}, {P_D4_VOICE, 50}, {P_D3_VOICE, 40}, {P_FLT_CUT, 30}, {P_FLT_RES, 40}, {P_FZ_MIX, 40}, {P_DL_SEND, 50},
+    {P_DL_TIME, 30}, {P_DL_TONE, 50}, {P_RV_SEND, 50}, {P_RV_SIZE, 40}, {P_RV_MOD, 60}, {P_RV_DAMP, 50}, {P_CMP_PUMP, 40},
+};
+static const uint8_t MA_DST[] = {P_RH_DENS, P_RH_THREES, P_RH_TURN, P_RH_SWING, P_RH_SELRATE, P_RH_PULL, P_RH_FEED, P_RH_FINE,
+                                 P_RH_FORM, P_RH_MOTION, P_RH_COUNT, P_RH_GRIP};
+static int mod_src(uint32_t *r) {
+    float u = frand(r);
+    return u < .55f ? SRC_LFO1 + (int)(frand(r) * 6) % 6 : u < .65f ? SRC_RAND : u < .8f ? (frand(r) < .5f ? SRC_MOT1 : SRC_MOT2)
+         : u < .87f ? SRC_TRIG : u < .94f ? SRC_ENV : (frand(r) < .5f ? SRC_PATHX : SRC_PATHY);
+}
+static void style_mod(Synth *s) {
     if (s->style == STYLE_WILD || s->locked[SEC_LFO]) return;
-    uint32_t *r = &s->rng; int keep = 2 + (int)(frand(r) * 3.f);
-    for (int k = 0; k < MOD_SLOTS; k++) {
+    uint32_t *r = &s->rng; int st = s->style;
+    int A = st == STYLE_AMBIENT, C = st == STYLE_COSMIC, MA = st == STYLE_MACHINE;
+    int GEN = st == STYLE_HOUSE || st == STYLE_HIPHOP || st == STYLE_BREAKS;
+    int lo = A ? 3 : C ? 5 : 4, hi = A ? 6 : C ? 10 : 8;
+    float sc = A ? .5f : C ? 1.f : MA ? 1.f : .8f;
+    int n = lo + (int)(frand(r) * (float)(hi - lo + 1)), k = 0;
+    memset(s->slot, 0, sizeof s->slot);
+    for (; k < n && k < MOD_SLOTS; k++) {
         ModSlot *m = &s->slot[k];
-        if (k >= keep) { m->src = 0; continue; }
-        m->src = (uint8_t)(SRC_LFO1 + (int)(frand(r) * 6) % 6);
-        m->dst = FRIENDLY[(int)(frand(r) * sizeof FRIENDLY) % sizeof FRIENDLY];
-        m->depth = (frand(r) < .5f ? -1.f : 1.f) * (.04f + .08f * frand(r));
+        int j = 0, nd = (int)(sizeof MOD_DST / sizeof MOD_DST[0]);
+        m->src = (uint8_t)mod_src(r);
+        for (int t = 0; t < 8; t++) { j = (int)(frand(r) * (float)nd) % nd; if (!mod_loop(m->src, MOD_DST[j][0])) break; }
+        if (mod_loop(m->src, MOD_DST[j][0])) m->src = SRC_LFO1 + (int)(frand(r) * 6) % 6;   /* (an LFO there instead) */
+        m->dst = MOD_DST[j][0];
+        float d = (float)MOD_DST[j][1] * .01f * sc * (.25f + .75f * frand(r));
+        m->depth = frand(r) < .5f ? -d : d;
+    }
+    if (MA) for (int j = 3 + (int)(frand(r) * 4.f); j > 0 && k < MOD_SLOTS; j--, k++) {   /* Machine: its rhythm, hard */
+        ModSlot *m = &s->slot[k];
+        m->src = (uint8_t)mod_src(r);
+        m->dst = MA_DST[(int)(frand(r) * sizeof MA_DST) % sizeof MA_DST];
+        float d = .25f + .55f * frand(r);
+        m->depth = frand(r) < .5f ? -d : d;
+    }
+    if (GEN && !s->locked[SEC_DRUMS] && frand(r) < .35f && k < MOD_SLOTS) {   /* a pattern that walks among its relatives */
+        int d = 1 + (int)(frand(r) * 3.f) % 3;                          /* (the snare, the hat or the fourth part) */
+        if (s->target[P_D1_PAT + d] * (float)(PAT_CNT[d] + 1) >= 1.f) {
+            ModSlot *m = &s->slot[k++];
+            int rot = d >= 2 && frand(r) < .4f;
+            m->src = (uint8_t)(frand(r) < .6f ? SRC_RAND : SRC_LFO1 + (int)(frand(r) * 6) % 6);
+            m->dst = (uint8_t)(rot ? P_D1_ROT + d : P_D1_PAT + d);
+            float dd = rot ? 2.f / 16.f : (1.5f + 1.5f * frand(r)) / (float)(PAT_CNT[d] + 1);
+            m->depth = frand(r) < .5f ? -dd : dd;
+        }
     }
 }
 
@@ -555,7 +758,12 @@ void params_roll(Synth *s, uint32_t seed) {
     params_roll_mod(s);
     if (!s->locked[SEC_KNOBS]) params_roll_knobs(s);
     apply_style(s);
-    tame_mod(s);
+    style_mod(s);
+    /* Wild: a quarter of the rolls take patterns too, from any genre's tree */
+    if (s->style == STYLE_WILD && !s->locked[SEC_DRUMS] && frand(r) < .25f) {
+        static const uint8_t GG[3] = {PG_HOUSE, PG_BREAKS, PG_HIPHOP};
+        roll_patterns(s, GG[(int)(frand(r) * 3.f) % 3], 0, 1);
+    }
 }
 
 void synth_set_style(Synth *s, int style) { s->style = style < 0 ? 0 : style % NUM_STYLES; }
@@ -620,7 +828,7 @@ void synth_set_macro(Synth *s, int m, float v) {
 }
 
 static const char *SURF_NAMES[] = {"plane","torus","sphere"};
-static const char *STYLE_NAMES[] = {"wild","tongue drum","groove","ambient","cosmic","drum circle","machine","breaks"};
+static const char *STYLE_NAMES[] = {"wild","hip-hop","groove","ambient","cosmic","house","machine","breakbeat"};
 
 static int slen(const char *b) { int n = 0; while (b[n]) n++; return n; }
 void synth_describe(Synth *s, char *buf, int len) {

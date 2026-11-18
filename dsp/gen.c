@@ -512,7 +512,7 @@ DSP_CTL void gen_tick(Synth *s, int l, float dt) {
         float fx = 0.f, fy = 0.f, fw = 0.f;
         float q0x, q0y; int anyk = 0;
         for (int i = 0; i < N; i++) if (g->kin[i] > 1e-3f) anyk = 1;
-        if (anyk) {
+        if (anyk && pint(s, P_KEY_PULL)) {                   /* (Keys pull off: a key plays its note; the points carry on) */
             path_view(s, x, y, &q0x, &q0y);
             for (int i = 0; i < N; i++) if (g->kin[i] > 1e-3f) {
                 float dX = s->eng.node[i].x - q0x, dY = s->eng.node[i].y - q0y;

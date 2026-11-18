@@ -78,7 +78,7 @@ its root on A1. It is silent until you press PLAY (the keys play at once).
 3. **Play the keys.** A key sounds its note and pulls the moving points toward it, so the music bends around what
    you play and lets go when you release.
 4. **Tap REC** for a new sound (the scale stays). **Double-tap REC** to roll everything.
-5. **Turn PRESET** to choose a style (Wild, Tongue drum, Groove, Ambient, Cosmic, Drum circle, Machine, Breaks); it
+5. **Turn PRESET** to choose a style (Wild, Hip-hop, Groove, Ambient, Cosmic, House, Machine, Breakbeat); it
    rolls a new patch in that style once the knob rests.
 6. **Hold SAVE and press a key (1–16)** to store the patch. **Hold HOME and press the key** to load it again. A tap
    on **SAVE** shows the Patches page: four banks of 16.
@@ -233,9 +233,9 @@ the knob as you turn it.
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
 | **Timbre** | both voices | Tone, Center, Band and Tilt of the voices |
-| **Groove** | the rhythm and the drums | Density, Swing |
+| **Groove** | the rhythm and the drums | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size and decay, delay send and feedback |
-| **Motion** | both layers, the path view and the LFOs | layer 1's Rate and Reach |
+| **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
 Levels (layer levels, drum levels, master) and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
 HOME** locks them so rolls keep them. The knobs can also be turned by the modulation matrix: see
@@ -278,7 +278,9 @@ play; it lets go when you release. The patch's own envelope shapes the key's not
 note (fast rise and fall), a soft one a bowed note (slow rise, long hold, slow release). While the generators run, a
 held key also breathes with the layer's envelope.
 
-**Which layer the keys play** is set in Setup → Keys: Layer 1, Layer 2, Both layers, or Drums.
+**Which layer the keys play** is set in Setup → Keys: Layer 1, Layer 2, Both layers (the default since 1.0.5), or
+Drums. **Whether a key pulls the moving points** toward its note is the patch's own setting (Layer 1 → Keys): off,
+a key plays exactly its note, for melodic lines.
 
 **Drum keys** (performance key 15, or Keys play → Drums): each key plays one of the four drums (kick, snare, hat,
 tom, repeating up the keys) at its velocity. The hit rides a note the drum layer is playing, as rhythm hits do.
@@ -294,14 +296,26 @@ give the same patch.
 
 | Style | Character |
 | --- | --- |
-| **Wild** | everything anywhere: the whole range of every setting |
-| **Tongue drum** | struck, clear, pentatonic and handpan scales, a low band, a pulse |
-| **Groove** | rhythmic and bright, runs and loops on the beat, drums on most of the time |
-| **Ambient** | slow, soft, wide; swells and drifts; drums rarely |
-| **Cosmic** | strange scales and combs, passing motions, anything goes |
-| **Drum circle** | Tongue drum's sound with busy, long-cycle drum patterns |
-| **Machine** | Groove's sound with an IDM rhythm: drums always on, Euclidean-feeling routes |
-| **Breaks** | Groove's sound with drum'n'bass: 4/4 at 164–176 BPM, two-step kick, fast hats |
+| **Wild** | everything anywhere: the whole range of every setting (45–165 BPM); a quarter of the rolls take genre patterns too |
+| **Hip-hop** | Groove's sound with boom-bap drums from the [patterns](#patterns): heavily swung 16ths, syncopated kicks, the snare on 2 and 4, about 62–100 BPM, a long deep kick, short hats |
+| **Groove** | rhythmic and bright, runs and loops on the beat, drums on most of the time (80–132 BPM) |
+| **Ambient** | slow, soft, wide; swells and drifts, down to a single slow note; drums rarely (40–90 BPM) |
+| **Cosmic** | strange scales and combs, passing motions, anything from sparse and slow to dense (60–135 BPM) |
+| **House** | Groove's sound with house and techno patterns: the kick on every beat, the clap on 2 and 4, off-beat and 16th hats, percussion against the bar (115–140 BPM) |
+| **Machine** | Groove's sound with an IDM rhythm: drums always on, the matrix moving the rhythm's own controls hard (80–170 BPM) |
+| **Breakbeat** | Groove's sound with the classic breaks: syncopated kicks, ghosted snares, mostly 124–140 BPM, a third of the rolls drum'n'bass at 160–178 |
+
+House, Hip-hop and Breakbeat build their drums from a **pattern library trained on about 100 genre patterns** (see
+[Patterns](#patterns)). Each roll walks a decision tree through the corpus: a kick, then a snare that goes with that
+kick, then hats that go with both, then the swing those hats are played with. Most rolls are combinations the corpus
+never has, but they keep its rules: in 60 rolls of each, the snare lands on 2 and 4 in 92–96 % of bars and House's kick
+is on every beat in 89 %.
+
+**The matrix in rolls.** Every curated style rolls 3–10 routes (Machine up to 14) to a wide list of musical places
+(the voices, the motions, the path, the rhythm, the drums, the effects), deep enough to be heard, each limited so
+nothing shuts or runs away. A route that would feed a layer back into itself (its own envelope moving its own path)
+is never rolled. The genre styles sometimes route a slow LFO or the bar's random to a pattern, so it walks among its
+relatives.
 
 **What a roll changes:**
 
@@ -350,6 +364,10 @@ slot that holds a patch replaces it, without asking.
 area of the flash to make room for 64: the 16 slots of earlier versions become bank A by themselves at the first
 power-on. Do not go back to a version before 1.0.4 afterwards: it would miss some patches and forget the Bluetooth
 speakers, and storing a patch there could overwrite others.
+
+**Patches from before 1.0.5** load as they were: the patterns' settings are new and arrive off (every drum Linear),
+with the keys' pull on. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
+Empty), so stay on 1.0.5 or later once you have saved with it.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
@@ -446,6 +464,12 @@ The two layers are the same, except that **Path view** is on Layer 1's page and 
 | Path view | K1 | **Path scale** | how much of the map the motions cover (1.0 = all the notes) |
 | | K2 | **Path rotation** | turns every motion on the map: a different set of neighbours along the same path |
 | | K3, K4 | **Path x, Path y** | slides the motions across the map |
+| Keys (Layer 1) | K1 | **Keys pull the points** | **On**: a key sounds its note and pulls the nearest point toward it (the music bends round what you play). **Off**: a key plays just its note, the points carry on around it: for melodic lines |
+
+![Layer 1: Keys](img/manual/layer1-5.png)
+
+**Keys pull the points** is part of the patch, and rolls switch it off in a share of patches (half in the beat
+styles). It applies to both layers.
 
 When a motion's discrete choice changes (a ratio, a figure, the motion itself, the number of points), each point
 glides from where it is onto the new path over about 0.3 s. A point never jumps.
@@ -500,9 +524,9 @@ If both layers are set to route, layer 2 shapes and layer 1 plays ("Plays (2 rou
 
 ## Drums and rhythm (SEQ)
 
-The Drums page has 19 tabs. The first ones are the ones you reach for most.
+The Drums page has 24 tabs. The first ones are the ones you reach for most.
 
-![Groove](img/manual/drums-1.png) ![Drums](img/manual/drums-2.png) ![Mix](img/manual/drums-4.png)
+![Groove](img/manual/drums-1.png) ![Patterns](img/manual/drums-patterns.png) ![Drums](img/manual/drums-4.png) ![Mix](img/manual/drums-6.png)
 
 ### How the rhythm works
 
@@ -519,6 +543,35 @@ is no grid.
 The stream also shapes the synth: **Grip** accents every envelope with it, and the **Stream** envelope and **Stride**
 motion follow it.
 
+### Patterns
+
+Each drum can either take part in the choice above (**Linear**: one drum per event, MANIFOLD's own drumming) or
+play a **pattern**: a line from a library trained on about 100 house, techno, breakbeat, drum'n'bass and hip-hop
+patterns (44 kick lines, 20 snare, 14 hat, 17 percussion, each one or two bars of 16ths). The two live side by side,
+a drum at a time: a patterned kick and snare with a linear hat and tom is the stream's own drumming over a genre
+skeleton.
+
+![Patterns](img/manual/drums-patterns.png) ![Pattern feel](img/manual/drums-feel.png)
+![Rotate](img/manual/drums-rotate.png) ![Mutes](img/manual/drums-mutes.png)
+
+**It is not a step sequencer.** A pattern says where in the metre a drum plays; when is still the stream's:
+
+- **Swing** bends the steps as it bends the stream (at the 16ths or the 8ths, **Swing on**): the second of each
+  pair moves from half way to two thirds (triplet swing) to three quarters, continuously.
+- **Density** thins a pattern from its weakest steps: a step sounds only if the stream without swing is strong enough
+  at its place in the bar (the 16ths go first, then the off-beats; the downbeat last). Ghost notes need more.
+- **Fills**: on the second half of every fourth bar, a drum may play a busier relative of its line instead.
+- **Ghosts**: the patterned drums also take part in the linear choice, quietly: MANIFOLD's own fills between the
+  pattern's hits.
+- **Rotate** delays a line by 16ths (the hats moved by two are off-beat hats); **Length** loops it over its first
+  2–32 steps against the bar (a 12-step percussion line over a 16-step bar drifts round it: polymeter).
+- **Mutes**: a drum that plays mutes another on the same instant: the kick clearing the hat, an open hat (the fourth
+  part) choking the closed one, the snare clearing the linear drums under it.
+
+The library is ordered from sparse to busy, with similar lines next to each other, so turning a pattern (by hand, with
+the Groove knob or from the matrix) moves to a close relative, never a random jump. A pattern moved by a knob or a
+route never falls back to Linear; only setting it to Linear by hand does.
+
 ### All the drum settings
 
 | Tab | Knob | Setting | What it does |
@@ -527,6 +580,10 @@ motion follow it.
 | | K2 | **Swing** | the off-beat's timing: straight (0 %), triplet swing (about 67 %), hard (100 %) |
 | | K3 | **Threes** | twos (eighths, sixteenths) … 3 against 4 (50 %) … threes (triplets) |
 | | K4 | **Fine** | how far the subdivisions go: beats only … sixteenths and thirty-seconds |
+| **Patterns** | K1–K4 | **Kick, Snare, Hat, Tom** | Linear, or a line of the library (1 … its count): the strip under it shows the steps, the ghosts dimmer, the step playing now white |
+| **Pattern feel** | K1 | **Ghosts** | how much the patterned drums also take the linear layer's events (quietly) |
+| | K2 | **Fills** | how often the second half of a fourth bar plays a busier relative |
+| | K3 | **Swing on** | the level Swing bends for the patterns: 8ths or 16ths |
 | **Drums** | K1–K4 | **Kick, Snare, Hat, Tom** density | each drum's share of the events (0 = that drum off) |
 | **Levels** | K1–K4 | **Kick, Snare, Hat, Tom** level | each drum's level (Off … 0 dB). A light by the name flashes on each hit |
 | **Mix** | K1 | **Drums** | on / off |
@@ -554,12 +611,15 @@ motion follow it.
 | **Shape & duck** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
 | | K2 | **Shape depth** | how much |
 | | K3 | **Kick duck** | sidechain: the kick ducks the synth |
-| **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too |
+| **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too. A drum with a pattern plays its pattern instead |
+| **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
+| **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
+| **Mutes** | K1–K4 | per drum | what it mutes on the instants it plays: Nothing, the kick, the snare, the hat, the tom, or the linear drums |
 | **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +2.7 dB a partial) |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit (25 ms): a bite on the attack |
 
-![Kick](img/manual/drums-5.png) ![Rhythm](img/manual/drums-9.png) ![Kick sound](img/manual/drums-16.png)
+![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png)
 
 **The drums never change pitch.** A hit swells a note that is already sounding and colours it. The kick also lets
 the note's fundamental through in full (normally partials under 90 Hz are softened), so it has weight. If the drum
@@ -766,6 +826,13 @@ busier on one side and sparser on the other.
 **A generator turns a knob.** LFO page, Matrix: Source Layer 2 motion, Destination Space knob, Depth +40 %. Layer 2's
 swells now open the reverb and delay. Lock the matrix with SAVE + LFO.
 
+**A house groove from scratch.** PRESET → House. Drums → Patterns: if the kick is not four on the floor, turn K1
+to a neighbour that is. Pattern feel: Ghosts 0 for a clean groove, 30 % for MANIFOLD's own fills between. Mutes: the
+tom (an open hat) mutes the hat.
+
+**A boom-bap loop you can play over.** PRESET → Hip-hop. Layer 1 → Keys: Keys pull the points Off, so the keys play
+exactly their notes over the beat. Turn Groove to move the patterns to busier or sparser relatives.
+
 **Long-form evolution.** Drums → Rhythm: Form high. Drums → Lock & motion: Evolve around 30 %. Leave it running.
 
 **Play along with other instruments.** Scale → Temper: Equal (12-tone). Root to match the song.
@@ -818,7 +885,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.4 # -> build/manifold-1.0.4.fwsc
+python3 tools/build.py ../Manifold --release 1.0.5 # -> build/manifold-1.0.5.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key
@@ -847,14 +914,15 @@ engine only through a lock-free command queue drained at the start of each audio
 | --- | --- |
 | `app.c`, `app.h`, `fm1.toml` | the app on fm1-base: UI, pages, performance keys, scenes, patches, MIDI, Bluetooth audio |
 | `dsp/gen.c` | the twelve motions, the eight envelopes, routes, keys, the drive |
-| `dsp/rhythm.c` | the stream, events, drum choice, the Lock engine |
+| `dsp/rhythm.c` | the stream, events, drum choice, the patterns, mutes, the Lock engine |
+| `dsp/patterns.c` | the pattern library and corpus entries (generated by `tools/patterns/train.py` from `tools/patterns/corpus.py`) |
 | `dsp/drums.c` | drum triggers, envelopes and character (on the synth's voices) |
 | `dsp/voice.c` | the oscillator banks and their spectral function |
 | `dsp/engine.c` | the surfaces, the Tonnetz layout, tuning |
 | `dsp/scales.c` | the scale library, tonal weights |
 | `dsp/mod.c` | LFOs, the matrix, the knobs' paths |
 | `dsp/fx.c` | fuzz, filter, delay, reverb, compressor, limiter |
-| `dsp/params.c` | the parameter table, rolls and styles |
+| `dsp/params.c` | the parameter table, rolls and styles, the patterns' decision tree |
 | `dsp/synth.c` | the top level: the block, the tick |
 
 Parameters are stored normalised (0…1) in `target` (what is set), `base` (smoothed toward it) and `mod` (base plus
@@ -1027,6 +1095,35 @@ dθ_d/dx = r_d (1 + δ_d) + K r_d sin 2π(r_d x − θ_d),    K = 0.4 Pull
 ```
 
 Above its detuning a drum locks to its exact rate; below, it slips and catches. Each hit nudges the others.
+
+### The patterns
+
+**The corpus** (`tools/patterns/corpus.py`) holds 102 kit patterns, 36 house and techno, 24 breakbeat, 8
+drum'n'bass and 34 hip-hop, each four lines (kick, snare, hat, a fourth part, or none: that drum stays linear) of one
+or two bars of 16ths, hits and ghosts, with a tempo range, a swing range, the level the swing works at and a weight.
+They are skeletons in the manner of each genre and of the well-known breaks, not transcriptions.
+
+**Training** (`tools/patterns/train.py`, run whenever the corpus changes) makes each role's library: its distinct
+lines (a two-bar line whose bars are equal is one bar), ordered by busyness (hits + 0.4 ghosts a bar, in steps of half
+a hit) and, within a step, as a chain of nearest neighbours by the Hamming distance over two bars (a ghost counting
+half). It writes `dsp/patterns.c`: the lines as hit and ghost masks, and every corpus entry as indices into them.
+
+**The decision tree** (params.c `roll_patterns`): a root entry of the genre by weight; then for each role *r* in
+order, an entry *e* drawn with probability ∝ wₑ · exp(−Dₑ/4), Dₑ the summed distance of *e*'s earlier roles to the
+ones already chosen, and *e*'s line taken (with probability 0.15–0.2 a close variation instead: another line of the
+genre's corpus within three hits, nearer likelier). This samples P(kick), P(snare | kick), P(hat | kick, snare),
+P(fourth | kick, snare, hat) as the corpus implies them, smoothed so unseen but rule-keeping combinations appear.
+Tempo comes from the root (Breakbeat outside drum'n'bass: 124–140), swing and its level from the hats' entry. Mutes,
+rotations, loop lengths, ghosts and fills are rolled per genre.
+
+**Playing them** (rhythm.c `pat_tick`, each control tick): step *n* of a bar sits at its 16th, bent by Swing: within
+each pair (two 16ths, or two 8ths) the second moves to *f* = ½ + Swing/4 of the pair. A step whose place falls in the
+tick's window (1.5 ticks back, as the stream's events land) is looked up at index (16·bar + *n* − Rotate) mod Length,
+bit modulo the line's length. It sounds if R₀ ≥ θ/2 (a ghost: R₀ ≥ θ), R₀ the stream without swing at the step's
+straight place, normalised: so Density, Fine and Form thin and vary a pattern as they do the stream. Its velocity is
+(1 − 0.55·Accent + 0.55·Accent·s)·(0.42 for a ghost), s = (R₀ − gate)/(1 − gate). Every hit of the tick, the patterns'
+and the linear layer's, is collected; then in the order kick, snare, tom, hat each drum that plays removes its Mute
+target's hits (or every linear hit) of that tick; then the rest are queued to the drums.
 
 ### The drums
 

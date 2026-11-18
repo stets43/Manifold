@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "gstat") && argc >= 3) {
         FILE *f = fopen(argv[2], "w");
         for (int g = 0; g < NUM_GENS; g++) for (int sd = 0; sd < 6; sd++) {
-            roll(1000 + (uint32_t)sd * 77, STYLE_TONGUE); setd(P_G1_FUNC, g); setd(P_G1_POINTS, 2); pset(P_V2_LEVEL, 0.f); setd(P_DR_ON, 0);
+            roll(1000 + (uint32_t)sd * 77, STYLE_HIPHOP); setd(P_G1_FUNC, g); setd(P_G1_POINTS, 2); pset(P_V2_LEVEL, 0.f); setd(P_DR_ON, 0);
             setr(P_TEMPO, 100); pset(P_EVOLVE, 0); engine_build(&S);
             static float L[64], R[64]; int lastc = -1; uint32_t start = S.meter.bar;
             while ((int)(S.meter.bar - start) < 33) {
@@ -267,7 +267,7 @@ int main(int argc, char **argv) {
         for (int st_ = 1; st_ < NUM_STYLES; st_++) { roll(7000u + 31u * (uint32_t)st_, st_); go(20.f, &L, &R, &n); char d[400]; synth_describe(&S, d, sizeof d); printf("%5.1f s  %s\n", (double)(n) / SR - 20., d); }
         /* the keys on two patches, transport stopped: a soft-contour pad, then a sharp-contour pluck (same eight notes) */
         for (int w = 0; w < 2; w++) {
-            roll(9100u + (uint32_t)w, w ? STYLE_TONGUE : STYLE_AMBIENT); setd(P_DR_ON, 0); pset(P_G1_CONTOUR, w ? .9f : .1f); S.transport = 0; engine_build(&S);
+            roll(9100u + (uint32_t)w, w ? STYLE_HIPHOP : STYLE_AMBIENT); setd(P_DR_ON, 0); pset(P_G1_CONTOUR, w ? .9f : .1f); S.transport = 0; engine_build(&S);
             printf("%5.1f s  keys, %s (Contour %s)\n", (double)n / SR, w ? "a struck patch" : "a pad patch", w ? "90%" : "10%");
             int N = S.eng.n_nodes; static int ord[MAX_NODES];
             for (int i = 0; i < N; i++) { int k = i; while (k > 0 && S.eng.node[ord[k - 1]].lr > S.eng.node[i].lr) { ord[k] = ord[k - 1]; k--; } ord[k] = i; }

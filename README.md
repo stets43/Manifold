@@ -12,7 +12,7 @@ and every partial is a whole-number multiple of its note. Four performance knobs
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
-  [`firmware/manifold-1.0.4.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
+  [`firmware/manifold-1.0.5.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
   It covers every page and setting, and ends with the mathematics of each generator for developers.
 
@@ -37,6 +37,14 @@ and every partial is a whole-number multiple of its note. Four performance knobs
 
 ## Releases
 
+- **1.0.5** (2026-11-17): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
+  breakbeat, drum'n'bass and hip-hop patterns, played without a grid (swing bends them, Density thins them, fills,
+  ghosts, rotation, polymetric loop lengths, mutes), rolled by a decision tree over the corpus. New styles **House**
+  (replacing Drum circle) and **Hip-hop** (replacing Tongue drum); **Breakbeat** rebuilt (mostly 124–140 BPM, a third
+  drum'n'bass). Wider tempos in every style; Ambient, Cosmic and Wild down to sparse, slow, evolving; a deeper,
+  richer matrix in every roll (no self-feedback routes); Machine modulates its own rhythm. **Keys pull the points**
+  (Layer 1 → Keys): off, a key plays just its note. The keys play both layers by default. Older patches load with the
+  patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with
   SAVE + OCT+ or K4 on that page, no longer with a SAVE tap. 1.0's 16 slots become bank A. After 1.0.4, do not go
@@ -66,7 +74,7 @@ python3 tools/build.py ../Manifold --host              # the host simulator (any
 
 tools/get_toolchain.sh                                     # JieLi's clang for the FM-1
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.4     # -> build/manifold-1.0.4.fwsc
+python3 tools/build.py ../Manifold --release 1.0.5     # -> build/manifold-1.0.5.fwsc
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,

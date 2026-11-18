@@ -64,6 +64,8 @@ const char *knob_name(int k) { return k >= 0 && k < NUM_MACRO ? KNOB_N[k] : "?";
 DSP_CTL int knob_of_r(int id) {
     if (id < 0 || id >= NUM_PARAMS || !g_param_meta[id].moddable) return -1;
     if (id == P_MASTER || id == P_V1_LEVEL || id == P_V2_LEVEL || id == P_DR_LEVEL || id == P_TEMPER) return -1;
+    if ((id >= P_D1_ROT && id <= P_D4_ROT) || id == P_RH_FILL) return 3;   /* the patterns' rotations, the fills: Motion */
+    if (id >= P_D1_LEN && id <= P_D4_LEN) return -1;                       /* (a loop's length: by hand) */
     switch (g_param_meta[id].section) {
     case SEC_VOICE1: case SEC_VOICE2: return 0;
     case SEC_METER: case SEC_DRUMS: return (id >= P_D1_DENS && (id - P_D1_DENS) % DR_STRIDE == P_D1_LEVEL - P_D1_DENS) ? -1 : 1;
