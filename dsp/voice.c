@@ -31,6 +31,7 @@
 static float T_SIN[OSC_N] DSP_POOL;      /* sin */
 static float T_D1[OSC_N] DSP_POOL;       /* Wave's addition with room for a 3rd harmonic: 0.5 sin 2x + 0.33 sin 3x */
 static float T_D2[OSC_N] DSP_POOL;
+static float T_D3[OSC_N] DSP_POOL;       /* a drum hit's Morph: 2nd to 6th harmonics at 1/k (a saw's), energy .491 */
 #define OSC_SH 20                           /* a 32-bit phase to a 4096-entry table */
 #define TAIL_N 4096
 static float T_T1[TAIL_N] DSP_POOL;      /* a bass note's partials 17..32, falling as 16/k (1/8 scale) */
@@ -58,6 +59,8 @@ void voices_init(void) {
         T_SIN[i] = fsin(x);
         T_D1[i] = .5f * fsin(2.f * x - (float)(int)(2.f * x)) + .33f * fsin(3.f * x - (float)(int)(3.f * x));
         T_D2[i] = .5f * fsin(2.f * x - (float)(int)(2.f * x));
+        T_D3[i] = 0.f;
+        for (int h = 2; h <= 6; h++) T_D3[i] += fsin((float)h * x - (float)(int)((float)h * x)) / (float)h;
     }
     for (int i = 0; i < TAIL_N; i++) {
         float x = (float)i / (float)TAIL_N, a = 0.f, b = 0.f;
@@ -197,20 +200,25 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         /* the hits on this voice: their level at the tick's start and end (reached from the sample the newest lands
            on), and their character, each in proportion to the hits' share of the voice's level */
         float H0 = 0.f, H1 = 0.f, tilt = 0.f, snap = 0.f, lift = 0.f; int off = 0;
+        float burst = 0.f, noise = 0.f, morph = 0.f, strike = -1.f, se = 0.f, nlp = 0.f;   /* (the hits' character, 1.0.5) */
         if (hl[i] > 0.f) {
             float hw = 0.f;
             for (int h = 0; h < nh; h++) if (hs[h]->node == i) {
                 const DrumHit *x = hs[h]; float m = .5f * (x->h0 + x->h1);
                 H0 += x->h0; H1 += x->h1; hw += m;
                 tilt += m * x->tilt; snap += m * x->snap; if (x->kick) lift += m;
+                burst += m * x->burst; noise += m * x->noise; morph += m * x->morph; nlp += m * x->nlp;
+                if (x->strike > 0.f) { if (x->strike > strike) strike = x->strike; if (x->se > se) se = x->se; }
                 if (x->off > off) off = x->off;
             }
-            float own = .5f * (a0 * g0 + a1 * g1), sh = hw > 1e-9f ? 1.f / (own + hw) : 0.f;
+            nlp = hw > 1e-9f ? nlp / hw : .3f;
+            float own = .5f * (a0 * g0 + a1 * g1) * (1.f - v->dip), sh = hw > 1e-9f ? 1.f / (own + hw) : 0.f;
             tilt *= sh; snap *= sh; lift *= sh;               /* (timbre only: the note's pitch is never touched) */
+            burst *= sh; noise *= sh; morph *= sh;
         }
         if (((g0 <= 0.f && g1 <= 0.f) || (a0 < 1e-6f && a1 < 1e-6f)) && H0 < 1e-6f && H1 < 1e-6f) { v->on = 0; continue; }
         if (f > .45f * SR) { v->on = 0; continue; }
-        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; }   /* a note starting: its oscillators from the phase law */
+        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->dip = 0.f; v->sk = 0.f; v->nr = (uint32_t)(i + 1) * 2654435761u ^ (uint32_t)l; v->ns = 0.f; }   /* a note starting: its oscillators from the phase law */
         nv++;
         uint32_t inc = (uint32_t)(f * (4294967296.f / SR)), ph1 = v->ph;
         /* Detune: the note's first three partials are doubled by a copy a few cents away (up to 14, each note its own
@@ -225,6 +233,21 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         if (tilt != 0.f) dm *= fexp2(tilt);                          /* a hit's brightness, settling (drums.c) */
         float wq = wave, wnorm = wn0;
         if (snap > 0.f) { wq = fclamp(wave + snap, 0.f, 1.f); wnorm = frsqrt(1.f + .359f * wq * wq); }   /* and its Snap: a push on Wave */
+        int mo = morph > .02f;                                       /* a hit's Morph: the oscillators toward a richer wave */
+        if (mo) { wq = fclamp(wq + morph, 0.f, 1.f); wnorm = frsqrt(1.f + .491f * wq * wq); }
+        /* a hit's Burst: the spectrum thrown up the harmonics (a bump centred from the 2nd to the 12th by its amount),
+           falling back with the hit: the sweep an FM drum makes, set directly. At the note's energy (the colour moves,
+           not the level) */
+        float bw[MAX_HARM]; int bo = burst > .01f;
+        if (bo) {
+            float cb = 2.f + 10.f * fclamp(burst, 0.f, 1.f), e0 = 0.f, e1 = 0.f;
+            for (int k = 1; k <= MAX_HARM; k++) {
+                float u = ((float)k - cb) * .4f, gk = 1.f + 6.f * burst * fexp2(-u * u * 1.4427f), a = L->amp[k - 1];
+                bw[k - 1] = gk; e0 += a * a; e1 += a * a * gk * gk;
+            }
+            float nb = e1 > 1e-12f ? frsqrt(e1 / (e0 + 1e-12f)) : 1.f;
+            for (int k = 0; k < MAX_HARM; k++) bw[k] *= nb;
+        }
         float c90 = 8100.f * (1.f - lift);                            /* the kick keeps its fundamental */
         /* Tone: where the note's partials stop, in Hz (250 Hz to 16 kHz), falling 24 dB an octave above it. Not a
            filter: each oscillator's level is set by its own frequency, so nothing rings and nothing is smeared; a high
@@ -243,6 +266,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         for (int t = 0; t < n; t++) { aC[t] = 0.f; aO[t] = 0.f; aE[t] = 0.f; aD[t] = 0.f; a2[t] = 0.f; a3[t] = 0.f; }
         for (int k = 1; k <= MAX_HARM; k++, bm *= dm) {
             float fk = f * (float)k, r2 = fk * fk * ifc2, ak = L->amp[k - 1] * bm * reg * hk[k - 1] / (1.f + r2 * r2);
+            if (bo) ak *= bw[k - 1];
             if (ak < thr || fk > .45f * SR) continue;     /* (under -42 dB of the note, or the cap's floor: not played) */
             if (nosc >= hard && k > 1) continue;              /* (a burst past the cap, before the floor has risen) */
             nosc++;
@@ -250,7 +274,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             if (kw > 0.f && ak < 2.f * thr) ai *= 1.f - kw * (1.f - (ak - thr) / thr);   /* the cap's knee */
             float *A = k == 1 ? aC : k == 2 ? a2 : k == 3 ? a3 : (k & 1) ? aO : aE;
             uint32_t ph = ph1 * (uint32_t)k + (uint32_t)(L->pho[k - 1] * 4294967296.f), ik = inc * (uint32_t)k;
-            const float *D = 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
+            const float *D = mo && 6.f * fk < .45f * SR ? T_D3 : 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
             float w = D ? wq : 0.f;
             if (dup && k <= 3) ai *= .8125f;           /* (shared with its detuned copy: the pair at the same power) */
             if (w == 0.f) {                                         /* the plain oscillator */
@@ -282,7 +306,15 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         float pn = fclamp(.5f + (nd->x - .5f) * width * .9f, 0.f, 1.f);   /* place on the surface, by Width */
         float gl = fsin(.25f + pn * .25f) * lg * wnorm, gr = fsin(pn * .25f) * lg * wnorm;
         /* the voice's own level, under the kick's duck; the hits' on top (not ducked), from the sample they land */
-        float amp = a0 * g0 * dk0, da = (a1 * g1 * dk1 - amp) * inv_n;
+        /* Strike: the note is struck by the drum that rides it. Its own level is held down by the Strike between the
+           hits, and each hit lifts it back with the hit's envelope (its attack, its decay): the note itself sounds as a
+           struck one. Held from the last hit; with no hit for a while (the drums stopped) it comes back up, slowly
+           (about 2 s). Ramped across the block from where it was */
+        if (strike >= 0.f) v->sk = strike;
+        else if (v->sk > 0.f) { v->sk -= (float)n * (1.f / (2.f * SR)); if (v->sk < 0.f) v->sk = 0.f; }
+        float dip1 = fclamp(.95f * v->sk * (1.f - se), 0.f, .95f);
+        float amp = a0 * g0 * dk0 * (1.f - v->dip), da = (a1 * g1 * dk1 * (1.f - dip1) - amp) * inv_n;
+        v->dip = dip1;
         float hsc = lg > 1e-6f ? DR_OUT / lg : 0.f;                  /* (the hits' own gain: not the layer's level staging) */
         float hv = H0 * hsc, dh = off < n ? (H1 - H0) * hsc / (float)(n - off) : 0.f;
         {   float wo = .6f * width, w23 = dup ? wo * (1.f / .8125f) : wo, wd = !dup ? 0.f : (i & 1) ? .8f * width : -.8f * width;
@@ -291,12 +323,26 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
                 float o = aO[t], ev = aE[t], dd = aD[t], p2 = a2[t], p3 = a3[t];
                 float m = (aC[t] + o + ev + dd + p2 + p3) * amp, sd = (wo * (o - ev) + w23 * (p3 - p2) + wd * dd) * amp;
                 Lo[t] += (m + sd) * gl; Ro[t] += (m - sd) * gr;
-            } else for (int t = 0; t < n; t++) {
+            } else if (noise < .01f) for (int t = 0; t < n; t++) {
                 amp += da; if (t >= off) hv += dh;
                 float lev = amp + hv;
                 float o = aO[t], ev = aE[t], dd = aD[t], p2 = a2[t], p3 = a3[t];
                 float m = (aC[t] + o + ev + dd + p2 + p3) * lev, sd = (wo * (o - ev) + w23 * (p3 - p2) + wd * dd) * lev;
                 Lo[t] += (m + sd) * gl; Ro[t] += (m - sd) * gr;
+            } else {                                          /* a hit's Noise: the note times smoothed noise (its
+                                                                 partials smeared into bands: wires, sizzle), unit power */
+                float nz = fclamp(noise, 0.f, 1.f), nk = nz * 1.732f * frsqrt(nlp / (2.f - nlp)), na = 1.f - nz, ns = v->ns;
+                uint32_t r = v->nr;
+                for (int t = 0; t < n; t++) {
+                    amp += da; if (t >= off) hv += dh;
+                    r = r * 1664525u + 1013904223u;
+                    ns += nlp * ((float)(int32_t)r * (1.f / 2147483648.f) - ns);
+                    float lev = (amp + hv) * (na + nk * ns);
+                    float o = aO[t], ev = aE[t], dd = aD[t], p2 = a2[t], p3 = a3[t];
+                    float m = (aC[t] + o + ev + dd + p2 + p3) * lev, sd = (wo * (o - ev) + w23 * (p3 - p2) + wd * dd) * lev;
+                    Lo[t] += (m + sd) * gl; Ro[t] += (m - sd) * gr;
+                }
+                v->nr = r; v->ns = ns;
             }
         }
     }

@@ -130,8 +130,17 @@ typedef enum {
     P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN,
     P_D1_MUTE, P_D2_MUTE, P_D3_MUTE, P_D4_MUTE,
     P_RH_GHOST, P_RH_FILL, P_RH_SWLEV, P_KEY_PULL,
+    /* each drum's hit on the synth (1.0.5): Burst throws the note's spectrum up the harmonics and lets it fall with the
+       hit, Noise smears its partials with noise, Drive opens the fuzz with the hit, Morph turns its oscillators toward
+       a richer wave, Strike takes the note's own level down under the hit (its attack out of near-silence) */
+    P_D1_BURST, P_D2_BURST, P_D3_BURST, P_D4_BURST,
+    P_D1_NOISE, P_D2_NOISE, P_D3_NOISE, P_D4_NOISE,
+    P_D1_DRIVE, P_D2_DRIVE, P_D3_DRIVE, P_D4_DRIVE,
+    P_D1_MORPH, P_D2_MORPH, P_D3_MORPH, P_D4_MORPH,
+    P_D1_STRIKE, P_D2_STRIKE, P_D3_STRIKE, P_D4_STRIKE,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_A (P_KEY_PULL + 1)                    /* the 1.0.5 test builds' patches ("MNPA") */
 #define NUM_PARAMS_9 (P_MASTER + 1)                      /* the parameters of the patches before 1.0.5 ("MNP9") */
 
 #define LAYER_STRIDE (P_V2_CENTER - P_V1_CENTER)
@@ -305,7 +314,8 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 /* a drum's hit on a voice for one control tick: the voice (layer, node), its level at the tick's start and end (the
    end reached from sample off: where a new hit lands), and the character it puts on the voice at the tick's middle:
    the partials' tilt (log2 a partial), the Wave push, and the kick's lift of the 90 Hz fade. (Never the pitch) */
-typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap; } DrumHit;
+typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap;
+                 float burst, noise, morph, strike, se, nlp; } DrumHit;   /* (the rest: the hit's character on the synth; se its envelope) */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
     float g;                   /* this hit's velocity */
@@ -326,6 +336,7 @@ typedef struct {
     float shape_e;             /* ... and the envelope itself (it lengthens the decay) */
     float duck, dk0, dk1;      /* the kick's sidechain: its envelope (0 none .. 1 full), the gain on the other voices at
                                   this tick's start and end */
+    float drive;               /* the hits' Drive now: added to the fuzz's mix (fx_update) */
 } Drums;
 #define MAX_PTS 8
 #define NUM_ERATES 13
@@ -384,6 +395,7 @@ typedef struct {
     /* fuzz, 2x oversampled: two soft-clipping stages, each with its own filters, then the tone */
     float dc_x[2], dc_y[2];
     float fz_hp[2], fz_l1[2], fz_h1[2], fz_l2[2], fz_tl[2], fz_th[2], fz_thx[2];
+    float fz_mix0;             /* the fuzz's mix at the last block's end: each block glides from it (the hits' Drive moves it) */
     Svf   morph[2];
     /* BBD delay */
     int16_t dbuf[16384];
@@ -415,6 +427,9 @@ typedef struct {
     float a;                  /* loudness at the start of this block */
     float gv;                 /* the voice cap's crossfade: 1 rendered, 0 not (ramps, never jumps) */
     uint8_t on;               /* it was rendered last block (else its phases start aligned) */
+    float dip;                /* Strike: the multiplier on its own level now (1 - dip: ramped across a block) */
+    float sk;                 /* and how far it is struck: the last hit's Strike, held between hits (and let go slowly) */
+    uint32_t nr; float ns;    /* Noise: its random state and the smoothed noise */
 } VoiceSt;
 typedef struct {
     GenSt   g;

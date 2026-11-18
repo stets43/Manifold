@@ -67,7 +67,7 @@ DSP_CTL void fx_update(Synth *s) {
     /* fuzz: the stages' gains and their one-pole filters at the rate they run at (2x, or 1x if the profiler says) */
     {   float k = -TWO_PI / SR * 1.4427f;
         C.fz_g1 = 16.f * fexp2(4.65f * pnorm(s, P_FZ_SUSTAIN));          /* x16 .. x400 on a mix that peaks near 0.2 */
-        C.fz_mix = pnorm(s, P_FZ_MIX); C.fz_tone = pnorm(s, P_FZ_TONE);
+        C.fz_mix = fclamp(pnorm(s, P_FZ_MIX) + s->dr.drive, 0.f, 1.f); C.fz_tone = pnorm(s, P_FZ_TONE);   /* (the hits' Drive) */
         C.fz_hp = 1.f - fexp2(k * 60.f); C.fz_lp = 1.f - fexp2(k * 5500.f); C.fz_hp2 = 1.f - fexp2(k * 90.f);
         C.fz_tl = 1.f - fexp2(k * 500.f); C.fz_th = 1.f - fexp2(k * 1400.f);
     }
@@ -247,17 +247,25 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
        running them sample by sample. */
 
     /* 1. fuzz, at the sample rate (the 2x oversampling is gone: it cost more than it was heard) */
-    if (C.fz_mix > 0.002f) {
-        float mix = C.fz_mix;
+    /* its mix glides across the block from the last block's (a hit's Drive opens it in a step at the block's rate:
+       a glide, not a click). Shut, its state is cleared, so it opens again from rest and not from an old note's */
+    if (C.fz_mix > 0.002f || f->fz_mix0 > 0.002f) {
+        float m0 = f->fz_mix0, dm = (C.fz_mix - m0) / (float)n;
         for (int c = 0; c < 2; c++) {
-            float *X = c ? R : L, dx = f->dc_x[c], dy = f->dc_y[c];
+            float *X = c ? R : L, dx = f->dc_x[c], dy = f->dc_y[c], mix = m0;
             for (int t = 0; t < n; t++) {
                 float w = shape(f, X[t], c), dc = w - dx + .995f * dy; dx = w; dy = dc;
+                mix += dm;
                 X[t] += mix * (dc - X[t]);
             }
             f->dc_x[c] = dx; f->dc_y[c] = dy;
         }
+        if (C.fz_mix <= 0.002f)
+            for (int c = 0; c < 2; c++)
+                f->fz_hp[c] = f->fz_l1[c] = f->fz_h1[c] = f->fz_l2[c] = f->fz_tl[c] = f->fz_th[c] = f->fz_thx[c] =
+                    f->dc_x[c] = f->dc_y[c] = 0.f;
     }
+    f->fz_mix0 = C.fz_mix;
 
     /* 2. the filter (LP / BP / HP blend), per channel over the block */
     for (int c = 0; c < 2; c++) {

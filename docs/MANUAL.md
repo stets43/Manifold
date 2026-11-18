@@ -366,7 +366,7 @@ power-on. Do not go back to a version before 1.0.4 afterwards: it would miss som
 speakers, and storing a patch there could overwrite others.
 
 **Patches from before 1.0.5** load as they were: the patterns' settings are new and arrive off (every drum Linear),
-with the keys' pull on. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
+the drum hits' Strike, Burst, Noise, Morph and Drive at 0, with the keys' pull on. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
 Empty), so stay on 1.0.5 or later once you have saved with it.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
@@ -618,10 +618,18 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +2.7 dB a partial) |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit (25 ms): a bite on the attack |
+| **Strike** | K1–K4 | per drum | the note the drum rides is struck: its own level held down (up to −26 dB) between hits, and each hit lifts it with the hit's own attack and decay. With no hit for a while (the drums stopped), it comes back over about 2 s |
+| **Burst** | K1–K4 | per drum | the hit throws the note's spectrum up its harmonics (a bump from the 2nd to the 12th by the amount) and lets it fall with the hit: an FM drum's sweep. At the note's energy: the colour moves, not the level |
+| **Noise** | K1–K4 | per drum | the hit smears the note's partials with noise for its length: sizzle on a hat, wires on a snare, a breath on a kick (each drum's noise its own colour) |
+| **Morph** | K1–K4 | per drum | the hit turns the note's oscillators toward a richer wave (2nd to 6th harmonics), falling faster than the hit: a hard edge on the attack |
+| **Drive** | K1–K4 | per drum | the hit opens the fuzz (Effects → Fuzz, at its own Sustain and Tone) over the whole mix for the hit's length: grit with each hit. Adds to the fuzz's own Mix |
 
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png)
+![Strike](img/manual/drums-25.png) ![Burst](img/manual/drums-26.png) ![Drive](img/manual/drums-29.png)
 
-**The drums never change pitch.** A hit swells a note that is already sounding and colours it. The kick also lets
+**The drums never change pitch.** A hit swells a note that is already sounding and colours it (the last five pages
+say how hard: all at 0 is the sound of 1.0.4 and before). Burst, Noise and Morph go with the **Timbre** knob, Strike
+and Drive with **Groove**. The kick also lets
 the note's fundamental through in full (normally partials under 90 Hz are softened), so it has weight. If the drum
 layer is silent, the hit lands on the note under its loudest point.
 
@@ -896,7 +904,7 @@ in `patches/`, against the fm1-base and felucca-bsp commits above.
 sectors from 0x97000, one copy per sector, the newest valid copy of an object winning, so a power cut during a save
 leaves the previous copy. 1.0's 16 slot pairs sat at the pool's first 32 sectors and are read as pool copies as they
 are; the Bluetooth record's pair at 0xDE000 moves in at the first boot. A slot's current copy that is not a MANIFOLD
-patch (another firmware's record of the same format) is erased at boot. A patch is 3052 bytes.
+patch (another firmware's record of the same format) is erased at boot. A patch is 3372 bytes.
 
 The device build needs three files from JieLi's AC79 SDK (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,
 `cfg/eq_cfg_hw.bin`; Apache-2.0). `tests/basic.txt` is the host test suite (144 checks: every page, rolls, locks,

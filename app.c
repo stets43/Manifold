@@ -72,7 +72,8 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5041u          /* "MNPA" (1.0.5): MNP9 with the patterns' 20 parameters after the others */
+#define PATCH_MAGIC 0x4D4E5042u          /* "MNPB" (1.0.5): MNP9 with the patterns' and the hits' 40 parameters after the others */
+#define PATCH_MAGIC_A 0x4D4E5041u        /* "MNPA": the 1.0.5 test builds', 195 parameters: read, the hits' at their defaults */
 #define PATCH_MAGIC_9 0x4D4E5039u        /* "MNP9": 175 parameters, the tempo 10..180: read, the new ones at their defaults */
 #define PATCH_MAGIC_8 0x4D4E5038u        /* "MNP8": the same, the tempo 60..180: read, its tempo moved to the new range */
 #define NSCENE 4
@@ -90,19 +91,14 @@ typedef struct {
     int8_t scene_macro[NSCENE][NUM_MACRO];
 } patch_t;
 typedef char patch_fits[sizeof(patch_t) <= PLAT_STORE_MAX ? 1 : -1];
-typedef struct {                         /* MNP9 and MNP8's layout: read, then laid out as patch_t (patch_up) */
-    uint32_t magic;
-    uint16_t nparams, nslots;
-    uint32_t seed;
-    uint8_t style, scene_set, rsv[2];
-    float p[NUM_PARAMS_9];
-    ModSlot slot[MOD_SLOTS];
-    int8_t kpath[NUM_PARAMS_9][KNOB_WP];
-    float macro[NUM_MACRO];
-    uint8_t locked[NUM_SECTIONS];
-    uint16_t scene[NSCENE][NUM_PARAMS_9];
-    int8_t scene_macro[NSCENE][NUM_MACRO];
-} patch9_t;
+/* the older layouts, read and then laid out as patch_t (patch_up): MNP9 and MNP8's (175 parameters), MNPA's (195) */
+#define PATCH_OLD(T, NP) typedef struct { \
+    uint32_t magic; uint16_t nparams, nslots; uint32_t seed; uint8_t style, scene_set, rsv[2]; \
+    float p[NP]; ModSlot slot[MOD_SLOTS]; int8_t kpath[NP][KNOB_WP]; float macro[NUM_MACRO]; \
+    uint8_t locked[NUM_SECTIONS]; uint16_t scene[NSCENE][NP]; int8_t scene_macro[NSCENE][NUM_MACRO]; } T
+PATCH_OLD(patch9_t, NUM_PARAMS_9);
+PATCH_OLD(patchA_t, NUM_PARAMS_A);
+#undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
 static uint8_t undo_ok;
@@ -476,38 +472,38 @@ static void settings_defaults(void)
     set.ver = 5;
 }
 
-/* an MNP9 (or MNP8) patch read into a patch_t's room, laid out as one in place: each field moved to its new place,
-   the last first (every field only moves later), then the new parameters at their defaults (in the patch, its scenes
-   and its knobs' paths) and the matrix's routes to the knobs moved past them */
+/* an older patch read into a patch_t's room, laid out as one in place: each field moved to its new place, the last
+   first (every field only moves later), then the new parameters at their defaults (in the patch, its scenes and its
+   knobs' paths) and the matrix's routes to the knobs moved past them. One body for each old layout (T, its count) */
 static void mv_up(unsigned char *d, const unsigned char *s, size_t n)   /* a copy to a later place (d >= s): from the end */
 {
     while (n--)
         d[n] = s[n];
 }
-static void patch_up(patch_t *p)
-{
-    unsigned char *b = (unsigned char *)p;
-    int i, k;
-    mv_up(b + offsetof(patch_t, scene_macro), b + offsetof(patch9_t, scene_macro), sizeof p->scene_macro);
-    for (k = NSCENE - 1; k >= 0; k--)
-        mv_up(b + offsetof(patch_t, scene) + (size_t)k * NUM_PARAMS * 2u, b + offsetof(patch9_t, scene) + (size_t)k * NUM_PARAMS_9 * 2u,
-                (size_t)NUM_PARAMS_9 * 2u);
-    mv_up(b + offsetof(patch_t, locked), b + offsetof(patch9_t, locked), sizeof p->locked);
-    mv_up(b + offsetof(patch_t, macro), b + offsetof(patch9_t, macro), sizeof p->macro);
-    mv_up(b + offsetof(patch_t, kpath), b + offsetof(patch9_t, kpath), (size_t)NUM_PARAMS_9 * KNOB_WP);
-    mv_up(b + offsetof(patch_t, slot), b + offsetof(patch9_t, slot), sizeof p->slot);
-    for (i = NUM_PARAMS_9; i < NUM_PARAMS; i++) {
-        p->p[i] = g_param_meta[i].def;
-        for (k = 0; k < KNOB_WP; k++)
-            p->kpath[i][k] = 0;
-        for (k = 0; k < NSCENE; k++)
-            p->scene[k][i] = (uint16_t)(g_param_meta[i].def * 65535.0f + 0.5f);
-    }
-    for (k = 0; k < MOD_SLOTS; k++)
-        if (p->slot[k].src && p->slot[k].dst >= NUM_PARAMS_9)
-            p->slot[k].dst = (uint8_t)(p->slot[k].dst + (NUM_PARAMS - NUM_PARAMS_9));
-    p->nparams = NUM_PARAMS;
+#define PATCH_UP(FN, T, NP) \
+static void FN(patch_t *p) \
+{ \
+    unsigned char *b = (unsigned char *)p; \
+    int i, k; \
+    mv_up(b + offsetof(patch_t, scene_macro), b + offsetof(T, scene_macro), sizeof p->scene_macro); \
+    for (k = NSCENE - 1; k >= 0; k--) \
+        mv_up(b + offsetof(patch_t, scene) + (size_t)k * NUM_PARAMS * 2u, b + offsetof(T, scene) + (size_t)k * (NP) * 2u, (size_t)(NP) * 2u); \
+    mv_up(b + offsetof(patch_t, locked), b + offsetof(T, locked), sizeof p->locked); \
+    mv_up(b + offsetof(patch_t, macro), b + offsetof(T, macro), sizeof p->macro); \
+    mv_up(b + offsetof(patch_t, kpath), b + offsetof(T, kpath), (size_t)(NP) * KNOB_WP); \
+    mv_up(b + offsetof(patch_t, slot), b + offsetof(T, slot), sizeof p->slot); \
+    for (i = (NP); i < NUM_PARAMS; i++) { \
+        p->p[i] = g_param_meta[i].def; \
+        for (k = 0; k < KNOB_WP; k++) p->kpath[i][k] = 0; \
+        for (k = 0; k < NSCENE; k++) p->scene[k][i] = (uint16_t)(g_param_meta[i].def * 65535.0f + 0.5f); \
+    } \
+    for (k = 0; k < MOD_SLOTS; k++) \
+        if (p->slot[k].src && p->slot[k].dst >= (NP)) p->slot[k].dst = (uint8_t)(p->slot[k].dst + (NUM_PARAMS - (NP))); \
+    p->nparams = NUM_PARAMS; \
 }
+PATCH_UP(patch_up9, patch9_t, NUM_PARAMS_9)
+PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
+#undef PATCH_UP
 
 static int patch_read(int slot, patch_t *p)
 {
@@ -517,9 +513,12 @@ static int patch_read(int slot, patch_t *p)
     n = plat_store_load(patch_obj(slot), p, sizeof *p);
     if (n == (int)sizeof(patch9_t) && (p->magic == PATCH_MAGIC_9 || p->magic == PATCH_MAGIC_8) && p->nparams == NUM_PARAMS_9
         && p->nslots == MOD_SLOTS) {
-        patch_up(p);                     /* (an older patch: the patterns' parameters at their defaults, off) */
+        patch_up9(p);                    /* (an older patch: the patterns' and the hits' parameters at their defaults, off) */
         if (p->magic == PATCH_MAGIC_9)
             p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchA_t) && p->magic == PATCH_MAGIC_A && p->nparams == NUM_PARAMS_A && p->nslots == MOD_SLOTS) {
+        patch_upA(p);                    /* (a 1.0.5 test build's: the hits' parameters at their defaults, off) */
+        p->magic = PATCH_MAGIC;
     } else if (n != (int)sizeof *p)
         return 0;
     if (p->nparams != NUM_PARAMS || p->nslots != MOD_SLOTS)
@@ -612,7 +611,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -817,6 +816,8 @@ static void param_name(int id, char *b, int max)
     case P_RH_SWLEV: n = "Swing on"; break;
     case P_KEY_PULL: n = "Keys pull the points"; break;
     }
+    if (id >= P_D1_BURST && id <= P_D4_STRIKE)        /* the hits' pages: a drum on each knob */
+        n = drum_name((id - P_D1_BURST) % NUM_DRUMS);
     if (id >= P_LFO1_RATE && id <= P_LFO6_SYNC) {
         static const char *const W[] = {" rate", " shape", " sync"};
         char t[4] = {(char)('1' + (id - P_LFO1_RATE) / 3), 0, 0, 0};
@@ -1054,6 +1055,11 @@ static const sub_t SUB_METER[] = {           /* the rhythm and the drums it play
     {"Snare sound", {P_D2_BRIGHT, P_D2_SETTLE, P_D2_SNAP, _}},
     {"Hat sound", {P_D3_BRIGHT, P_D3_SETTLE, P_D3_SNAP, _}},
     {"Tom sound", {P_D4_BRIGHT, P_D4_SETTLE, P_D4_SNAP, _}},
+    {"Strike", {P_D1_STRIKE, P_D2_STRIKE, P_D3_STRIKE, P_D4_STRIKE}},   /* (1.0.5: how each hit acts on the synth) */
+    {"Burst", {P_D1_BURST, P_D2_BURST, P_D3_BURST, P_D4_BURST}},
+    {"Noise", {P_D1_NOISE, P_D2_NOISE, P_D3_NOISE, P_D4_NOISE}},
+    {"Morph", {P_D1_MORPH, P_D2_MORPH, P_D3_MORPH, P_D4_MORPH}},
+    {"Drive", {P_D1_DRIVE, P_D2_DRIVE, P_D3_DRIVE, P_D4_DRIVE}},
 };
 static const sub_t SUB_GEN2[] = {
     {"Motion", {P_G2_FUNC, P_G2_A, P_G2_B, P_G2_RATE}},
@@ -2361,6 +2367,8 @@ static void draw_items(const sub_t *sb)
                 dl = (it - P_D1_DENS) / DR_STRIDE;
             else if (it >= P_D1_PAT && it <= P_D4_MUTE)
                 dl = (it - P_D1_PAT) % NUM_DRUMS;
+            else if (it >= P_D1_BURST && it <= P_D4_STRIKE)
+                dl = (it - P_D1_BURST) % NUM_DRUMS;
             if (dl >= 0) {
                 float fl = S.dr.flash[dl];
                 if (fl > 0.15f) cv_rect(32 + text_w(&FONT_XS, n) + 6, y + 6, 6, 6, fl > 0.6f ? C_HI : C_AMB);
@@ -2876,6 +2884,36 @@ void app_frame(void)
 #ifdef PLAT_HOST
 #include <stdio.h>
 static uint32_t dr_last;
+/* (the tests'): this sound saved in an older layout in slot n, with a route from LFO 1 to the Groove knob in its last
+   matrix slot (at that layout's numbering) */
+#define MAKE_OLD(FN, T, NP, MAGIC) \
+static int FN(int sl) \
+{ \
+    static T o; \
+    int i, k; \
+    fill_patch(&pbuf); \
+    memset(&o, 0, sizeof o); \
+    o.magic = MAGIC; o.nparams = (NP); o.nslots = MOD_SLOTS; o.seed = pbuf.seed; o.style = pbuf.style; \
+    o.scene_set = pbuf.scene_set; \
+    for (i = 0; i < (NP); i++) { \
+        o.p[i] = pbuf.p[i]; \
+        for (k = 0; k < KNOB_WP; k++) o.kpath[i][k] = pbuf.kpath[i][k]; \
+        for (k = 0; k < NSCENE; k++) o.scene[k][i] = pbuf.scene[k][i]; \
+    } \
+    memcpy(o.slot, pbuf.slot, sizeof o.slot); \
+    for (k = 0; k < MOD_SLOTS; k++) \
+        if (o.slot[k].dst >= NUM_PARAMS) o.slot[k].dst = (uint8_t)(o.slot[k].dst - (NUM_PARAMS - (NP))); \
+        else if (o.slot[k].dst >= (NP)) o.slot[k].src = 0; \
+    o.slot[MOD_SLOTS - 1].src = SRC_LFO1; o.slot[MOD_SLOTS - 1].dst = (uint8_t)((NP) + 1); o.slot[MOD_SLOTS - 1].depth = .5f; \
+    memcpy(o.macro, pbuf.macro, sizeof o.macro); memcpy(o.locked, pbuf.locked, sizeof o.locked); \
+    memcpy(o.scene_macro, pbuf.scene_macro, sizeof o.scene_macro); \
+    if (plat_store_save(patch_obj(sl), &o, sizeof o) != 0) return 0; \
+    patch_here |= 1ull << sl; \
+    return 1; \
+}
+MAKE_OLD(make_old9, patch9_t, NUM_PARAMS_9, PATCH_MAGIC_9)
+MAKE_OLD(make_oldA, patchA_t, NUM_PARAMS_A, PATCH_MAGIC_A)
+#undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "page"))
@@ -2906,26 +2944,23 @@ int app_expect(const char *what, int *got)
         *got = pint(&S, P_KEY_PULL);
     else if (!strcmp(what, "swlev"))
         *got = pint(&S, P_RH_SWLEV);
-    else if (!strncmp(what, "make9_", 6)) {          /* (a test's): this sound saved as a 1.0.4 patch (MNP9) in slot n,
-                                                        with a route from LFO 1 to the Groove knob in its last matrix slot */
-        static patch9_t o;
-        int sl = atoi(what + 6), i, k;
-        fill_patch(&pbuf);
-        memset(&o, 0, sizeof o);
-        o.magic = PATCH_MAGIC_9; o.nparams = NUM_PARAMS_9; o.nslots = MOD_SLOTS; o.seed = pbuf.seed; o.style = pbuf.style;
-        o.scene_set = pbuf.scene_set;
-        for (i = 0; i < NUM_PARAMS_9; i++) {
-            o.p[i] = pbuf.p[i];
-            for (k = 0; k < KNOB_WP; k++) o.kpath[i][k] = pbuf.kpath[i][k];
-            for (k = 0; k < NSCENE; k++) o.scene[k][i] = pbuf.scene[k][i];
-        }
-        memcpy(o.slot, pbuf.slot, sizeof o.slot);
-        for (k = 0; k < MOD_SLOTS; k++) if (o.slot[k].dst >= NUM_PARAMS) o.slot[k].dst = (uint8_t)(o.slot[k].dst - (NUM_PARAMS - NUM_PARAMS_9));
-        o.slot[MOD_SLOTS - 1].src = SRC_LFO1; o.slot[MOD_SLOTS - 1].dst = (uint8_t)(NUM_PARAMS_9 + 1); o.slot[MOD_SLOTS - 1].depth = .5f;
-        memcpy(o.macro, pbuf.macro, sizeof o.macro); memcpy(o.locked, pbuf.locked, sizeof o.locked); memcpy(o.scene_macro, pbuf.scene_macro, sizeof o.scene_macro);
-        *got = plat_store_save(patch_obj(sl), &o, sizeof o) == 0;
-        if (*got) patch_here |= 1ull << sl;
-    } else if (!strcmp(what, "last_route"))         /* the last matrix slot's destination */
+    else if (!strncmp(what, "make9_", 6))           /* (a test's): this sound saved as a 1.0.4 patch (MNP9) in slot n, */
+        *got = make_old9(atoi(what + 6));            /* with a route from LFO 1 to the Groove knob in its last matrix slot */
+    else if (!strncmp(what, "makeA_", 6))           /* the same as a 1.0.5 test build's (MNPA) */
+        *got = make_oldA(atoi(what + 6));
+    else if (!strcmp(what, "hits_on"))               /* how many of the hits' 20 parameters are above 0 */
+    {
+        int i, n = 0;
+        for (i = P_D1_BURST; i <= P_D4_STRIKE; i++) n += S.base[i] > .005f;   /* (a glide ends near, not at, its value) */
+        *got = n;
+    } else if (!strcmp(what, "hits_any"))           /* any hit on the synth at all */
+    {
+        int i, n = 0;
+        for (i = P_D1_BURST; i <= P_D4_STRIKE; i++) n += S.base[i] > .005f;   /* (a glide ends near, not at, its value) */
+        *got = n > 0;
+    } else if (!strncmp(what, "hit_", 4))           /* a hit parameter in percent: hit_<n> is P_D1_BURST + n */
+        *got = (int)(S.base[P_D1_BURST + atoi(what + 4)] * 100.f + .5f);
+    else if (!strcmp(what, "last_route"))           /* the last matrix slot's destination */
         *got = S.slot[MOD_SLOTS - 1].src ? S.slot[MOD_SLOTS - 1].dst : -1;
     else if (!strcmp(what, "patches_all"))           /* how many of the 64 hold a patch */
         *got = __builtin_popcountll(patch_here);

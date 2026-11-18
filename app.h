@@ -35,12 +35,12 @@ enum { OBJ_SETTINGS, OBJ_PANEL,
 #define APP_STORE_POOL_OBJ0 OBJ_P0
 #define APP_STORE_POOL_OBJN (OBJ_NOBJ - OBJ_P0)
 /* a pooled copy that is not MANIFOLD's (another firmware's record left in the data area, the same record format): a
- * patch slot's current copy whose payload is no MANIFOLD patch ("MNP8", "MNP9", "MNPA") is erased at boot, so it can
+ * patch slot's current copy whose payload is no MANIFOLD patch ("MNP8", "MNP9", "MNPA", "MNPB") is erased at boot, so it can
  * never stand in front of one (storage.c st_pool_boot) */
 #define APP_STORE_POOL_FOREIGN(obj, p, n) ((obj) != OBJ_BLE && !manifold_patch_magic((const unsigned char *)(p), (n)))
 static inline int manifold_patch_magic(const unsigned char *p, unsigned n)
 {
-    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u);
+    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u || p[0] == 0x42u);
 }
 /* Bluetooth audio (fm1-base's own stack): the radio's receive queue, between its interrupt and the main loop. A packet
    acknowledged on air and dropped here when the queue is full is lost for good, and the audio set-up stalls; fm1-base

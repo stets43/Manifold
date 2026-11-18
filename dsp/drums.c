@@ -162,7 +162,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         for (int q = 0; q < v->nq; q++) { v->qt[q] -= SUB; if (v->qt[q] < 0) v->qt[q] = 0; }
     }
     /* the envelopes and what they put on their voices this tick */
-    float lev = pval(s, P_DR_LEVEL) * D->shape * DR_HG, kick = 0.f;
+    float lev = pval(s, P_DR_LEVEL) * D->shape * DR_HG, kick = 0.f, drive = 0.f;
     float dshape = pint(s, P_DR_SHAPE) != DSHAPE_NONE ? 1.f + pval(s, P_DR_DEPTH) * (D->shape_e - .5f) * 1.2f : 1.f;
     for (int d = 0; d < NUM_DRUMS; d++) {
         DrumV *v = &D->v[d]; DrumHit *c = &v->cur, *o = &v->old;
@@ -188,7 +188,17 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         float st = pval(s, DP(d, P_D1_SETTLE)), ts = .3f * fexp2(-5.f * st), se = fexp2(-tm / ts * 1.4427f);
         c->tilt = .45f * pval(s, DP(d, P_D1_BRIGHT)) * se - .2f * st * (1.f - se);
         c->snap = pval(s, DP(d, P_D1_SNAP)) * fexp2(-tm * (1.f / .025f) * 1.4427f);
-        if (t1 > A + H && e < 1e-4f) { v->on = 0; v->env = 0.f; c->h1 = 0.f; }
+        {   /* the hit on the synth (1.0.5): each with the hit's envelope and velocity; Morph falls faster (an attack's) */
+            static const float NLP[NUM_DRUMS] = {.04f, .3f, .85f, .12f};   /* the noise's smoothing: kick dark .. hat bright */
+            float ev = e * v->g;
+            c->burst = pval(s, P_D1_BURST + d) * ev;
+            c->noise = pval(s, P_D1_NOISE + d) * ev;
+            c->morph = pval(s, P_D1_MORPH + d) * e * ev;
+            c->strike = pval(s, P_D1_STRIKE + d); c->se = e;   /* (Strike: the amount, and the hit's envelope that lifts it) */
+            c->nlp = NLP[d];
+            drive += pval(s, P_D1_DRIVE + d) * ev;
+        }
+        if (t1 > A + H && e < 1e-4f) { v->on = 0; v->env = 0.f; c->h1 = 0.f; c->burst = c->noise = c->morph = c->strike = c->se = 0.f; }
         if (d == 0) kick = v->env * v->g;
     }
     {   /* the duck: the kick's envelope squared, released over 150 ms; its gain on the other voices */
@@ -196,6 +206,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         D->duck = k2 > D->duck ? k2 : D->duck * fexp2(-(float)SUB / (.15f * SR) * 1.4427f);
         D->dk0 = D->dk1; D->dk1 = 1.f - dk * D->duck;
     }
+    D->drive = on ? fclamp(drive, 0.f, 1.f) : 0.f;   /* (the fuzz opens with the hits: fx_update) */
     (void)dt;
 }
 #include "ctl_off.h"

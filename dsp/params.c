@@ -147,6 +147,14 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_RH_FILL,"fills",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .3f,.1f,.5f,0),
  M(P_RH_SWLEV,"swing on",SEC_METER,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
  M(P_KEY_PULL,"keys pull",SEC_GEN1,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
+/* the hits' character on the synth: off unless rolled (Wild: anywhere up to 60 %, Drive 40 %) */
+#define CH_P(id,nm,hi) M(id,nm,SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,hi,0)
+ CH_P(P_D1_BURST,"burst",.6f), CH_P(P_D2_BURST,"burst",.6f), CH_P(P_D3_BURST,"burst",.6f), CH_P(P_D4_BURST,"burst",.6f),
+ CH_P(P_D1_NOISE,"noise",.6f), CH_P(P_D2_NOISE,"noise",.6f), CH_P(P_D3_NOISE,"noise",.6f), CH_P(P_D4_NOISE,"noise",.6f),
+ CH_P(P_D1_DRIVE,"drive",.4f), CH_P(P_D2_DRIVE,"drive",.4f), CH_P(P_D3_DRIVE,"drive",.4f), CH_P(P_D4_DRIVE,"drive",.4f),
+ CH_P(P_D1_MORPH,"morph",.6f), CH_P(P_D2_MORPH,"morph",.6f), CH_P(P_D3_MORPH,"morph",.6f), CH_P(P_D4_MORPH,"morph",.6f),
+ CH_P(P_D1_STRIKE,"strike",.6f), CH_P(P_D2_STRIKE,"strike",.6f), CH_P(P_D3_STRIKE,"strike",.6f), CH_P(P_D4_STRIKE,"strike",.6f),
+#undef CH_P
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -638,6 +646,25 @@ static void apply_style(Synth *s) {
         if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .5f, .8f);
                   TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); TR(s, P_D4_BRIGHT, .6f, .9f); TR(s, P_D4_SNAP, .2f, .6f); }
         if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .45f, .8f); TR(s, P_D3_DECAY, .03f, .1f); }
+        /* each hit on the synth (1.0.5): per drum, how likely each is and its range (strike, burst, noise, morph, drive).
+           The genres, Groove and Machine: the kick and tom burst, the snare and hat noise, all strike; Cosmic a little of
+           anything; Ambient almost none (its drums are soft). Wild keeps the plain roll's (each 0..0.6, drive 0..0.4) */
+        {
+            /*                              strike         burst          noise          morph          drive   (p, lo, hi) */
+            static const float CHP[4][15] = {{1, .3f, .7f,  .7f, .2f, .6f,  .15f, .05f, .2f, .2f, .05f, .2f,  .4f, .1f, .4f},  /* kick */
+                                             {1, .4f, .8f,  .3f, 0, .3f,    .8f, .3f, .8f,   .4f, .1f, .4f,  .15f, .05f, .25f}, /* snare */
+                                             {1, .2f, .5f,  .1f, 0, .2f,    .9f, .4f, .9f,   .6f, .2f, .6f,  0, 0, 0},          /* hat */
+                                             {1, .3f, .6f,  .8f, .3f, .7f,  .3f, .1f, .4f,   .4f, .1f, .3f,  .1f, .05f, .2f}};  /* tom */
+            static const int CHI[5] = {P_D1_STRIKE, P_D1_BURST, P_D1_NOISE, P_D1_MORPH, P_D1_DRIVE};
+            for (int d = 0; d < NUM_DRUMS; d++)
+                for (int j = 0; j < 5; j++) {
+                    int id = CHI[j] + d;
+                    float p = CHP[d][3 * j], lo = CHP[d][3 * j + 1], hi = CHP[d][3 * j + 2];
+                    if (A) { p = j == 0 ? .3f : j == 2 && d == 2 ? .3f : 0.f; hi = lo + .5f * (hi - lo); }   /* (ambient: gentle) */
+                    else if (C) { p *= .5f; }
+                    if (frand(r) < p) TR(s, id, lo, hi); else TR(s, id, 0.f, 0.f);
+                }
+        }
         /* and the other way: in Machine, sometimes layer 1 swells with the kick (its Drums envelope) */
         if (on && MA && !s->locked[SEC_GEN1] && frand(r) < .3f) { TD(s, P_G1_ENV, ENV_DRUMS); TD(s, P_G1_ERATE, 0); TR(s, P_G1_CONTOUR, .1f, .5f); }
     }
