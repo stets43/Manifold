@@ -202,11 +202,11 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             for (int h = 0; h < nh; h++) if (hs[h]->node == i) {
                 const DrumHit *x = hs[h]; float m = .5f * (x->h0 + x->h1);
                 H0 += x->h0; H1 += x->h1; hw += m;
-                tilt += m * x->tilt; snap += m * x->snap; if (x->kick) lift += m;
+                tilt += m * x->w * x->tilt; snap += m * x->w * x->snap; if (x->kick) lift += m * x->w;
                 if (x->off > off) off = x->off;
             }
-            float own = .5f * (a0 * g0 + a1 * g1), sh = hw > 1e-9f ? 1.f / (own + hw) : 0.f;
-            tilt *= sh; snap *= sh; lift *= sh;               /* (timbre only: the note's pitch is never touched) */
+            float sh = hw > 1e-9f ? 1.f / hw : 0.f;           /* the hits' own character (their mean), not their share of */
+            tilt *= sh; snap *= sh; lift *= sh;               /* the note's level. Timbre only: the pitch is never touched */
         }
         if (((g0 <= 0.f && g1 <= 0.f) || (a0 < 1e-6f && a1 < 1e-6f)) && H0 < 1e-6f && H1 < 1e-6f) { v->on = 0; continue; }
         if (f > .45f * SR) { v->on = 0; continue; }
@@ -224,7 +224,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         float br = fclamp(lb * 1.6f, 0.f, 1.f), dm = fexp2(-.36f * bloom * (1.f - br)), bm = 1.f;
         if (tilt != 0.f) dm *= fexp2(tilt);                          /* a hit's brightness, settling (drums.c) */
         float wq = wave, wnorm = wn0;
-        if (snap > 0.f) { wq = fclamp(wave + snap, 0.f, 1.f); wnorm = frsqrt(1.f + .359f * wq * wq); }   /* and its Snap: a push on Wave */
+        if (snap > 0.f) { wq = fclamp(wave + snap, 0.f, 2.5f); wnorm = frsqrt(1.f + .359f * wq * wq); }   /* and its Snap: a push on Wave, past its top */
         float c90 = 8100.f * (1.f - lift);                            /* the kick keeps its fundamental */
         /* Tone: where the note's partials stop, in Hz (250 Hz to 16 kHz), falling 24 dB an octave above it. Not a
            filter: each oscillator's level is set by its own frequency, so nothing rings and nothing is smeared; a high

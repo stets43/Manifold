@@ -97,7 +97,7 @@ DSP_CTL static void control_tick(Synth *s) {
         L->eavg += (e * e - L->eavg) * (dt / 1.f);
         float er = sqrtf(L->eavg);
         float want = pval(s, LP(l, P_V1_LEVEL)) * LAYER_GAIN * frsqrt(er > .08f ? er : .08f);
-        if (pint(s, P_DR_ON)) want *= .6f;    /* -4.4 dB: the drums' share of the mix (their hits keep their own gain) */
+        if (pint(s, P_DR_ON)) want *= .45f;   /* -6.9 dB: the drums' share of the mix (their hits keep their own gain): room for their attacks under the limiter */
         L->level_g += (want - L->level_g) * .05f;
     }
     engine_update(s);

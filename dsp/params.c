@@ -73,7 +73,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_DR_ACCENT,"accent",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .6f,.3f,.9f,0),
  M(P_DR_SHAPE,"shape by",SEC_DRUMS,CURVE_DISC,0,0, 0,NUM_DSHAPES, .17f,0,1,0),
  M(P_DR_DEPTH,"depth",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .6f,.3f,1,0),
- M(P_DR_DUCK,"duck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0.f,0,.6f,0),
+ M(P_DR_DUCK,"duck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0.f,0,.9f,0),
 /* a drum's block: its triggers (density, place, follow), the note it rides on the drum layer (voice: 0 the lowest
    sounding .. 1 the highest), its envelope (attack, hold, decay, curve), its level, its character on the voice
    (bright, settle, snap). Every one moddable and rolled */
@@ -578,7 +578,7 @@ static void apply_style(Synth *s) {
         else TD(s, P_DR_SHAPE, DSHAPE_NONE);
         /* the kick's duck: Machine, Breaks and Groove, sometimes Drum circle and Cosmic; never Ambient */
         float pdk = (MA || G || GEN) ? .7f : C ? .3f : 0.f;
-        if (frand(r) < pdk) TR(s, P_DR_DUCK, .25f, .7f); else TR(s, P_DR_DUCK, 0.f, 0.f);
+        if (frand(r) < pdk) TR(s, P_DR_DUCK, .4f, 1.f); else TR(s, P_DR_DUCK, 0.f, 0.f);   /* (1.0.5: deeper) */
         /* the kits, as characters: decay's scale, curve, bright, settle, snap (each a lo..hi; the last three unused) */
         enum { K_SKIN, K_BOOM, K_808, K_WOOD, K_METAL, K_GLITCH, NUM_K };
         static const float KT[NUM_K][12] = {

@@ -305,7 +305,7 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 /* a drum's hit on a voice for one control tick: the voice (layer, node), its level at the tick's start and end (the
    end reached from sample off: where a new hit lands), and the character it puts on the voice at the tick's middle:
    the partials' tilt (log2 a partial), the Wave push, and the kick's lift of the 90 Hz fade. (Never the pitch) */
-typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap; } DrumHit;
+typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap, w; } DrumHit;   /* w: the character's strength, by the hit's envelope */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
     float g;                   /* this hit's velocity */
