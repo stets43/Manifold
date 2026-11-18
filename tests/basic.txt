@@ -688,6 +688,20 @@ expect pat2 0
 expect pat3 0
 expect last_route 196
 expect keys_pull 1
+# and one saved by the withdrawn drum-hits test build (MNPB): loads, its hit parameters and routes to them dropped,
+# its knob route moved back (216 -> 196)
+expect makeB_29 1
+press HOME
+wait 30
+key 13 down
+wait 50
+key 13 up
+wait 30
+release HOME
+wait 1500
+expect last_route 196
+expect first_route 0
+expect keys_pull 1
 # the genre styles: PRESET to House (5), Hip-hop (1), Breakbeat (7): each roll puts a trained pattern on the kick, and
 # the drums play
 tap PLAY
