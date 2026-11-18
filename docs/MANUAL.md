@@ -232,7 +232,7 @@ the knob as you turn it.
 
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
-| **Timbre** | both voices (their Colour too) | Tone, Center, Band and Tilt of the voices |
+| **Timbre** | both voices (their Colour too) | Tone, Center, Band, Tilt and Depth of the voices |
 | **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size and decay, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
@@ -302,7 +302,7 @@ give the same patch.
 | **Ambient** | slow, soft, wide; swells and drifts, down to a single slow note; drums rarely (40–90 BPM) |
 | **Cosmic** | strange scales and combs, passing motions, anything from sparse and slow to dense (60–135 BPM) |
 | **House** | Groove's sound with house and techno patterns: the kick on every beat, the clap on 2 and 4, off-beat and 16th hats, percussion against the bar (115–140 BPM) |
-| **Machine** | Groove's sound with an IDM rhythm: drums always on, the matrix moving the rhythm's own controls hard (80–170 BPM) |
+| **Machine** | Groove's sound with an IDM rhythm: drums always on, the matrix moving the rhythm's own controls firmly (80–170 BPM) |
 | **Breakbeat** | Groove's sound with the classic breaks: syncopated kicks, ghosted snares, mostly 124–140 BPM, a third of the rolls drum'n'bass at 160–178 |
 
 House, Hip-hop and Breakbeat build their drums from a **pattern library trained on about 100 genre patterns** (see
@@ -311,7 +311,7 @@ kick, then hats that go with both, then the swing those hats are played with. Mo
 never has, but they keep its rules: in 60 rolls of each, the snare lands on 2 and 4 in 92–96 % of bars and House's kick
 is on every beat in 89 %.
 
-**The matrix in rolls.** Every curated style rolls 3–10 routes (Machine up to 14) to a wide list of musical places
+**The matrix in rolls.** Every curated style rolls 3–10 routes (Machine up to 12: two to four more on the rhythm's own controls) to a wide list of musical places
 (the voices, the motions, the path, the rhythm, the drums, the effects), deep enough to be heard, each limited so
 nothing shuts or runs away. A route that would feed a layer back into itself (its own envelope moving its own path)
 is never rolled. The genre styles sometimes route a slow LFO or the bar's random to a pattern, so it walks among its

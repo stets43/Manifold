@@ -254,9 +254,10 @@ void params_roll_knobs(Synth *s) {
         int8_t *w = s->kpath[i];
         w[0] = w[1] = w[2] = w[3] = 0;
         /* the ones a player reaches for are always on their knob: the filter, the reverb and delay, the bank's centre,
-           band and tilt, the rhythm's density and swing, the motions' rates */
+           band and tilt and the voices' Depth (the low end: Timbre), the rhythm's density and swing, the motions' rates */
         int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_DL_SEND || i == P_DL_FB
-                || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH;
+                || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH
+                || i == P_V1_DEPTH || i == P_V2_DEPTH;
         if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
         const ParamMeta *m = &g_param_meta[i];
         float span = m->rhi - m->rlo + .15f; if (span < .45f) span = .45f; if (span > 1.f) span = 1.f;
@@ -588,7 +589,7 @@ static void apply_style(Synth *s) {
         TD(s, P_RH_COUNT, 1 + (int)(frand(r) * 4.f));
         TR(s, P_RH_GRIP, A ? 0.f : C ? .15f : .35f, A ? .15f : C ? .7f : .9f);   /* (ambient: the notes do not pulse with the stream) */
         TR(s, P_EVOLVE, (A || C) ? .1f : .05f, (A || C) ? .6f : G ? .2f : .35f);   /* (ambient, cosmic: evolving) */
-        if (MA) TR(s, P_EVOLVE, .25f, .55f);
+        if (MA) TR(s, P_EVOLVE, .2f, .45f);
         if (GEN) { TD(s, P_RH_ASSIGN, RH_SELECT); TR(s, P_RH_MOTION, 0.f, .12f); }
     }
     if (!s->locked[SEC_DRUMS]) {
@@ -745,7 +746,7 @@ static void style_mod(Synth *s) {
     int A = st == STYLE_AMBIENT, C = st == STYLE_COSMIC, MA = st == STYLE_MACHINE;
     int GEN = st == STYLE_HOUSE || st == STYLE_HIPHOP || st == STYLE_BREAKS;
     int lo = A ? 3 : C ? 5 : 4, hi = A ? 6 : C ? 10 : 8;
-    float sc = A ? .5f : C ? 1.f : MA ? 1.f : .8f;
+    float sc = A ? .5f : C ? 1.f : MA ? .85f : .8f;
     int n = lo + (int)(frand(r) * (float)(hi - lo + 1)), k = 0;
     memset(s->slot, 0, sizeof s->slot);
     for (; k < n && k < MOD_SLOTS; k++) {
@@ -758,11 +759,12 @@ static void style_mod(Synth *s) {
         float d = (float)MOD_DST[j][1] * .01f * sc * (.25f + .75f * frand(r));
         m->depth = frand(r) < .5f ? -d : d;
     }
-    if (MA) for (int j = 3 + (int)(frand(r) * 4.f); j > 0 && k < MOD_SLOTS; j--, k++) {   /* Machine: its rhythm, hard */
+    if (MA) for (int j = 2 + (int)(frand(r) * 3.f); j > 0 && k < MOD_SLOTS; j--, k++) {   /* Machine: its rhythm, firmly
+                                                                                         (2..4 routes at 0.15..0.5: it was 3..6 at 0.25..0.8, too much) */
         ModSlot *m = &s->slot[k];
         m->src = (uint8_t)mod_src(r);
         m->dst = MA_DST[(int)(frand(r) * sizeof MA_DST) % sizeof MA_DST];
-        float d = .25f + .55f * frand(r);
+        float d = .15f + .35f * frand(r);
         m->depth = frand(r) < .5f ? -d : d;
     }
     if (GEN && !s->locked[SEC_DRUMS] && frand(r) < .35f && k < MOD_SLOTS) {   /* a pattern that walks among its relatives */

@@ -2955,6 +2955,7 @@ void app_frame(void)
 #ifdef PLAT_HOST
 #include <stdio.h>
 static uint32_t dr_last;
+static float g_kept[NUM_PARAMS];
 /* (the tests'): this sound saved in an older layout of NP parameters in slot n: the parameters past NP dropped (and
    routes to them), with a route from LFO 1 to the Groove knob in its last matrix slot and, past FIRST, one from LFO 1
    to parameter FIRST (a withdrawn one) in its first, at that layout's numbering */
@@ -3000,6 +3001,12 @@ int app_expect(const char *what, int *got)
         *got = S.transport;
     else if (!strcmp(what, "nodes"))
         *got = S.eng.n_nodes;
+    else if (!strncmp(what, "keep_", 5))            /* (the tests') remember a parameter's value now */
+        { g_kept[atoi(what + 5) % NUM_PARAMS] = S.base[atoi(what + 5) % NUM_PARAMS]; *got = 1; }
+    else if (!strncmp(what, "same_", 5))            /* ... and whether it is that again (within a glide's end) */
+        { int id = atoi(what + 5) % NUM_PARAMS; float d = S.base[id] - g_kept[id]; *got = d < .01f && d > -.01f; }
+    else if (!strncmp(what, "onknob_", 7))          /* a parameter is on a performance knob's path */
+        { int id = atoi(what + 7) % NUM_PARAMS, k, on = 0; for (k = 0; k < KNOB_WP; k++) on |= S.kpath[id][k] != 0; *got = on; }
     else if (!strcmp(what, "seed"))
         *got = (int)S.seed;
     else if (!strcmp(what, "style"))

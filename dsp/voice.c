@@ -152,8 +152,12 @@ void voices_build(Synth *s) {
         DSP_FAR(bank_levels)(s, l, L->amp_t);
         memcpy(L->amp, L->amp_t, sizeof L->amp);
         memcpy(L->amc, L->amp, sizeof L->amc);
-        L->mkey[0] = -1.f;                                    /* (the mask: at the next tick) */
-        for (int i = 0; i < MAX_NODES; i++) L->pmask[i] = 0;
+        {   /* Clarity's mask, now (a rebuild must not leave a block without partials) */
+            Engine *e = &s->eng; int N = e->n_nodes < MAX_NODES ? e->n_nodes : MAX_NODES;
+            float k[4] = {pval(s, P_V1_CLARITY + l), DSP_FAR(dsp_exp2)((float)(pint(s, LP(l, P_V1_REG)) - 1)), (float)N,
+                          N > 0 ? e->node[0].freq + 7.f * e->node[N - 1].freq : 0.f};
+            clarity_mask(s, l, k);
+        }
         DSP_FAR(bank_phases)(s, l, L->pho);
     }
 }

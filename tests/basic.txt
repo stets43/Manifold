@@ -482,6 +482,9 @@ wait 30
 release SAVE
 wait 50
 expect patches 1
+expect keep_207 1
+expect keep_210 1
+expect onknob_207 1
 tap REC
 wait 1500
 press HOME
@@ -495,6 +498,9 @@ wait 2000
 expect page 0
 expect build_req 0
 expect scenes 1
+# the undertones' Depth and layer 2's Clarity came back with the patch
+expect same_207 1
+expect same_210 1
 # the Patches page: a SAVE tap opens it and keeps nothing (the load above left the settings unsaved), a second goes
 # back; OCT - / + and K1 choose the bank, never the keys' octave; SAVE + key and HOME + key use the bank
 expect dirty 1
