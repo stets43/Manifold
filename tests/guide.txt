@@ -129,22 +129,7 @@ shot drums-23.png
 turn SELECT 1
 wait 120
 shot drums-24.png
-turn SELECT 1
-wait 120
-shot drums-25.png
-turn SELECT 1
-wait 120
-shot drums-26.png
-turn SELECT 1
-wait 120
-shot drums-27.png
-turn SELECT 1
-wait 120
-shot drums-28.png
-turn SELECT 1
-wait 120
-shot drums-29.png
-turn SELECT -31
+turn SELECT -26
 wait 60
 tap ARP
 wait 300

@@ -43,10 +43,8 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   (replacing Drum circle) and **Hip-hop** (replacing Tongue drum); **Breakbeat** rebuilt (mostly 124–140 BPM, a third
   drum'n'bass). Wider tempos in every style; Ambient, Cosmic and Wild down to sparse, slow, evolving; a deeper,
   richer matrix in every roll (no self-feedback routes); Machine modulates its own rhythm. **Keys pull the points**
-  (Layer 1 → Keys): off, a key plays just its note. The keys play both layers by default. **Drum hits on the synth**:
-  per drum, Strike (the note it rides sounds struck), Burst (a sweep up the harmonics), Noise, Morph (a richer wave
-  on the attack) and Drive (the hit opens the fuzz); rolled in every style but Ambient (lightly) and Wild (anything).
-  Older patches load with the patterns and the hits off; 1.0.4 cannot read patches saved by 1.0.5.
+  (Layer 1 → Keys): off, a key plays just its note. The keys play both layers by default. Older patches load with the
+  patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with
   SAVE + OCT+ or K4 on that page, no longer with a SAVE tap. 1.0's 16 slots become bank A. After 1.0.4, do not go
