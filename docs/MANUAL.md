@@ -232,8 +232,8 @@ the knob as you turn it.
 
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
-| **Timbre** | both voices | Tone, Center, Band and Tilt of the voices |
-| **Groove** | the rhythm and the drums | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
+| **Timbre** | both voices (their Colour too) | Tone, Center, Band and Tilt of the voices |
+| **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size and decay, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
@@ -437,6 +437,12 @@ the colour, not the volume.
 | Colour | K1 | **Odd / even** | 0–100 % | the partials above the fundamental blended toward a square's (odd, falling 1/k: hollow, reedy) under 50 %, toward the even ones (octaves: nasal, organ-like) over it. 50 % is the bank as it is; the fundamental is never changed |
 | | K2 | **Pluck** | Off … 100 % | after a note's level rises (or a drum hits it), its upper partials fade faster than the lower: the top first, as a plucked or struck string. Higher is faster (1.5 s … 25 ms). It also lightens the load: fewer partials sound |
 
+![Colour](img/manual/voice1-4.png)
+
+Rolls set the Colour per layer: Odd / even is left as it is in about half of them (Ambient gently either way), Pluck
+in about half the rhythmic rolls (Machine's fast, Hip-hop's slower, a slow one sometimes in Ambient). Wild takes
+anything.
+
 A layer plays up to 8 notes at once (Setup → Load). When more want to sound, the quietest fade out over 8 ms; no
 note is ever cut.
 
@@ -620,8 +626,10 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +6 dB an octave, the note's energy kept: brighter, not louder), however loud the note already is |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
+| | K4 | **Pluck** | the hit plucks the note it rides: its upper partials fade first after the hit, as the layer's own Pluck does (1.5 s … 25 ms). Off: the layer's own. The note stays plucked until it rises by itself (or, 2 s without a plucking hit, lets go over a second) |
+| **Odd / even** | K1–K4 | per drum | the hit pushes its note's colour toward hollow or even (as the layer's Odd / even), settling as its Bright does. None: the note's own |
 
-![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png)
+![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 
 **The drums never change pitch.** A hit swells a note that is already sounding and colours it. The kick also lets
 the note's fundamental through in full (normally partials under 90 Hz are softened), so it has weight. If the drum

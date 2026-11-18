@@ -133,8 +133,13 @@ typedef enum {
     /* each voice's colour (1.0.5): Odd/even, the balance of its odd and even partials (the middle as before), and
        Pluck, its upper partials fading faster than the lower after it rises (0: off) */
     P_V1_ODDEVEN, P_V2_ODDEVEN, P_V1_PLUCK, P_V2_PLUCK,
+    /* and each drum's on the note it hits: Odd/even, the note's colour pushed at the hit and settling with it (as its
+       Bright does; the middle: none), and Pluck, the note plucked by the hit (0: the layer's own) */
+    P_D1_OE, P_D2_OE, P_D3_OE, P_D4_OE,
+    P_D1_HPLUCK, P_D2_HPLUCK, P_D3_HPLUCK, P_D4_HPLUCK,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_C (P_V2_PLUCK + 1)                    /* the 1.0.5 test build's with the voices' colour ("MNPC") */
 #define NUM_PARAMS_A (P_KEY_PULL + 1)                    /* the 1.0.5 test builds' patches before the voices' colour ("MNPA") */
 #define NUM_PARAMS_9 (P_MASTER + 1)                      /* the parameters of the patches before 1.0.5 ("MNP9") */
 
@@ -309,7 +314,7 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 /* a drum's hit on a voice for one control tick: the voice (layer, node), its level at the tick's start and end (the
    end reached from sample off: where a new hit lands), and the character it puts on the voice at the tick's middle:
    the partials' tilt (log2 a partial), the Wave push, and the kick's lift of the 90 Hz fade. (Never the pitch) */
-typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap, w; } DrumHit;   /* w: the character's strength, by the hit's envelope */
+typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap, w, oe, pl; } DrumHit;   /* (oe: its Odd/even push, -1..1; pl: its Pluck) */   /* w: the character's strength, by the hit's envelope */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
     float g;                   /* this hit's velocity */
@@ -421,6 +426,10 @@ typedef struct {
     uint8_t on;               /* it was rendered last block (else its phases start aligned) */
     float age;                /* Pluck: seconds since its level last rose */
     float pk;                 /* and that level (let down slowly, so a new rise after a fall starts it again) */
+    float hp;                 /* the Pluck a drum's hit gave it: held until the note rises by itself (or 2 s without hits) */
+    float hq;                 /* seconds since a hit last plucked it */
+    float pq;                 /* Pluck's step between partials, as it was last block (it opens over a few blocks, not in one) */
+    float oe;                 /* a hit's Odd/even push on it, smoothed the same way */
 } VoiceSt;
 typedef struct {
     GenSt   g;

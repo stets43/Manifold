@@ -148,8 +148,12 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_RH_SWLEV,"swing on",SEC_METER,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
  M(P_KEY_PULL,"keys pull",SEC_GEN1,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
  /* the voices' colour: at their defaults (the sound before them) and not rolled, until the rolls take them */
- M(P_V1_ODDEVEN,"odd/even",SEC_VOICE1,CURVE_LIN,1,0, 0,1, .5f,.5f,.5f,0), M(P_V2_ODDEVEN,"odd/even",SEC_VOICE2,CURVE_LIN,1,0, 0,1, .5f,.5f,.5f,0),
- M(P_V1_PLUCK,"pluck",SEC_VOICE1,CURVE_LIN,1,0, 0,1, 0,0,0,0), M(P_V2_PLUCK,"pluck",SEC_VOICE2,CURVE_LIN,1,0, 0,1, 0,0,0,0),
+ M(P_V1_ODDEVEN,"odd/even",SEC_VOICE1,CURVE_LIN,1,0, 0,1, .5f,0,1,0), M(P_V2_ODDEVEN,"odd/even",SEC_VOICE2,CURVE_LIN,1,0, 0,1, .5f,0,1,0),
+ M(P_V1_PLUCK,"pluck",SEC_VOICE1,CURVE_LIN,1,0, 0,1, 0,0,.8f,0), M(P_V2_PLUCK,"pluck",SEC_VOICE2,CURVE_LIN,1,0, 0,1, 0,0,.8f,0),
+ M(P_D1_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0), M(P_D2_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0),
+ M(P_D3_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0), M(P_D4_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0),
+ M(P_D1_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D2_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
+ M(P_D3_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D4_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -199,8 +203,7 @@ static int mod_loop(int src, int dst) {
 }
 static int rand_moddable(uint32_t *r) {
     for (;;) {
-        int id = (int)(frand(r) * NUM_PARAMS_A) % NUM_PARAMS_A;   /* (over the parameters before the voices' colour: the
-                                                                     rolls as they were) */
+        int id = (int)(frand(r) * NUM_PARAMS) % NUM_PARAMS;
         if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL
             && !(id >= P_D1_PAT && id <= P_D4_LEN)) return id;   /* (a pattern moves only where a style puts it) */
     }
@@ -537,6 +540,21 @@ static void apply_style(Synth *s) {
             if (ro == ROUTE_MOVE) TR(s, P_G2_ENERGY, .2f, .6f); else TR(s, P_G2_ENERGY, .6f, 1.f);
         } else TD(s, P_G2_ROUTE, ROUTE_PLAY);
     }
+    /* the voices' colour (1.0.5), each layer its own: Odd/even often left as it is, else toward hollow or even (Ambient
+       gently); Pluck in about half the rhythmic rolls (Hip-hop's slower), Machine's fast, a slow one sometimes in Ambient */
+    for (int l = 0; l < NUM_LAYERS; l++) if (!s->locked[l ? SEC_VOICE2 : SEC_VOICE1]) {
+        int oe = P_V1_ODDEVEN + l, pk = P_V1_PLUCK + l;
+        float poe = A ? .35f : (C || MA) ? .6f : .45f, ow = A ? .25f : .45f;
+        if (frand(r) < poe) { if (frand(r) < .5f) TR(s, oe, .5f - ow, .45f); else TR(s, oe, .55f, .5f + ow); }
+        else TR(s, oe, .5f, .5f);
+        float ppk = A ? .2f : C ? .4f : MA ? .55f : .45f;
+        if (frand(r) < ppk) {
+            if (A) TR(s, pk, .05f, .3f);
+            else if (HH) TR(s, pk, .2f, .55f);
+            else if (MA) TR(s, pk, .35f, .85f);
+            else TR(s, pk, .25f, .7f);
+        } else TR(s, pk, 0.f, 0.f);
+    }
     if (!s->locked[SEC_METER]) {
         /* the rhythm: tempo, how many of the stream's peaks pass, the twos or the threes, how fine, the swing, how
            much the long form moves it, and what picks the drum */
@@ -642,6 +660,17 @@ static void apply_style(Synth *s) {
         if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .5f, .8f);
                   TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); TR(s, P_D4_BRIGHT, .6f, .9f); TR(s, P_D4_SNAP, .2f, .6f); }
         if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .45f, .8f); TR(s, P_D3_DECAY, .03f, .1f); }
+        /* each hit's colour on its note (1.0.5): Pluck, so the note it rides sounds struck (most on the snare and tom);
+           Odd/even, a push toward hollow or even that settles with the hit (most on the hat and snare). Ambient: none */
+        {
+            static const float PPL[4] = {.3f, .45f, .25f, .5f}, POE[4] = {.15f, .35f, .45f, .25f};
+            for (int d = 0; d < NUM_DRUMS; d++) {
+                float sc = A ? 0.f : C ? .5f : 1.f;
+                if (frand(r) < PPL[d] * sc) TR(s, P_D1_HPLUCK + d, .25f, .7f); else TR(s, P_D1_HPLUCK + d, 0.f, 0.f);
+                if (frand(r) < POE[d] * sc) { if (frand(r) < .5f) TR(s, P_D1_OE + d, .1f, .35f); else TR(s, P_D1_OE + d, .65f, .9f); }
+                else TR(s, P_D1_OE + d, .5f, .5f);
+            }
+        }
         /* and the other way: in Machine, sometimes layer 1 swells with the kick (its Drums envelope) */
         if (on && MA && !s->locked[SEC_GEN1] && frand(r) < .3f) { TD(s, P_G1_ENV, ENV_DRUMS); TD(s, P_G1_ERATE, 0); TR(s, P_G1_CONTOUR, .1f, .5f); }
     }
@@ -692,6 +721,7 @@ static const uint8_t MOD_DST[][2] = {     /* the place, its most (hundredths) */
     {P_RH_THREES, 40}, {P_RH_TURN, 50}, {P_RH_GRIP, 60}, {P_D1_DECAY, 40}, {P_D3_DECAY, 50}, {P_D2_SNAP, 50}, {P_D3_BRIGHT, 50},
     {P_D2_BRIGHT, 50}, {P_D4_VOICE, 50}, {P_D3_VOICE, 40}, {P_FLT_CUT, 30}, {P_FLT_RES, 40}, {P_FZ_MIX, 40}, {P_DL_SEND, 50},
     {P_DL_TIME, 30}, {P_DL_TONE, 50}, {P_RV_SEND, 50}, {P_RV_SIZE, 40}, {P_RV_MOD, 60}, {P_RV_DAMP, 50}, {P_CMP_PUMP, 40},
+    {P_V1_ODDEVEN, 50}, {P_V2_ODDEVEN, 50}, {P_V1_PLUCK, 40}, {P_V2_PLUCK, 40}, {P_D2_OE, 40}, {P_D3_OE, 40},   /* (1.0.5) */
 };
 static const uint8_t MA_DST[] = {P_RH_DENS, P_RH_THREES, P_RH_TURN, P_RH_SWING, P_RH_SELRATE, P_RH_PULL, P_RH_FEED, P_RH_FINE,
                                  P_RH_FORM, P_RH_MOTION, P_RH_COUNT, P_RH_GRIP};

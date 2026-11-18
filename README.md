@@ -47,7 +47,8 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   Bright and Snap act at full strength however loud the note is (no longer by the hit's share of it), Snap past Wave's
   top with a length Settle sets, and rolls give the kick's duck more depth. A drum's **Bright** tilts by the octave at the
   note's energy (brighter, not louder). Each layer's new **Colour** page: **Odd / even** (hollow ↔ even-rich) and
-  **Pluck** (the upper partials fade first after a note rises); at their defaults the sound is as before. Older patches load with the
+  **Pluck** (the upper partials fade first after a note rises); at their defaults the sound is as before. Each drum
+  can pluck the note it hits and push its Odd / even; all of it rolled per style and on the Timbre and Groove knobs. Older patches load with the
   patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with

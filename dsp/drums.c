@@ -195,6 +195,8 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
             c->snap = sn * (1.f + sn) * fexp2(-tm / tsn * 1.4427f);
         }
         c->w = e * 8.f > 1.f ? 1.f : e * 8.f;   /* (the character at full until the hit falls under -18 dB, then with it) */
+        c->oe = (pval(s, P_D1_OE + d) - .5f) * 2.f * se;   /* its Odd/even push, settling as its Bright does */
+        c->pl = pval(s, P_D1_HPLUCK + d);                  /* its Pluck on the note (voice.c holds it) */
         if (t1 > A + H && e < 1e-4f) { v->on = 0; v->env = 0.f; c->h1 = 0.f; }
         if (d == 0) kick = v->env * v->g;
     }

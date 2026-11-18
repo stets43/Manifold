@@ -72,7 +72,8 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5043u          /* "MNPC" (1.0.5): MNP9 with the patterns' 20 and the voices' 4 parameters after the others */
+#define PATCH_MAGIC 0x4D4E5044u          /* "MNPD" (1.0.5): MNP9 with the patterns' 20, the voices' 4 and the hits' 8 colour parameters after */
+#define PATCH_MAGIC_C 0x4D4E5043u        /* "MNPC": a 1.0.5 test build's, before the hits' colour: read, those at their defaults */
 #define PATCH_MAGIC_A 0x4D4E5041u        /* "MNPA": the 1.0.5 test builds' before the voices' colour: read, those at their defaults */
 #define PATCH_MAGIC_9 0x4D4E5039u        /* "MNP9": 175 parameters, the tempo 10..180: read, the new ones at their defaults */
 #define PATCH_MAGIC_8 0x4D4E5038u        /* "MNP8": the same, the tempo 60..180: read, its tempo moved to the new range */
@@ -102,6 +103,7 @@ typedef char patch_fits[sizeof(patch_t) <= PLAT_STORE_MAX ? 1 : -1];
     uint8_t locked[NUM_SECTIONS]; uint16_t scene[NSCENE][NP]; int8_t scene_macro[NSCENE][NUM_MACRO]; } T
 PATCH_OLD(patch9_t, NUM_PARAMS_9);
 PATCH_OLD(patchA_t, NUM_PARAMS_A);
+PATCH_OLD(patchC_t, NUM_PARAMS_C);
 #undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
@@ -507,6 +509,7 @@ static void FN(patch_t *p) \
 }
 PATCH_UP(patch_up9, patch9_t, NUM_PARAMS_9)
 PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
+PATCH_UP(patch_upC, patchC_t, NUM_PARAMS_C)
 #undef PATCH_UP
 
 typedef struct {                         /* MNPB's layout */
@@ -556,6 +559,9 @@ static int patch_read(int slot, patch_t *p)
             p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchA_t) && p->magic == PATCH_MAGIC_A && p->nparams == NUM_PARAMS_A && p->nslots == MOD_SLOTS) {
         patch_upA(p);                    /* (an earlier 1.0.5 test build's: the voices' colour at its defaults) */
+        p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchC_t) && p->magic == PATCH_MAGIC_C && p->nparams == NUM_PARAMS_C && p->nslots == MOD_SLOTS) {
+        patch_upC(p);                    /* (a later one's: the hits' colour at its defaults) */
         p->magic = PATCH_MAGIC;
     } else if (n != (int)sizeof *p)
         return 0;
@@ -649,7 +655,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -855,6 +861,8 @@ static void param_name(int id, char *b, int max)
     case P_KEY_PULL: n = "Keys pull the points"; break;
     case P_V1_ODDEVEN: case P_V2_ODDEVEN: n = "Odd / even"; break;
     case P_V1_PLUCK: case P_V2_PLUCK: n = "Pluck"; break;
+    case P_D1_HPLUCK: case P_D2_HPLUCK: case P_D3_HPLUCK: case P_D4_HPLUCK: n = "Pluck"; break;
+    case P_D1_OE: case P_D2_OE: case P_D3_OE: case P_D4_OE: n = drum_name(id - P_D1_OE); break;
     }
     if (id >= P_LFO1_RATE && id <= P_LFO6_SYNC) {
         static const char *const W[] = {" rate", " shape", " sync"};
@@ -970,6 +978,17 @@ static void value_text(int id, float n, char *b, int max)
         float hz = 250.0f * fm_exp2f(6.0f * n);
         if (hz < 1000.0f) { int_text((int32_t)(hz + 0.5f), t); text_cat(t, " Hz"); }
         else { fix_text(hz * 0.001f, 1, t); text_cat(t, " kHz"); }
+    } else if (id == P_V1_ODDEVEN || id == P_V2_ODDEVEN || (id >= P_D1_OE && id <= P_D4_OE)) {   /* hollow .. as is .. even */
+        int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);
+        if (pc < 3) text_cpy(t, (id >= P_D1_OE) ? "None" : "As is", sizeof t);
+        else { text_cpy(t, n < .5f ? "Hollow " : "Even ", sizeof t); { char u[6]; int_text(pc, u); text_cat(t, u); } text_cat(t, "%"); }
+    } else if (id == P_V1_PLUCK || id == P_V2_PLUCK || (id >= P_D1_HPLUCK && id <= P_D4_HPLUCK)) {   /* its time */
+        if (n <= .01f) text_cpy(t, (id >= P_D1_HPLUCK) ? "Off: the layer's" : "Off", sizeof t);
+        else {
+            float ms = 1500.0f * fm_exp2f(-6.0f * n);
+            if (ms < 1000.0f) { int_text((int32_t)(ms + 0.5f), t); text_cat(t, " ms"); }
+            else { fix_text(ms * 0.001f, 1, t); text_cat(t, " s"); }
+        }
     } else if (id == P_RH_SWING) {
         int pc = (int)(n * 100.0f + 0.5f);
         int_text(pc, t);
@@ -1090,10 +1109,11 @@ static const sub_t SUB_METER[] = {           /* the rhythm and the drums it play
     {"Rotate", {P_D1_ROT, P_D2_ROT, P_D3_ROT, P_D4_ROT}},
     {"Length", {P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN}},
     {"Mutes", {P_D1_MUTE, P_D2_MUTE, P_D3_MUTE, P_D4_MUTE}},
-    {"Kick sound", {P_D1_BRIGHT, P_D1_SETTLE, P_D1_SNAP, _}},
-    {"Snare sound", {P_D2_BRIGHT, P_D2_SETTLE, P_D2_SNAP, _}},
-    {"Hat sound", {P_D3_BRIGHT, P_D3_SETTLE, P_D3_SNAP, _}},
-    {"Tom sound", {P_D4_BRIGHT, P_D4_SETTLE, P_D4_SNAP, _}},
+    {"Kick sound", {P_D1_BRIGHT, P_D1_SETTLE, P_D1_SNAP, P_D1_HPLUCK}},
+    {"Snare sound", {P_D2_BRIGHT, P_D2_SETTLE, P_D2_SNAP, P_D2_HPLUCK}},
+    {"Hat sound", {P_D3_BRIGHT, P_D3_SETTLE, P_D3_SNAP, P_D3_HPLUCK}},
+    {"Tom sound", {P_D4_BRIGHT, P_D4_SETTLE, P_D4_SNAP, P_D4_HPLUCK}},
+    {"Odd / even", {P_D1_OE, P_D2_OE, P_D3_OE, P_D4_OE}},          /* (1.0.5: the hit's push on its note's colour) */
 };
 static const sub_t SUB_GEN2[] = {
     {"Motion", {P_G2_FUNC, P_G2_A, P_G2_B, P_G2_RATE}},
@@ -1312,11 +1332,16 @@ static void mx_dst_name(int d, char *b, int max)
     case SEC_GEN2: pre = "Layer 2 "; break;
     case SEC_METER: pre = "Rhythm "; break;
     case SEC_DRUMS:
-        if (d >= P_D1_DENS) {
-            text_cpy(b, drum_name((d - P_D1_DENS) / DR_STRIDE), max);
-            text_cat(b, " ");
-            cat_lower(b, g_param_meta[d].name);
-            return;
+        {   /* a drum's own: its name, then what (the per-drum blocks, the patterns' and the hits' colour by fours) */
+            int dn = d >= P_D1_DENS && d < P_D1_DENS + NUM_DRUMS * DR_STRIDE ? (d - P_D1_DENS) / DR_STRIDE
+                   : d >= P_D1_PAT && d <= P_D4_MUTE ? (d - P_D1_PAT) % NUM_DRUMS
+                   : d >= P_D1_OE && d <= P_D4_HPLUCK ? (d - P_D1_OE) % NUM_DRUMS : -1;
+            if (dn >= 0) {
+                text_cpy(b, drum_name(dn), max);
+                text_cat(b, " ");
+                cat_lower(b, g_param_meta[d].name);
+                return;
+            }
         }
         pre = d == P_DR_ACCENT ? "Drum " : 0;
         break;
@@ -2402,6 +2427,8 @@ static void draw_items(const sub_t *sb)
                 dl = (it - P_D1_DENS) / DR_STRIDE;
             else if (it >= P_D1_PAT && it <= P_D4_MUTE)
                 dl = (it - P_D1_PAT) % NUM_DRUMS;
+            else if (it >= P_D1_OE && it <= P_D4_HPLUCK)
+                dl = (it - P_D1_OE) % NUM_DRUMS;
             if (dl >= 0) {
                 float fl = S.dr.flash[dl];
                 if (fl > 0.15f) cv_rect(32 + text_w(&FONT_XS, n) + 6, y + 6, 6, 6, fl > 0.6f ? C_HI : C_AMB);
@@ -2949,6 +2976,7 @@ static int FN(int sl) \
 MAKE_OLD(make_old9, patch9_t, NUM_PARAMS_9, PATCH_MAGIC_9, NUM_PARAMS_9)
 MAKE_OLD(make_oldA, patchA_t, NUM_PARAMS_A, PATCH_MAGIC_A, NUM_PARAMS_A)
 MAKE_OLD(make_oldB, patchB_t, NUM_PARAMS_B, PATCH_MAGIC_B, NUM_PARAMS_A)
+MAKE_OLD(make_oldC, patchC_t, NUM_PARAMS_C, PATCH_MAGIC_C, NUM_PARAMS_C)
 #undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
@@ -2990,6 +3018,20 @@ int app_expect(const char *what, int *got)
         *got = make_old9(atoi(what + 6));            /* with a route from LFO 1 to the Groove knob in its last matrix slot */
     else if (!strncmp(what, "makeA_", 6))           /* the same as an earlier 1.0.5 test build's (MNPA) */
         *got = make_oldA(atoi(what + 6));
+    else if (!strncmp(what, "makeC_", 6))           /* and a later one's (MNPC) */
+        *got = make_oldC(atoi(what + 6));
+    else if (!strcmp(what, "hitcolour"))             /* the hits' colour at its defaults (odd/even in the middle, no pluck) */
+    {
+        int d, ok = 1;
+        for (d = 0; d < NUM_DRUMS; d++)
+            if (S.base[P_D1_OE + d] < .49f || S.base[P_D1_OE + d] > .51f || S.base[P_D1_HPLUCK + d] > .005f) ok = 0;
+        *got = ok;
+    } else if (!strncmp(what, "dstname_", 8)) {     /* a matrix destination's name starts with a drum's (1) or "?" (0) */
+        char nb[40];
+        mx_dst_name(atoi(what + 8), nb, sizeof nb);
+        *got = nb[0] != '?' && nb[0] != '-';
+    } else if (!strncmp(what, "knobof_", 7))         /* the performance knob a parameter is on (-1 none) */
+        *got = knob_of(atoi(what + 7));
     else if (!strcmp(what, "colour"))                /* the voices' colour at its defaults (odd/even in the middle, no pluck) */
         *got = S.base[P_V1_ODDEVEN] > .49f && S.base[P_V1_ODDEVEN] < .51f && S.base[P_V2_ODDEVEN] > .49f && S.base[P_V2_ODDEVEN] < .51f
                && S.base[P_V1_PLUCK] < .005f && S.base[P_V2_PLUCK] < .005f;
