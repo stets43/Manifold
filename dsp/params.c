@@ -155,7 +155,9 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_D1_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D2_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
  M(P_D3_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D4_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
  M(P_V1_DEPTH,"depth",SEC_VOICE1,CURVE_LIN,1,0, 0,1, .3f,0,1,0), M(P_V2_DEPTH,"depth",SEC_VOICE2,CURVE_LIN,1,0, 0,1, .3f,0,1,0),
- M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,0, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,0, 0,1, .5f,0,1,0),
+ /* (Clarity is structural: it takes effect at a rebuild, under its duck, never glided: a glide would switch partials
+    tick by tick, and work the mask out each time) */
+ M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,1, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,1, 0,1, .5f,0,1,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -248,9 +250,10 @@ void params_roll_mod(Synth *s) {
 /* the knobs' paths: most parameters of each knob's part ride it (four in five), each with its own way to go: how far
    at the ends (either direction, in proportion to the parameter's own musical range) and somewhere else on the way
    (the half-way point may overshoot the end or lean the other way), so the turn is not one straight morph */
-void params_roll_knobs(Synth *s) {
+void params_roll_knobs(Synth *s) { params_roll_knobs_part(s, 0, NUM_PARAMS); }
+void params_roll_knobs_part(Synth *s, int i0, int i1) {    /* (the knobs' paths of parameters i0..i1-1; the macros at the end) */
     uint32_t *r = &s->rng;
-    for (int i = 0; i < NUM_PARAMS; i++) {
+    for (int i = i0; i < i1; i++) {
         int8_t *w = s->kpath[i];
         w[0] = w[1] = w[2] = w[3] = 0;
         /* the ones a player reaches for are always on their knob: the filter, the reverb and delay, the bank's centre,
@@ -271,7 +274,7 @@ void params_roll_knobs(Synth *s) {
             w[side ? 2 : 1] = (int8_t)(fclamp(near, -1.f, 1.f) * 127.f);
         }
     }
-    for (int m = 0; m < NUM_MACRO; m++) s->macro[m] = 0.f;
+    if (i1 >= NUM_PARAMS) for (int m = 0; m < NUM_MACRO; m++) s->macro[m] = 0.f;
 }
 
 /* ---------------- curated styles ---------------- */
@@ -781,8 +784,28 @@ static void style_mod(Synth *s) {
 }
 
 void params_roll(Synth *s, uint32_t seed) {
-    s->rng = seed * 2654435761u + 1u;
+    for (int p = 0; p < ROLL_PARTS; p++) params_roll_part(s, p, seed);
+}
+/* the roll in parts, each a fraction of a block's work, so a roll run from the audio's interrupt (synth_roll_step) is
+   spread over a few blocks: 0 the parameters, the effects' pairs, the matrix's random routes; 1, 2 the knobs' paths
+   (each half); 3 the style, its matrix, Wild's patterns */
+void params_roll_part(Synth *s, int part, uint32_t seed) {
+    if (part == 1 || part == 2) {
+        if (!s->locked[SEC_KNOBS]) params_roll_knobs_part(s, part == 1 ? 0 : NUM_PARAMS / 2, part == 1 ? NUM_PARAMS / 2 : NUM_PARAMS);
+        return;
+    }
     uint32_t *r = &s->rng;
+    if (part == 3) {
+        apply_style(s);
+        style_mod(s);
+        /* Wild: a quarter of the rolls take patterns too, from any genre's tree */
+        if (s->style == STYLE_WILD && !s->locked[SEC_DRUMS] && frand(r) < .25f) {
+            static const uint8_t GG[3] = {PG_HOUSE, PG_BREAKS, PG_HIPHOP};
+            roll_patterns(s, GG[(int)(frand(r) * 3.f) % 3], 0, 1);
+        }
+        return;
+    }
+    s->rng = seed * 2654435761u + 1u;
     for (int i = 0; i < NUM_PARAMS; i++) {
         const ParamMeta *m = &g_param_meta[i];
         if (s->locked[m->section] || i == P_TEMPER) continue;   /* (locked: left as it is; Temper is the player's: never rolled) */
@@ -801,14 +824,6 @@ void params_roll(Synth *s, uint32_t seed) {
     }
     roll_together(s);
     params_roll_mod(s);
-    if (!s->locked[SEC_KNOBS]) params_roll_knobs(s);
-    apply_style(s);
-    style_mod(s);
-    /* Wild: a quarter of the rolls take patterns too, from any genre's tree */
-    if (s->style == STYLE_WILD && !s->locked[SEC_DRUMS] && frand(r) < .25f) {
-        static const uint8_t GG[3] = {PG_HOUSE, PG_BREAKS, PG_HIPHOP};
-        roll_patterns(s, GG[(int)(frand(r) * 3.f) % 3], 0, 1);
-    }
 }
 
 void synth_set_style(Synth *s, int style) { s->style = style < 0 ? 0 : style % NUM_STYLES; }
@@ -816,12 +831,61 @@ void synth_set_style(Synth *s, int style) { s->style = style < 0 ? 0 : style % N
 /* ---------------- public helpers ---------------- */
 /* the randomizer: every section not locked, or only those in mask. The generators and the meter start again only
    when their sections are rolled, so rolling the effects leaves the rhythm alone */
+static void roll_commit(Synth *s, uint32_t seed, float morph_seconds);
 void synth_roll_sections(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
     uint8_t keep[NUM_SECTIONS];
     memcpy(keep, s->locked, sizeof keep);
     for (int i = 0; i < NUM_SECTIONS; i++) if (!(mask >> i & 1u)) s->locked[i] = 1;
     s->seed = seed;
     params_roll(s, seed);
+    roll_commit(s, seed, morph_seconds);
+    memcpy(s->locked, keep, sizeof keep);
+}
+
+/* The same roll, a part a block (synth_roll_begin, then synth_roll_step at each block's start): run from the audio's
+   interrupt, a whole roll in one block (with the rebuild and the new notes after it) could overrun it. Until the last
+   part the matrix and the knobs' paths are rolled into a copy of their own (swapped in for each part), so the sound
+   never has half a matrix; the targets move at once (the morph glides toward them anyway) */
+static struct {
+    int part;                                   /* the next part (0 none running) */
+    uint32_t seed; float morph; uint8_t keep[NUM_SECTIONS], mask_locked[NUM_SECTIONS];
+} g_roll;
+static ModSlot g_rslot[MOD_SLOTS] DSP_POOL;
+static int8_t g_rkp[NUM_PARAMS][KNOB_WP] DSP_POOL;
+static float g_rmac[NUM_MACRO] DSP_POOL;
+static void roll_swap(Synth *s) {               /* (the live matrix, paths and macros <-> the roll's) */
+    ModSlot t[MOD_SLOTS]; memcpy(t, s->slot, sizeof t); memcpy(s->slot, g_rslot, sizeof t); memcpy(g_rslot, t, sizeof t);
+    for (int i = 0; i < NUM_PARAMS; i++) for (int k = 0; k < KNOB_WP; k++) { int8_t x = s->kpath[i][k]; s->kpath[i][k] = g_rkp[i][k]; g_rkp[i][k] = x; }
+    for (int m = 0; m < NUM_MACRO; m++) { float x = s->macro[m]; s->macro[m] = g_rmac[m]; g_rmac[m] = x; }
+}
+void synth_roll_begin(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
+    if (g_roll.part) { memcpy(s->locked, g_roll.keep, sizeof g_roll.keep); }   /* (a roll before the last finished: dropped) */
+    memcpy(g_roll.keep, s->locked, sizeof g_roll.keep);
+    for (int i = 0; i < NUM_SECTIONS; i++) g_roll.mask_locked[i] = (mask >> i & 1u) ? s->locked[i] : 1;
+    memcpy(g_rslot, s->slot, sizeof g_rslot); memcpy(g_rkp, s->kpath, sizeof g_rkp); memcpy(g_rmac, s->macro, sizeof g_rmac);
+    g_roll.seed = seed; g_roll.morph = morph_seconds; g_roll.part = 1;
+}
+int synth_roll_step(Synth *s) {                 /* one part; 1 while a roll is under way */
+    if (!g_roll.part) return 0;
+    uint8_t lk[NUM_SECTIONS];
+    memcpy(lk, s->locked, sizeof lk); memcpy(s->locked, g_roll.mask_locked, sizeof lk);   /* (the roll's locks, for its part) */
+    int p = g_roll.part - 1;
+    if (p == 0) s->seed = g_roll.seed;
+    roll_swap(s);
+    params_roll_part(s, p, g_roll.seed);
+    roll_swap(s);
+    memcpy(s->locked, lk, sizeof lk);
+    if (++g_roll.part > ROLL_PARTS) {           /* the last: the matrix, the paths and the macros in, the rest as a roll does */
+        roll_swap(s);
+        memcpy(lk, s->locked, sizeof lk); memcpy(s->locked, g_roll.mask_locked, sizeof lk);
+        roll_commit(s, g_roll.seed, g_roll.morph);
+        memcpy(s->locked, lk, sizeof lk);
+        g_roll.part = 0;
+    }
+    return 1;
+}
+
+static void roll_commit(Synth *s, uint32_t seed, float morph_seconds) {
     int structural = 0;
     for (int i = 0; i < NUM_PARAMS; i++) {
         const ParamMeta *m = &g_param_meta[i];
@@ -839,7 +903,6 @@ void synth_roll_sections(Synth *s, uint32_t seed, float morph_seconds, uint32_t 
         gen_reset(g, seed + 77u * (uint32_t)l);
         memcpy(g->held, h, sizeof h); memcpy(g->held_v, hv, sizeof hv);
     }
-    memcpy(s->locked, keep, sizeof keep);
 }
 void synth_randomize(Synth *s, uint32_t seed, float morph_seconds) {
     synth_roll_sections(s, seed, morph_seconds, SEC_ALL);

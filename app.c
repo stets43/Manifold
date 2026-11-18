@@ -179,12 +179,13 @@ static void release_all(void)
 
 static void drain(void)                  /* audio interrupt, start of a block */
 {
+    synth_roll_step(&S);                 /* a roll under way: its next part (a roll is spread over a few blocks) */
     while (q_r != q_w) {
         const cmd_t *c = &q[q_r % QN];
         switch (c->op) {
         case C_PARAM: synth_set_param(&S, c->b, c->f); break;
         case C_MACRO: synth_set_macro(&S, c->a, c->f); break;
-        case C_ROLL: synth_roll_sections(&S, c->u, c->f, c->b); break;
+        case C_ROLL: synth_roll_begin(&S, c->u, c->f, c->b); break;   /* (a part a block: synth_roll_step) */
         case C_MUTATE: synth_mutate(&S, c->f); break;
         case C_STYLE: synth_set_style(&S, c->a); break;
         case C_NOTE: synth_note(&S, c->b, c->f, c->a); break;

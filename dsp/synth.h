@@ -545,6 +545,7 @@ int  knob_of(int id);                       /* the performance knob a parameter 
 const char *knob_name(int k);
 float knob_offset(const Synth *s, int id);  /* the parameter's offset now, from its knob's position along its path */
 void params_roll_knobs(Synth *s);
+void params_roll_knobs_part(Synth *s, int i0, int i1);
 
 /* internal, shared between files */
 DSP_INL float pval(const Synth *s, int id) { return s->val[id]; }   /* modulated, real units (cached) */
@@ -654,6 +655,10 @@ void fx_process(Synth *s, float *L, float *R, int n, float trig_env);
 
 void params_init_meta(void);
 void params_roll(Synth *s, uint32_t seed);
+#define ROLL_PARTS 4
+void params_roll_part(Synth *s, int part, uint32_t seed);
+void synth_roll_begin(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask);   /* a roll, a part a block: */
+int synth_roll_step(Synth *s);                                                        /* (call at each block's start) */
 void params_roll_mod(Synth *s);
 
 #endif

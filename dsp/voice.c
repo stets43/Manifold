@@ -181,7 +181,7 @@ static void clarity_mask(Synth *s, int l, const float *key) {
     for (int i = 0; i < N; i++) {
         float f = e->node[i].freq * oct; L->pmask[i] = 0;
         if (f >= 20.f && f < .45f * SR) {
-            int o = (int)flog2(f * (1.f / 20.f)); if (o > 10) o = 10;
+            int o = 0; for (float b = 40.f; f >= b && o < 10; b *= 2.f) o++;
             L->pmask[i] = 1; cnt[o]++;
         }
     }
@@ -190,7 +190,7 @@ static void clarity_mask(Synth *s, int l, const float *key) {
         for (int q = 0; q < MAX_HARM - 1; q++) {
             int j = ORD[q]; float fj = f * PR[j];
             if (fj < 20.f || fj >= .45f * SR) continue;
-            int o = (int)flog2(fj * (1.f / 20.f)); if (o > 10) o = 10;
+            int o = 0; for (float b = 40.f; fj >= b && o < 10; b *= 2.f) o++;   /* (its octave from 20 Hz) */
             if (cl > .001f && (float)cnt[o] >= BASE[o] * m) continue;
             L->pmask[i] |= (uint16_t)(1u << j); cnt[o]++;
         }
@@ -282,7 +282,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
     static float accB[NUM_LAYERS][6][SUB] DSP_POOL;                  /* (a layer each: layer 2 may run on the second core) */
     float *aC = accB[l][0], *aO = accB[l][1], *aE = accB[l][2], *aD = accB[l][3], *a2 = accB[l][4], *a3 = accB[l][5];
     int nv = 0, nosc = 0;
-    const int capo = OSC_CAP, hard = capo + capo / 4;
+    const int capo = OSC_CAP, hard = capo + capo / 8;   /* (every oscillator counts against it: copies and tails too) */
     float thr = g_thr[l];
     float kw = thr > 2.f * OSC_FLOOR ? 1.f : (thr - OSC_FLOOR) * (1.f / OSC_FLOOR);   /* (the knee deepens as the floor rises) */
     for (int i = 0; i < N; i++) {
@@ -401,14 +401,15 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             uint32_t ph = ph8 * PM[j] + (uint32_t)(L->pho[j] * 4294967296.f), ik = inc8 * PM[j];
             const float *D = !hm ? 0 : 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
             float w = D ? wq : 0.f;
-            if (dup && k <= 3) ai *= .8125f;           /* (shared with its detuned copy: the pair at the same power) */
+            int cp = dup && k <= 3 && nosc < hard;        /* (its detuned copy: under the cap) */
+            if (cp) ai *= .8125f;                      /* (shared with its detuned copy: the pair at the same power) */
             if (w == 0.f) {                                         /* the plain oscillator */
                 for (int t = 0; t < n; t++) { A[t] += T_SIN[ph >> OSC_SH] * ai; ph += ik; }
             } else {                                          /* with Wave's addition (its 2nd and 3rd harmonic) */
                 float aw = ai * w;
                 for (int t = 0; t < n; t++) { uint32_t x = ph >> OSC_SH; A[t] += T_SIN[x] * ai + D[x] * aw; ph += ik; }
             }
-            if (dup && k <= 3) {                              /* the detuned copy of the first three partials */
+            if (cp) {                                         /* the detuned copy of the first three partials */
                 nosc++;
                 float ad = ai * .625f;
                 uint32_t q = v->ph2 * (uint32_t)k, iq = inc2 * (uint32_t)k;
@@ -420,7 +421,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         for (int tl = 0; tl < 2; tl++) {
             float top = f * (tl ? 64.f : 32.f), mid = f * (tl ? 46.f : 23.f), r2 = mid * mid * ifc2;
             float ak = av[NH - 1] * pm * reg / (1.f + r2 * r2);
-            if (top > .45f * SR || ak < 4e-3f || !(pmk & (1u << (NH - 1)))) break;
+            if (top > .45f * SR || ak < 4e-3f || !(pmk & (1u << (NH - 1))) || nosc >= hard) break;
             nosc++;
             float ai = ak;
             const float *T = tl ? T_T2 : T_T1; uint32_t ph = ph8 * 8u;
