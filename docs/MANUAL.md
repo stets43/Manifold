@@ -632,7 +632,7 @@ route never falls back to Linear; only setting it to Linear by hand does.
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 
 **The drums never change pitch.** A hit swells a note that is already sounding and colours it. The kick also lets
-the note's fundamental through in full (normally partials under 90 Hz are softened), so it has weight. If the drum
+the note's fundamental through in full (normally partials under 40 Hz are softened), so it has weight. If the drum
 layer is silent, the hit lands on the note under its loudest point.
 
 With the drums on, the synth sits about 4 dB lower to make room.
@@ -1166,8 +1166,10 @@ bloom(k) = (2^{−0.36·Bloom·(1 − loudness)})^{k − 1}
 
 Partials 7, 11, 13 and 14, which belong to no scale but the harmonic series, are held back. Phases follow
 φₖ = π·D·k², D = Phase/8 (Schroeder's low-crest-factor phases at D = 1/16, Phase = 50 %). Partials below
-90 Hz are softened (12 dB/oct), with the level made up from the partials above, so bass notes read on small speakers
-and leave the sub to the kick. Wave adds each oscillator's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x);
+40 Hz are softened (12 dB/oct; 90 Hz before 1.0.5), with the level made up from the partials above. Every partial
+then takes a gain by its frequency, the voices' balance: up to +6.5 dB under 120 Hz, a broad dip of up to −2.5 dB
+over 300–900 Hz, up to +3 dB at 4–8 kHz (between half-octave steps, a straight line in dB). Without it the
+instrument's long-term spectrum was a mid-range hump, 10 dB light under 100 Hz: an amplified guitar's. Wave adds each oscillator's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x);
 Detune doubles partials 1–3 with copies up to 14 cents away. No partial above 0.45·*f*ₛ is played.
 
 The oscillator budget is 64 per layer. When a layer needs more, a floor rises (from −44 dB relative to each note) so

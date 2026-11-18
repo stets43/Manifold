@@ -37,6 +37,13 @@ static float T_T1[TAIL_N] DSP_POOL;      /* a bass note's partials 17..32, falli
 static float T_T2[TAIL_N] DSP_POOL;      /* ... and 33..64 */       /* ... with room for a 2nd only: 0.5 sin 2x */
 
 static float LOG2K[MAX_HARM + 1];          /* flog2(k): the bank's tilt, k^-p, without a log each time */
+/* the voices' balance across the spectrum (1.0.5): a gain on each partial by its frequency, every half octave from
+   20 Hz, in dB: up to +6.5 dB under 120 Hz (the low end's weight), a broad dip around 300 .. 900 Hz (where most
+   of the notes' partials pile up, and ring: the instrument read as an amplified guitar), a little air from 2 kHz. As
+   amplitudes, worked out once (contour_init); between the steps, a straight line */
+static const float CT_DB[21] = {4.f, 5.f, 6.f, 6.5f, 6.5f, 5.f, 3.f, 1.f, -1.f, -2.5f, -2.5f, -1.5f, 0.f, .5f, 1.5f,
+                                2.5f, 3.f, 3.f, 2.f, 1.f, 0.f};
+static float CT[22];
 /* the last inputs each layer's bank was worked out for (its levels, its phases): a tick whose controls did not move
    reuses them */
 static float g_lv_key[NUM_LAYERS][5], g_ph_key[NUM_LAYERS], g_ph_t[NUM_LAYERS][MAX_HARM];
@@ -52,6 +59,8 @@ static float g_thr[NUM_LAYERS] = {OSC_FLOOR, OSC_FLOOR};
 
 void voices_init(void) {
     for (int k = 1; k <= MAX_HARM; k++) LOG2K[k] = flog2((float)k);
+    for (int i = 0; i < 21; i++) CT[i] = fexp2(CT_DB[i] * .16610f);   /* (dB to an amplitude: 2^(dB / 6.02)) */
+    CT[21] = CT[20];
     for (int l = 0; l < NUM_LAYERS; l++) { g_lv_key[l][0] = -1.f; g_ph_key[l] = -1.f; }
     for (int i = 0; i < OSC_N; i++) {
         float x = (float)i / (float)OSC_N;
@@ -66,6 +75,25 @@ void voices_init(void) {
     }
 }
 
+/* Odd/even on a bank's partials (a): out, blended toward a square's or the even series by how far o is from the middle.
+   The target has the bank's own energy above the fundamental, at least 15 % of the note's; the fundamental is kept.
+   (Inline: the render runs from RAM and calls nothing) */
+DSP_INL void colour(const float *a, float o, float *am) {
+    float x = o < .5f ? 1.f - 2.f * o : 2.f * o - 1.f;
+    for (int k = 0; k < MAX_HARM; k++) am[k] = a[k];
+    if (x <= .02f) return;
+    if (x > 1.f) x = 1.f;
+    int sq = o < .5f;
+    float ea = 0.f, et = 0.f, e1 = am[0] * am[0];
+    for (int k = 2; k <= MAX_HARM; k++) { float t = ((k & 1) == sq) ? 1.f / (float)k : 0.f; ea += am[k - 1] * am[k - 1]; et += t * t; }
+    float want = ea > .15f * (e1 + ea) ? ea : .15f * (e1 + ea);
+    if (want < 1e-12f) return;                            /* (a silent bank: nothing to colour, and no 0 x inf) */
+    float sc = want / et; sc *= frsqrt(sc);
+    for (int k = 2; k <= MAX_HARM; k++) {
+        float t = ((k & 1) == sq) ? sc / (float)k : 0.f;
+        am[k - 1] += x * (t - am[k - 1]);
+    }
+}
 #include "ctl_on.h"
 DSP_CTL static float pw(float x, float e) { return x <= 0.f ? 0.f : fexp2(e * flog2(x)); }
 
@@ -118,6 +146,7 @@ void voices_build(Synth *s) {
         Layer *L = &s->layer[l];
         DSP_FAR(bank_levels)(s, l, L->amp_t);
         memcpy(L->amp, L->amp_t, sizeof L->amp);
+        memcpy(L->amc, L->amp, sizeof L->amc);
         DSP_FAR(bank_phases)(s, l, L->pho);
     }
 }
@@ -138,28 +167,10 @@ DSP_CTL void voices_tick(Synth *s, int l) {
         d = fclamp(d, -.012f, .012f);
         L->pho[k] += d; L->pho[k] -= floorf(L->pho[k]);
     }
+    colour(L->amp, pval(s, P_V1_ODDEVEN + l), L->amc);      /* the layer's Odd/even, once a tick (the notes take it) */
 }
 
 #include "ctl_off.h"
-/* Odd/even on a bank's partials (a): out, blended toward a square's or the even series by how far o is from the middle.
-   The target has the bank's own energy above the fundamental, at least 15 % of the note's; the fundamental is kept.
-   (Inline: the render runs from RAM and calls nothing) */
-DSP_INL void colour(const float *a, float o, float *am) {
-    float x = o < .5f ? 1.f - 2.f * o : 2.f * o - 1.f;
-    for (int k = 0; k < MAX_HARM; k++) am[k] = a[k];
-    if (x <= .02f) return;
-    if (x > 1.f) x = 1.f;
-    int sq = o < .5f;
-    float ea = 0.f, et = 0.f, e1 = am[0] * am[0];
-    for (int k = 2; k <= MAX_HARM; k++) { float t = ((k & 1) == sq) ? 1.f / (float)k : 0.f; ea += am[k - 1] * am[k - 1]; et += t * t; }
-    float want = ea > .15f * (e1 + ea) ? ea : .15f * (e1 + ea);
-    if (want < 1e-12f) return;                            /* (a silent bank: nothing to colour, and no 0 x inf) */
-    float sc = want / et; sc *= frsqrt(sc);
-    for (int k = 2; k <= MAX_HARM; k++) {
-        float t = ((k & 1) == sq) ? sc / (float)k : 0.f;
-        am[k - 1] += x * (t - am[k - 1]);
-    }
-}
 /* Pluck's rate (1/T, per partial step, per second) for an amount: T from 1.5 s down to 25 ms; 0 off */
 DSP_INL float pluck_rate(float p) { return p > .01f ? (1.f / 1.5f) * fexp2(6.f * p) : 0.f; }
 DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
@@ -175,8 +186,6 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
        exp(-(k - 1) t / T) after the note's level last rose, T from 1.5 s down to 25 ms: the top goes first, as a
        plucked or struck string's does (and a drum hit on it strikes it again) */
     float oev = pval(s, P_V1_ODDEVEN + l), plk = pval(s, P_V1_PLUCK + l);
-    float am[MAX_HARM];
-    colour(L->amp, oev, am);
     /* the drums' hits on this layer (drums.c: a slot each, and one fading out): which voices they ride */
     const DrumHit *hs[2 * NUM_DRUMS]; int nh = 0;
     for (int d = 0; d < NUM_DRUMS; d++) {
@@ -242,7 +251,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         }
         if (((g0 <= 0.f && g1 <= 0.f) || (a0 < 1e-6f && a1 < 1e-6f)) && H0 < 1e-6f && H1 < 1e-6f) { v->on = 0; continue; }
         if (f > .45f * SR) { v->on = 0; continue; }
-        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->age = 0.f; v->pk = 0.f; v->hp = 0.f; v->hq = 0.f; v->pq = 1.f; v->oe = 0.f; }   /* a note starting: its oscillators from the phase law */
+        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->age = 0.f; v->pk = 0.f; v->hp = 0.f; v->hq = 0.f; v->pq = 1.f; v->oe = 0.f; v->cf = -1.f; }   /* a note starting: its oscillators from the phase law */
         float plv = plk;
         {   /* Pluck's clock: back to 0 while the note's level (and its hits) rises past where it was. A drum's Pluck
                holds on the note after its hit: until the note rises by itself, or, 2 s without a plucking hit, let go
@@ -263,7 +272,8 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         /* (both glide toward where they are going, about 4 ms: a partial's level is set once a block, and a step of
            the whole spectrum at a hit's start would be a click) */
         v->oe += .35f * (oe - v->oe);
-        float vam[MAX_HARM]; const float *av = am;
+        /* (the layer's colour is worked out once a tick, voices_tick; a note a hit pushes, here) */
+        float vam[MAX_HARM]; const float *av = L->amc;
         if (v->oe > .02f || v->oe < -.02f) { colour(L->amp, fclamp(oev + .5f * v->oe, 0.f, 1.f), vam); av = vam; }
         nv++;
         uint32_t inc = (uint32_t)(f * (4294967296.f / SR)), ph1 = v->ph;
@@ -283,16 +293,15 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         v->pq = pq;
         float wq = wave, wnorm = wn0;
         if (snap > 0.f) { wq = fclamp(wave + snap, 0.f, 2.5f); wnorm = frsqrt(1.f + .359f * wq * wq); }   /* and its Snap: a push on Wave, past its top */
-        float c90 = 8100.f * (1.f - lift);                            /* the kick keeps its fundamental */
+        float c90 = 1600.f * (1.f - lift);                            /* the kick keeps its fundamental */
         /* Tone: where the note's partials stop, in Hz (250 Hz to 16 kHz), falling 24 dB an octave above it. Not a
            filter: each oscillator's level is set by its own frequency, so nothing rings and nothing is smeared; a high
            note under a low Tone is just its fundamental, then nothing. Higher notes are a little quieter too
            (1.5 dB an octave above 350 Hz): the ear is keener there. */
         float fc = 250.f * fexp2(6.f * tone), ifc2 = 1.f / (fc * fc);
         float reg = f > 350.f ? fexp2(-.25f * flog2(f * (1.f / 350.f))) : 1.f;
-        /* ... and where they start: under 90 Hz a partial fades (12 dB an octave), and the note's level is made up from
-           the partials above, so a bass note is its harmonics more than its fundamental, as a low string or reed is:
-           it reads on small speakers, it does not pile up under the kick, and the sub stays the kick's. */
+        /* ... and where they start: under 40 Hz a partial fades (12 dB an octave; before 1.0.5, 90 Hz), and the note's
+           level is made up from the partials above: a bass note keeps its fundamental, the low end its weight */
         float hk[MAX_HARM];
         {   float e0 = 0.f, e1 = 0.f;
             for (int k = 1; k <= MAX_HARM; k++) { float fk = f * (float)k, a = av[k - 1], h = fk * fk / (fk * fk + c90 + 1e-9f); hk[k - 1] = h; e0 += a * a; e1 += a * a * h * h; }
@@ -313,9 +322,19 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             for (int k = 0; k < MAX_HARM; k++) wk[k] *= nr;
         }
         for (int t = 0; t < n; t++) { aC[t] = 0.f; aO[t] = 0.f; aE[t] = 0.f; aD[t] = 0.f; a2[t] = 0.f; a3[t] = 0.f; }
+        if (f != v->cf) {                                             /* the contour's gains: again only when its pitch moves */
+            float cx0 = 2.f * flog2(f * (1.f / 20.f));                /* (the note's place on it, in half octaves) */
+            for (int k = 1; k <= MAX_HARM; k++) {
+                float cx = cx0 + 2.f * LOG2K[k]; if (cx < 0.f) cx = 0.f; if (cx > 20.f) cx = 20.f;
+                int ci = (int)cx; v->cg[k - 1] = CT[ci] + (CT[ci + 1] - CT[ci]) * (cx - (float)ci);
+            }
+            v->cf = f;
+        }
         for (int k = 1; k <= MAX_HARM; k++, bm *= dm, pm *= pq) {
             float fk = f * (float)k, r2 = fk * fk * ifc2, ak = av[k - 1] * bm * pm * reg * hk[k - 1] / (1.f + r2 * r2);
             if (wo) ak *= wk[k - 1];
+            if (ak * 2.12f < thr || fk > .45f * SR) continue;   /* (under the floor even at the contour's top: not played) */
+            ak *= v->cg[k - 1];
             if (ak < thr || fk > .45f * SR) continue;     /* (under -42 dB of the note, or the cap's floor: not played) */
             if (nosc >= hard && k > 1) continue;              /* (a burst past the cap, before the floor has risen) */
             nosc++;

@@ -430,11 +430,14 @@ typedef struct {
     float hq;                 /* seconds since a hit last plucked it */
     float pq;                 /* Pluck's step between partials, as it was last block (it opens over a few blocks, not in one) */
     float oe;                 /* a hit's Odd/even push on it, smoothed the same way */
+    float cf;                 /* the frequency its contour gains (cg) were worked out for */
+    float cg[MAX_HARM];       /* the voices' contour on each of its partials (voice.c), kept while its pitch holds */
 } VoiceSt;
 typedef struct {
     GenSt   g;
     VoiceSt vs[MAX_NODES];
     float   amp[MAX_HARM];         /* the bank's function now: each oscillator's level (unit energy over the 16), glided */
+    float   amc[MAX_HARM];         /* and with the layer's Odd/even (voices_tick) */
     float   amp_t[MAX_HARM];       /* ... its target */
     float   pho[MAX_HARM];         /* each oscillator's phase offset now, cycles (Phase's law, turned by Spin) */
     float   spin;                  /* Spin's angle, cycles */

@@ -44,6 +44,8 @@ static struct {
 } C;
 static float g_drate = 1.f;
 static int g_rint[8];
+static float g_rf0[8], g_rf1[8];   /* a moving line's length at the block's start and end (its reads between samples) */
+static uint8_t g_rmov;             /* which lines are moving (a bit each) */
 static float g_rm0[4], g_rm1[4];                  /* the four modulated lines' lengths, last tick and this */
 static const int RV_MODL[4] = {0, 2, 5, 7};
 
@@ -105,7 +107,7 @@ DSP_CTL void fx_update(Synth *s) {
             L = per * mlt; if (L > 4500.f) L = per * (mlt - 1.f > 1.f ? mlt - 1.f : 1.f);
         }
         if (L > 4500.f) L = 4500.f; if (L < 50.f) L = 50.f;
-        f->rlen_tgt[i] = L;
+        f->rlen_tgt[i] = (float)(int)(L * .5f + .5f) * 2.f;   /* (a whole number of the reverb's steps: still, it reads whole ones) */
         float th = t60 * (1.f - .85f * damp);
         C.r_glo[i] = fexp2(-9.9658f * f->rlen[i] / (t60 * SR));
         C.r_ghi[i] = fexp2(-9.9658f * f->rlen[i] / (th * SR));
@@ -137,9 +139,21 @@ DSP_CTL void fx_update(Synth *s) {
     /* BBD: rate and anti-alias filter glide at control rate */
     g_drate += 0.016f * (C.d_rate_tgt - g_drate);
     C.d_aa = 1.f - fexp2(-TWO_PI * .21f * g_drate * 1.4427f);
-    /* reverb line lengths glide at control rate; unmodulated lines read integer taps */
+    /* reverb line lengths glide at control rate. An unmodulated line that is still reads whole steps; while its
+       length moves (Size turned or modulated, Tuned following the notes) it reads between steps, its length gliding
+       across the block: a smooth bend, where a whole-step read jumped a step at a time (a click each). It lands on a
+       whole step (rlen_tgt is one), and from there reads whole steps again: the same samples, no seam */
+    g_rmov = 0;
     for (int i = 0; i < 8; i++) {
-        f->rlen[i] += 0.0016f * (f->rlen_tgt[i] - f->rlen[i]);
+        float d = f->rlen_tgt[i] - f->rlen[i];
+        g_rf0[i] = f->rlen[i] * rs;
+        if (d > .02f || d < -.02f) {          /* (the glide's tail at least 0.02 a block: it lands, not creeps for seconds) */
+            float st = 0.0016f * d;
+            if (st > -.02f && st < .02f) st = d > 0.f ? .02f : -.02f;
+            f->rlen[i] += st; g_rmov |= (uint8_t)(1u << i);
+        } else f->rlen[i] = f->rlen_tgt[i];
+        g_rf1[i] = f->rlen[i] * rs;
+        if (g_rf0[i] != g_rf1[i]) g_rmov |= (uint8_t)(1u << i);
         g_rint[i] = (int)(f->rlen[i] * rs + .5f);
     }
     float mr = (0.13f + 0.6f * C.r_mod) * (float)SUB / SR;
@@ -150,6 +164,8 @@ DSP_CTL void fx_update(Synth *s) {
         g_rm0[j] = g_rm1[j];
         float ph = f->rmod_ph * MR[j] + MP[j];
         g_rm1[j] = (f->rlen[RV_MODL[j]] + md * fsin(ph - (float)(int)ph)) * rs;
+        g_rf0[RV_MODL[j]] = g_rm0[j]; g_rf1[RV_MODL[j]] = g_rm1[j];   /* (a modulated line: always read between steps) */
+        g_rmov |= (uint8_t)(1u << RV_MODL[j]);
     }
 }
 
@@ -207,13 +223,13 @@ DSP_INL void rv_step(Fx *f, float rin, float fr, float gd, const int *apl, float
     int rw = f->rw[0];
     #define RV_LINE(i, y) do { y += gd; y8[i] = y; f->rlp[i] += lp * (y - f->rlp[i]); \
                                v[i] = C.r_ghi[i] * y + (C.r_glo[i] - C.r_ghi[i]) * f->rlp[i]; } while (0)
-    #define RV_MOD(i, mj) do { float len = g_rm0[mj] + (g_rm1[mj] - g_rm0[mj]) * fr; \
-                               float y = rd16(f->rbuf[i], RV_BUF, (float)rw - len, 1.f / 8192.f); RV_LINE(i, y); } while (0)
-    #define RV_FIX(i) do { int r = rw - g_rint[i]; if (r < 0) r += RV_BUF; \
-                           float y = (float)f->rbuf[i][r] * (1.f / 8192.f); RV_LINE(i, y); } while (0)
-    RV_MOD(0, 0); RV_FIX(1); RV_MOD(2, 1); RV_FIX(3); RV_FIX(4); RV_MOD(5, 2); RV_FIX(6); RV_MOD(7, 3);
-    #undef RV_MOD
-    #undef RV_FIX
+    /* every line reads between steps, its length gliding across the block (g_rf0 .. g_rf1): a modulated line, or a
+       still one while its length moves (Size turned or modulated, Tuned following the notes). A still line's length
+       is a whole number of steps, so it reads whole samples, as before */
+    #define RV_RD(i) do { float y = rd16(f->rbuf[i], RV_BUF, (float)rw - (g_rf0[i] + (g_rf1[i] - g_rf0[i]) * fr), 1.f / 8192.f); \
+                          RV_LINE(i, y); } while (0)
+    RV_RD(0); RV_RD(1); RV_RD(2); RV_RD(3); RV_RD(4); RV_RD(5); RV_RD(6); RV_RD(7);
+    #undef RV_RD
     #undef RV_LINE
     {   /* fast Hadamard, unrolled: 24 add/sub */
         float a0 = v[0] + v[1], a1 = v[0] - v[1], a2 = v[2] + v[3], a3 = v[2] - v[3];
