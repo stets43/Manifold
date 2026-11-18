@@ -602,8 +602,8 @@ typedef struct { uint32_t hit, ghost; uint8_t len; } PatLine;   /* a line: its s
 typedef struct { uint8_t genre, line[4], bpm_lo, bpm_hi, sw_lo, sw_hi, lev, w; } PatEntry;   /* a corpus entry */
 enum { PG_HOUSE, PG_BREAKS, PG_DNB, PG_HIPHOP };
 enum { PMUTE_NONE, PMUTE_KICK, PMUTE_SNARE, PMUTE_HAT, PMUTE_TOM, PMUTE_LINEAR, NUM_PMUTE };
-extern PatLine PAT_LIB[];                   /* (in RAM: the audio tick's; never written) */
-extern uint8_t PAT_OFF[], PAT_CNT[];
+extern const PatLine PAT_LIB[];
+extern const uint8_t PAT_OFF[], PAT_CNT[];
 extern const PatEntry PAT_ENT[];
 extern const int PAT_NENT;
 const PatLine *pat_line(const struct Synth *s, int d);   /* drum d's line now, or 0 (linear) */

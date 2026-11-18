@@ -85,9 +85,7 @@ def main():
     w("")
     off = 0
     offs = []
-    w("/* (PAT_LIB, PAT_OFF, PAT_CNT in RAM: the audio tick reads them, and code in the RAM window must not reach into the")
-    w(" * flash: a cache miss there stalls the audio. PAT_ENT is the roll's, in the flash.) */")
-    w("PatLine PAT_LIB[] = {")
+    w("const PatLine PAT_LIB[] = {")
     for r in ROLES:
         offs.append(off)
         w(f"    /* {r}: {len(lib[r])} lines */")
@@ -97,8 +95,8 @@ def main():
             w(f"    {{0x{hit:08X}u, 0x{ghost:08X}u, {n}}},   /* {vis[:16]}{' ' + vis[16:] if n == 32 else ''} */")
         off += len(lib[r])
     w("};")
-    w(f"uint8_t PAT_OFF[NUM_DRUMS] = {{{', '.join(map(str, offs))}}};")
-    w(f"uint8_t PAT_CNT[NUM_DRUMS] = {{{', '.join(str(len(lib[r])) for r in ROLES)}}};")
+    w(f"const uint8_t PAT_OFF[NUM_DRUMS] = {{{', '.join(map(str, offs))}}};")
+    w(f"const uint8_t PAT_CNT[NUM_DRUMS] = {{{', '.join(str(len(lib[r])) for r in ROLES)}}};")
     w("")
     w("/* the entries: genre (0 house, 1 breakbeat, 2 drum'n'bass, 3 hip-hop), each role's line (1-based; 0 linear), BPM")
     w(" * low and high, swing low and high (hundredths), the swing's level (8 or 16), weight (tenths) */")
