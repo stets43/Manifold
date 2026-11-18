@@ -130,8 +130,12 @@ typedef enum {
     P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN,
     P_D1_MUTE, P_D2_MUTE, P_D3_MUTE, P_D4_MUTE,
     P_RH_GHOST, P_RH_FILL, P_RH_SWLEV, P_KEY_PULL,
+    /* each voice's colour (1.0.5): Odd/even, the balance of its odd and even partials (the middle as before), and
+       Pluck, its upper partials fading faster than the lower after it rises (0: off) */
+    P_V1_ODDEVEN, P_V2_ODDEVEN, P_V1_PLUCK, P_V2_PLUCK,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_A (P_KEY_PULL + 1)                    /* the 1.0.5 test builds' patches before the voices' colour ("MNPA") */
 #define NUM_PARAMS_9 (P_MASTER + 1)                      /* the parameters of the patches before 1.0.5 ("MNP9") */
 
 #define LAYER_STRIDE (P_V2_CENTER - P_V1_CENTER)
@@ -415,6 +419,8 @@ typedef struct {
     float a;                  /* loudness at the start of this block */
     float gv;                 /* the voice cap's crossfade: 1 rendered, 0 not (ramps, never jumps) */
     uint8_t on;               /* it was rendered last block (else its phases start aligned) */
+    float age;                /* Pluck: seconds since its level last rose */
+    float pk;                 /* and that level (let down slowly, so a new rise after a fall starts it again) */
 } VoiceSt;
 typedef struct {
     GenSt   g;

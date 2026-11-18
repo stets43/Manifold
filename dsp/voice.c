@@ -147,6 +147,29 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
     float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
     float width = pval(s, LP(l, P_V1_WIDTH)), bloom = pval(s, LP(l, P_V1_BLOOM));
     float wave = pval(s, LP(l, P_V1_WAVE)), tone = pval(s, LP(l, P_V1_TONE)), det = pval(s, LP(l, P_V1_SPIN));
+    /* the voice's colour (1.0.5). Odd/even: the partials above the fundamental blended toward a square's (odd, 1/k:
+       hollow, a clarinet's) under the middle, toward the even ones' (1/k: octaves, nasal, organ-like) over it; at the
+       ends, all the way. The blend's target has the bank's own energy above the fundamental, and at least 15 % of the
+       note's (a near-sine still takes the colour); the fundamental is left as it is. Pluck: a partial k fades as
+       exp(-(k - 1) t / T) after the note's level last rose, T from 1.5 s down to 25 ms: the top goes first, as a
+       plucked or struck string's does (and a drum hit on it strikes it again) */
+    float oev = pval(s, P_V1_ODDEVEN + l), plk = pval(s, P_V1_PLUCK + l);
+    float am[MAX_HARM];
+    {
+        float x = oev < .5f ? 1.f - 2.f * oev : 2.f * oev - 1.f;
+        for (int k = 0; k < MAX_HARM; k++) am[k] = L->amp[k];
+        if (x > .02f) {
+            int sq = oev < .5f;
+            float ea = 0.f, et = 0.f, e1 = am[0] * am[0];
+            for (int k = 2; k <= MAX_HARM; k++) { float t = ((k & 1) == sq) ? 1.f / (float)k : 0.f; ea += am[k - 1] * am[k - 1]; et += t * t; }
+            float want = ea > .15f * (e1 + ea) ? ea : .15f * (e1 + ea), sc = want / et; sc *= frsqrt(sc);
+            for (int k = 2; k <= MAX_HARM; k++) {
+                float t = ((k & 1) == sq) ? sc / (float)k : 0.f;
+                am[k - 1] += x * (t - am[k - 1]);
+            }
+        }
+    }
+    float pl_r = plk > .01f ? (1.f / 1.5f) * fexp2(6.f * plk) : 0.f;   /* (1/T: per partial step, per second) */
     /* the drums' hits on this layer (drums.c: a slot each, and one fading out): which voices they ride */
     const DrumHit *hs[2 * NUM_DRUMS]; int nh = 0;
     for (int d = 0; d < NUM_DRUMS; d++) {
@@ -210,7 +233,12 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         }
         if (((g0 <= 0.f && g1 <= 0.f) || (a0 < 1e-6f && a1 < 1e-6f)) && H0 < 1e-6f && H1 < 1e-6f) { v->on = 0; continue; }
         if (f > .45f * SR) { v->on = 0; continue; }
-        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; }   /* a note starting: its oscillators from the phase law */
+        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->age = 0.f; v->pk = 0.f; }   /* a note starting: its oscillators from the phase law */
+        {   /* Pluck's clock: back to 0 while the note's level (and its hits) rises past where it was */
+            float lv = a1 * g1 + H1;
+            if (lv > v->pk * 1.05f + 1e-4f) v->age = 0.f; else v->age += (float)n * (1.f / SR);
+            v->pk = lv > v->pk ? lv : v->pk * (1.f - (float)n * (1.f / (.5f * SR)));   /* (let down over ~0.5 s) */
+        }
         nv++;
         uint32_t inc = (uint32_t)(f * (4294967296.f / SR)), ph1 = v->ph;
         /* Detune: the note's first three partials are doubled by a copy a few cents away (up to 14, each note its own
@@ -222,7 +250,8 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         /* Bloom: quieter is darker, each partial step down by exp(-0.25 Bloom (1 - loudness)) */
         float lb = a0 > a1 ? a0 : a1; if (H1 > lb) lb = H1;
         float br = fclamp(lb * 1.6f, 0.f, 1.f), dm = fexp2(-.36f * bloom * (1.f - br)), bm = 1.f;
-        if (tilt != 0.f) dm *= fexp2(tilt);                          /* a hit's brightness, settling (drums.c) */
+        float pq = pl_r > 0.f ? fexp2(-pl_r * v->age * 1.4427f) : 1.f, pm = 1.f;   /* Pluck: each partial step this much lower */
+        if (pq < 1e-3f) pq = 1e-3f;
         float wq = wave, wnorm = wn0;
         if (snap > 0.f) { wq = fclamp(wave + snap, 0.f, 2.5f); wnorm = frsqrt(1.f + .359f * wq * wq); }   /* and its Snap: a push on Wave, past its top */
         float c90 = 8100.f * (1.f - lift);                            /* the kick keeps its fundamental */
@@ -237,12 +266,27 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
            it reads on small speakers, it does not pile up under the kick, and the sub stays the kick's. */
         float hk[MAX_HARM];
         {   float e0 = 0.f, e1 = 0.f;
-            for (int k = 1; k <= MAX_HARM; k++) { float fk = f * (float)k, a = L->amp[k - 1], h = fk * fk / (fk * fk + c90 + 1e-9f); hk[k - 1] = h; e0 += a * a; e1 += a * a * h * h; }
+            for (int k = 1; k <= MAX_HARM; k++) { float fk = f * (float)k, a = am[k - 1], h = fk * fk / (fk * fk + c90 + 1e-9f); hk[k - 1] = h; e0 += a * a; e1 += a * a * h * h; }
             float nr = e1 > 1e-9f ? e0 / e1 : 1.f; if (nr > 9.f) nr = 9.f;
             reg *= nr * frsqrt(nr); }
+        /* a hit's Bright (a tilt per octave, settling: drums.c): a weight for each partial, then all of them together at
+           the note's energy as it was (brighter, not louder: at most +-12 dB) */
+        float wk[MAX_HARM]; int wo = tilt != 0.f;
+        if (wo) {
+            float e0 = 0.f, e1 = 0.f, b = 1.f;
+            for (int k = 1; k <= MAX_HARM; k++, b *= dm) {
+                float fk = f * (float)k, r2 = fk * fk * ifc2, a = am[k - 1] * b * hk[k - 1] / (1.f + r2 * r2);
+                float w = fexp2(tilt * LOG2K[k]);
+                wk[k - 1] = w; e0 += a * a; e1 += a * a * w * w;
+            }
+            float nr = e1 > 1e-12f ? e0 / e1 : 1.f; if (nr > 16.f) nr = 16.f; if (nr < 1.f / 16.f) nr = 1.f / 16.f;
+            nr *= frsqrt(nr);                             /* (its root: no call into the flash) */
+            for (int k = 0; k < MAX_HARM; k++) wk[k] *= nr;
+        }
         for (int t = 0; t < n; t++) { aC[t] = 0.f; aO[t] = 0.f; aE[t] = 0.f; aD[t] = 0.f; a2[t] = 0.f; a3[t] = 0.f; }
-        for (int k = 1; k <= MAX_HARM; k++, bm *= dm) {
-            float fk = f * (float)k, r2 = fk * fk * ifc2, ak = L->amp[k - 1] * bm * reg * hk[k - 1] / (1.f + r2 * r2);
+        for (int k = 1; k <= MAX_HARM; k++, bm *= dm, pm *= pq) {
+            float fk = f * (float)k, r2 = fk * fk * ifc2, ak = am[k - 1] * bm * pm * reg * hk[k - 1] / (1.f + r2 * r2);
+            if (wo) ak *= wk[k - 1];
             if (ak < thr || fk > .45f * SR) continue;     /* (under -42 dB of the note, or the cap's floor: not played) */
             if (nosc >= hard && k > 1) continue;              /* (a burst past the cap, before the floor has risen) */
             nosc++;
@@ -270,7 +314,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
            table each, continuing at the 16th's level and a saw's slope, under Tone like the others (at their middle) */
         for (int tl = 0; tl < 2; tl++) {
             float top = f * (tl ? 64.f : 32.f), mid = f * (tl ? 46.f : 23.f), r2 = mid * mid * ifc2;
-            float ak = L->amp[15] * reg / (1.f + r2 * r2);
+            float ak = am[15] * pm * reg / (1.f + r2 * r2);
             if (top > .45f * SR || ak < 4e-3f) break;
             nosc++;
             float ai = ak;

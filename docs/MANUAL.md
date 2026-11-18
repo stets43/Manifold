@@ -434,6 +434,8 @@ the colour, not the volume.
 | | K2 | **Width** | 0–100 % | stereo: each note is panned by its place on the map |
 | | K3 | **Register** | Octave down, As tuned, Octave up | the whole layer an octave down or up |
 | | K4 | **Layer level** | 0–100 % | the layer's volume |
+| Colour | K1 | **Odd / even** | 0–100 % | the partials above the fundamental blended toward a square's (odd, falling 1/k: hollow, reedy) under 50 %, toward the even ones (octaves: nasal, organ-like) over it. 50 % is the bank as it is; the fundamental is never changed |
+| | K2 | **Pluck** | Off … 100 % | after a note's level rises (or a drum hits it), its upper partials fade faster than the lower: the top first, as a plucked or struck string. Higher is faster (1.5 s … 25 ms). It also lightens the load: fewer partials sound |
 
 A layer plays up to 8 notes at once (Setup → Load). When more want to sound, the quietest fade out over 8 ms; no
 note is ever cut.
@@ -615,7 +617,7 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
 | **Mutes** | K1–K4 | per drum | what it mutes on the instants it plays: Nothing, the kick, the snare, the hat, the tom, or the linear drums |
-| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +2.7 dB a partial), however loud the note already is |
+| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +6 dB an octave, the note's energy kept: brighter, not louder), however loud the note already is |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
 
@@ -1137,7 +1139,7 @@ so Curve blends exponential and straight. It is recomputed each tick from the cu
 parameters, so modulation reshapes a hit that is still ringing. The hit rides a sounding note on the drum layer
 (Voice picks lowest … highest), raising that note's level by the envelope (its own gain, independent of the layer's
 level staging) and, at full strength while the hit is within 18 dB of its peak (then fading with it; before 1.0.5,
-in proportion to the hit's share of the note's level), tilting the partials (Bright, up to +2.7 dB per partial,
+in proportion to the hit's share of the note's level), tilting the partials (Bright, up to +6 dB an octave at the note's energy,
 settling over 300 … 9 ms) and pushing Wave (Snap, past Wave's own top, over 71 … 25 … 9 ms as Settle goes 0 … ½ … 1).
 The kick's duck multiplies the other voices by 1 − 0.75·Duck·env², released over 150 ms. No drum ever changes a frequency.
 

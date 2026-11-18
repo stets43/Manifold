@@ -40,7 +40,7 @@ enum { OBJ_SETTINGS, OBJ_PANEL,
 #define APP_STORE_POOL_FOREIGN(obj, p, n) ((obj) != OBJ_BLE && !manifold_patch_magic((const unsigned char *)(p), (n)))
 static inline int manifold_patch_magic(const unsigned char *p, unsigned n)
 {
-    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u || p[0] == 0x42u);
+    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u || p[0] == 0x42u || p[0] == 0x43u);
 }
 /* Bluetooth audio (fm1-base's own stack): the radio's receive queue, between its interrupt and the main loop. A packet
    acknowledged on air and dropped here when the queue is full is lost for good, and the audio set-up stalls; fm1-base

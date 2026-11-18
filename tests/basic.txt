@@ -278,17 +278,17 @@ expect mx_src 0
 turn K2 1
 wait 50
 expect mx_src 1
-expect mx_dst 195
+expect mx_dst 199
 expect mx_depth 25
 turn K4 3
 wait 30
 expect mx_depth 28
 turn K3 1
 wait 30
-expect mx_dst 196
+expect mx_dst 200
 turn K3 -1
 wait 2000
-expect mx_dst 195
+expect mx_dst 199
 expect knob_moved0 >0
 shot page_matrix.png
 # a layer's motion onto the Motion knob: the generators on a knob
@@ -297,7 +297,7 @@ wait 30
 expect mx_src 17
 turn K3 3
 wait 1000
-expect mx_dst 198
+expect mx_dst 202
 tap HOME
 wait 300
 shot home_knob_routed.png
@@ -672,7 +672,7 @@ expect bank 1
 expect patches_all 4
 expect patches 529
 # 1.0.5: a patch saved by 1.0.4 (MNP9) loads: its sound, the patterns off (their defaults), the keys' pull on, and its
-# matrix route to the Groove knob moved past the new parameters (176 -> 196)
+# matrix route to the Groove knob moved past the new parameters (176 -> 200)
 expect make9_28 1
 press HOME
 wait 30
@@ -686,10 +686,10 @@ expect pat0 0
 expect pat1 0
 expect pat2 0
 expect pat3 0
-expect last_route 196
+expect last_route 200
 expect keys_pull 1
 # and one saved by the withdrawn drum-hits test build (MNPB): loads, its hit parameters and routes to them dropped,
-# its knob route moved back (216 -> 196)
+# its knob route moved (216 -> 200)
 expect makeB_29 1
 press HOME
 wait 30
@@ -699,9 +699,23 @@ key 13 up
 wait 30
 release HOME
 wait 1500
-expect last_route 196
+expect last_route 200
 expect first_route 0
 expect keys_pull 1
+expect colour 1
+# and one saved by an earlier 1.0.5 test build (MNPA, before the voices' colour): its route moved (196 -> 200)
+expect makeA_30 1
+press HOME
+wait 30
+key 14 down
+wait 50
+key 14 up
+wait 30
+release HOME
+wait 1500
+expect last_route 200
+expect keys_pull 1
+expect colour 1
 # the genre styles: PRESET to House (5), Hip-hop (1), Breakbeat (7): each roll puts a trained pattern on the kick, and
 # the drums play
 tap PLAY

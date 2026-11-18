@@ -147,6 +147,9 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_RH_FILL,"fills",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .3f,.1f,.5f,0),
  M(P_RH_SWLEV,"swing on",SEC_METER,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
  M(P_KEY_PULL,"keys pull",SEC_GEN1,CURVE_DISC,0,0, 0,2, .75f,0,1,0),
+ /* the voices' colour: at their defaults (the sound before them) and not rolled, until the rolls take them */
+ M(P_V1_ODDEVEN,"odd/even",SEC_VOICE1,CURVE_LIN,1,0, 0,1, .5f,.5f,.5f,0), M(P_V2_ODDEVEN,"odd/even",SEC_VOICE2,CURVE_LIN,1,0, 0,1, .5f,.5f,.5f,0),
+ M(P_V1_PLUCK,"pluck",SEC_VOICE1,CURVE_LIN,1,0, 0,1, 0,0,0,0), M(P_V2_PLUCK,"pluck",SEC_VOICE2,CURVE_LIN,1,0, 0,1, 0,0,0,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -196,7 +199,8 @@ static int mod_loop(int src, int dst) {
 }
 static int rand_moddable(uint32_t *r) {
     for (;;) {
-        int id = (int)(frand(r) * NUM_PARAMS) % NUM_PARAMS;
+        int id = (int)(frand(r) * NUM_PARAMS_A) % NUM_PARAMS_A;   /* (over the parameters before the voices' colour: the
+                                                                     rolls as they were) */
         if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL
             && !(id >= P_D1_PAT && id <= P_D4_LEN)) return id;   /* (a pattern moves only where a style puts it) */
     }
