@@ -583,6 +583,8 @@ void app_init(void)
         set.midi_ch > 16 || set.last_patch >= N_PATCH || set.theme >= NTHEMES)
         settings_defaults();
     /* caps from older firmware (32 ringing nodes; no harmonics cap): bring them into range, keep the rest */
+    set.cpu2 = 1;                        /* (the second core is always used: 1.0.4 and earlier let the Load page turn it
+                                            off, and kept that) */
     if (set.ver < 5) {                   /* (settings from before 1.0.5: the keys on both layers, once) */
         set.keys_to = 2;
         set.ver = 5;
@@ -1384,7 +1386,9 @@ static float item_value(int it, char *b, int max)
     case V_CAP_HARM: int_text(set.cap_harm, b); text_cat(b, " of 16"); return (float)set.cap_harm / (float)MAX_HARM;
     case V_WS_OS: text_cpy(b, set.ws_os ? "On" : "Off (cheaper)", max); return -1.0f;
     case V_FB_ST: text_cpy(b, set.rv_full ? "Full" : "Half (cheaper)", max); return -1.0f;
-    case V_CPU2: text_cpy(b, !plat_cpu2_on() ? "Unavailable" : set.cpu2 ? "Layer 2 on core 2" : "Off", max); return -1.0f;
+    case V_CPU2:                         /* (1.0.5: a status, not a control: the second core is always used) */
+        text_cpy(b, plat_cpu2_barred() ? "Given up: one core" : !plat_cpu2_on() ? "Unavailable" : "Layer 2 on core 2", max);
+        return -1.0f;
     case V_PEAK: {
         int_text((int32_t)(ui.pf_peak_hold * 100u / BUDGET_US), b);
         text_cat(b, "%  (turn: reset)");
@@ -1558,7 +1562,8 @@ static void edit_item(int it, int32_t det)
     case V_CAP_HARM: set_cap(CAP_HARM, clamp(set.cap_harm + 2 * d, 4, MAX_HARM)); break;
     case V_WS_OS: set_cap(CAP_WSOS, d > 0); break;
     case V_FB_ST: set_cap(CAP_FBST, d > 0); break;
-    case V_CPU2: set_cap(CAP_CPU2, d > 0); break;
+    case V_CPU2: break;                  /* (a status: turning it changes nothing. Off, the first core carried both layers:
+                                            twice its load, crackling) */
     case V_PEAK: ui.pf_peak_hold = 0; break;
     case V_MX_ROUTE: ui.mx_sel = clamp(ui.mx_sel + d, 0, MOD_SLOTS - 1); break;
     case V_MX_SRC: case V_MX_DST: case V_MX_DEPTH: mx_edit(it, det); break;
@@ -2893,6 +2898,8 @@ int app_expect(const char *what, int *got)
         *got = pint(&S, P_D1_PAT + (what[3] - '0'));
     else if (!strncmp(what, "mute", 4) && what[4] >= '0' && what[4] <= '3' && !what[5])
         *got = pint(&S, P_D1_MUTE + (what[4] - '0'));
+    else if (!strcmp(what, "cpu2_used"))             /* layer 2 on the second core (where there is one) */
+        *got = S.par_on == plat_cpu2_on();
     else if (!strcmp(what, "kick_pat_on"))
         *got = pint(&S, P_D1_PAT) > 0;
     else if (!strcmp(what, "keys_pull"))

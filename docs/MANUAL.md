@@ -751,7 +751,7 @@ From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps the
 | **Load** | K1 | **Layer 1 voices** | 4–8 notes at once |
 | | K2 | **Layer 2 voices** | 4–8 |
 | | K3 | **Partials** | 4–16 oscillators a note |
-| **Load cuts 2** | K1 | **Second core** | layer 2 on the FM-1's second core (default) or off |
+| **Load cuts 2** | K1 | **Second core** | a status, not a control: **Layer 2 on core 2** (always, since 1.0.5), or **Given up: one core** if the second core ever failed (fm1-base then renders both layers on the first core until power-off, which crackles: power off and on) |
 | | K2 | **Peak** | the worst block since reset; turn to reset |
 | **Keys** | K1 | **Keys play** | Layer 1, Layer 2, Both layers, Drums |
 
