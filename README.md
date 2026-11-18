@@ -7,7 +7,7 @@
 MANIFOLD turns the FM-1 into a self-playing instrument. Two layers of moving points wander over a map of a
 just-intonation scale (a Tonnetz: neighbours are fifths, thirds and sevenths), and every note they pass near sounds,
 as loud as the points near it. The rhythm is one continuous function of the bar, the drums ride the synth's own notes,
-and every partial is a whole-number multiple of its note. Four performance knobs steer it; the keys play into it.
+and every partial is in tune with its note (its harmonics, and undertones below it). Four performance knobs steer it; the keys play into it.
 
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
@@ -23,21 +23,24 @@ and every partial is a whole-number multiple of its note. Four performance knobs
 - **Twelve motions** for the points: Orbit (Lissajous), Ladder, Swarm (Kuramoto), Lorenz, Motif, Drift, Billiard
   (Sinai), Gravity, Stride, Loops (coprime tape loops), Erode, Chords. **Eight envelopes**: Pulse, Swell, Speed, Pass,
   Height, Hold, Stream, Drums. Either layer can move, add to or gate the other instead of playing.
-- **Voices** of up to 16 exact harmonics a note, shaped by one continuous spectral function (tone, tilt, centre, band,
-  stride, phase law, bloom, detune, width).
+- **Voices** of 13 exact harmonics and three undertones a note (an octave, two and three below: in tune), shaped by
+  one continuous spectral function (tone, tilt, centre, band, stride, phase law, bloom, detune, width), with odd/even
+  colour, pluck, depth and per-octave clarity. Each layer's **Balance** spreads its loudness evenly over the notes'
+  range, or toward the bass or the middle.
 - **A rhythm without a grid**: a stream of smooth peaks with continuous swing, three-against-four, fineness, rotation
   and long form; a threshold or a coupled-oscillator engine; four drums that put envelopes and colour on notes the synth
-  already plays, never changing pitch.
+  already plays, never changing pitch, either linear or playing patterns from a library trained on real house, techno,
+  breakbeat, drum'n'bass and hip-hop.
 - **A 24-route modulation matrix** with six LFOs, the knobs, the generators' own motion and more as sources, and the
   performance knobs as destinations.
 - **Effects**: fuzz, morphing filter, tempo delay, an 8-line reverb that can be tuned to the scale or frozen, bus
   compressor, look-ahead limiter.
-- Rolls in eight styles, locks, undo, 16 patches with four scenes each, MIDI over USB and Bluetooth, Bluetooth audio
+- Rolls in eight styles, locks, undo, 64 patches in four banks with four scenes each, MIDI over USB and Bluetooth, Bluetooth audio
   out to headphones and speakers.
 
 ## Releases
 
-- **1.0.5** (2026-11-17): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
+- **1.0.5** (2026-11-18): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
   breakbeat, drum'n'bass and hip-hop patterns, played without a grid (swing bends them, Density thins them, fills,
   ghosts, rotation, polymetric loop lengths, mutes), rolled by a decision tree over the corpus. New styles **House**
   (replacing Drum circle) and **Hip-hop** (replacing Tongue drum); **Breakbeat** rebuilt (mostly 124–140 BPM, a third

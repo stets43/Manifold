@@ -365,8 +365,8 @@ area of the flash to make room for 64: the 16 slots of earlier versions become b
 power-on. Do not go back to a version before 1.0.4 afterwards: it would miss some patches and forget the Bluetooth
 speakers, and storing a patch there could overwrite others.
 
-**Patches from before 1.0.5** load as they were: the patterns' settings are new and arrive off (every drum Linear),
-with the keys' pull on. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
+**Patches from before 1.0.5** load: the patterns' settings are new and arrive off (every drum Linear), with the keys'
+pull on, and each layer's Balance at Balanced. They may sound different: the voices themselves changed in 1.0.5. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
 Empty), so stay on 1.0.5 or later once you have saved with it.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
