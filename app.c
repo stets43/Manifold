@@ -72,7 +72,8 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5044u          /* "MNPD" (1.0.5): MNP9 with the patterns' 20, the voices' 4 and the hits' 8 colour parameters after */
+#define PATCH_MAGIC 0x4D4E5045u          /* "MNPE" (1.0.5): MNP9 with the patterns' 20, the colour's 12 and the undertones' 4 parameters after */
+#define PATCH_MAGIC_D 0x4D4E5044u        /* "MNPD": a 1.0.5 test build's, before the undertones: read, those at their defaults */
 #define PATCH_MAGIC_C 0x4D4E5043u        /* "MNPC": a 1.0.5 test build's, before the hits' colour: read, those at their defaults */
 #define PATCH_MAGIC_A 0x4D4E5041u        /* "MNPA": the 1.0.5 test builds' before the voices' colour: read, those at their defaults */
 #define PATCH_MAGIC_9 0x4D4E5039u        /* "MNP9": 175 parameters, the tempo 10..180: read, the new ones at their defaults */
@@ -104,6 +105,7 @@ typedef char patch_fits[sizeof(patch_t) <= PLAT_STORE_MAX ? 1 : -1];
 PATCH_OLD(patch9_t, NUM_PARAMS_9);
 PATCH_OLD(patchA_t, NUM_PARAMS_A);
 PATCH_OLD(patchC_t, NUM_PARAMS_C);
+PATCH_OLD(patchD_t, NUM_PARAMS_D);
 #undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
@@ -510,6 +512,7 @@ static void FN(patch_t *p) \
 PATCH_UP(patch_up9, patch9_t, NUM_PARAMS_9)
 PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
 PATCH_UP(patch_upC, patchC_t, NUM_PARAMS_C)
+PATCH_UP(patch_upD, patchD_t, NUM_PARAMS_D)
 #undef PATCH_UP
 
 typedef struct {                         /* MNPB's layout */
@@ -562,6 +565,9 @@ static int patch_read(int slot, patch_t *p)
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchC_t) && p->magic == PATCH_MAGIC_C && p->nparams == NUM_PARAMS_C && p->nslots == MOD_SLOTS) {
         patch_upC(p);                    /* (a later one's: the hits' colour at its defaults) */
+        p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchD_t) && p->magic == PATCH_MAGIC_D && p->nparams == NUM_PARAMS_D && p->nslots == MOD_SLOTS) {
+        patch_upD(p);                    /* (a later one's still: the undertones at their defaults) */
         p->magic = PATCH_MAGIC;
     } else if (n != (int)sizeof *p)
         return 0;
@@ -655,7 +661,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -861,6 +867,8 @@ static void param_name(int id, char *b, int max)
     case P_KEY_PULL: n = "Keys pull the points"; break;
     case P_V1_ODDEVEN: case P_V2_ODDEVEN: n = "Odd / even"; break;
     case P_V1_PLUCK: case P_V2_PLUCK: n = "Pluck"; break;
+    case P_V1_DEPTH: case P_V2_DEPTH: n = "Depth (undertones)"; break;
+    case P_V1_CLARITY: case P_V2_CLARITY: n = "Clarity"; break;
     case P_D1_HPLUCK: case P_D2_HPLUCK: case P_D3_HPLUCK: case P_D4_HPLUCK: n = "Pluck"; break;
     case P_D1_OE: case P_D2_OE: case P_D3_OE: case P_D4_OE: n = drum_name(id - P_D1_OE); break;
     }
@@ -989,6 +997,9 @@ static void value_text(int id, float n, char *b, int max)
             if (ms < 1000.0f) { int_text((int32_t)(ms + 0.5f), t); text_cat(t, " ms"); }
             else { fix_text(ms * 0.001f, 1, t); text_cat(t, " s"); }
         }
+    } else if (id == P_V1_CLARITY || id == P_V2_CLARITY) {
+        if (n <= .001f) text_cpy(t, "Open", sizeof t);
+        else { int_text((int32_t)(n * 100.0f + 0.5f), t); text_cat(t, "%"); }
     } else if (id == P_RH_SWING) {
         int pc = (int)(n * 100.0f + 0.5f);
         int_text(pc, t);
@@ -1079,7 +1090,7 @@ static const sub_t SUB_VOICE1[] = {
     {"Tone", {P_V1_TONE, P_V1_TILT, P_V1_SPIN, P_V1_WAVE}},
     {"Spectrum", {P_V1_CENTER, P_V1_BAND, P_V1_STRIDE, P_V1_PHASE}},
     {"Voice", {P_V1_BLOOM, P_V1_WIDTH, P_V1_REG, P_V1_LEVEL}},
-    {"Colour", {P_V1_ODDEVEN, P_V1_PLUCK, _, _}},       /* (1.0.5) */
+    {"Colour", {P_V1_ODDEVEN, P_V1_PLUCK, P_V1_DEPTH, P_V1_CLARITY}},       /* (1.0.5) */
 };
 static const sub_t SUB_GEN1[] = {
     {"Motion", {P_G1_FUNC, P_G1_A, P_G1_B, P_G1_RATE}},
@@ -1143,7 +1154,7 @@ static const sub_t SUB_VOICE2[] = {
     {"Tone", {P_V2_TONE, P_V2_TILT, P_V2_SPIN, P_V2_WAVE}},
     {"Spectrum", {P_V2_CENTER, P_V2_BAND, P_V2_STRIDE, P_V2_PHASE}},
     {"Voice", {P_V2_BLOOM, P_V2_WIDTH, P_V2_REG, P_V2_LEVEL}},
-    {"Colour", {P_V2_ODDEVEN, P_V2_PLUCK, _, _}},       /* (1.0.5) */
+    {"Colour", {P_V2_ODDEVEN, P_V2_PLUCK, P_V2_DEPTH, P_V2_CLARITY}},       /* (1.0.5) */
 };
 enum { SS_GENERAL, SS_BT, SS_LOAD, SS_LOAD2, SS_KEYS };
 static const sub_t SUB_SETUP[] = {
@@ -2977,6 +2988,7 @@ MAKE_OLD(make_old9, patch9_t, NUM_PARAMS_9, PATCH_MAGIC_9, NUM_PARAMS_9)
 MAKE_OLD(make_oldA, patchA_t, NUM_PARAMS_A, PATCH_MAGIC_A, NUM_PARAMS_A)
 MAKE_OLD(make_oldB, patchB_t, NUM_PARAMS_B, PATCH_MAGIC_B, NUM_PARAMS_A)
 MAKE_OLD(make_oldC, patchC_t, NUM_PARAMS_C, PATCH_MAGIC_C, NUM_PARAMS_C)
+MAKE_OLD(make_oldD, patchD_t, NUM_PARAMS_D, PATCH_MAGIC_D, NUM_PARAMS_D)
 #undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
@@ -3020,6 +3032,12 @@ int app_expect(const char *what, int *got)
         *got = make_oldA(atoi(what + 6));
     else if (!strncmp(what, "makeC_", 6))           /* and a later one's (MNPC) */
         *got = make_oldC(atoi(what + 6));
+    else if (!strncmp(what, "makeD_", 6))           /* and the one before the undertones (MNPD) */
+        *got = make_oldD(atoi(what + 6));
+    else if (!strncmp(what, "pmask_", 6))           /* layer 1's Clarity mask on note n */
+        *got = S.layer[0].pmask[atoi(what + 6)];
+    else if (!strcmp(what, "nodes"))                 /* how many notes */
+        *got = S.eng.n_nodes;
     else if (!strcmp(what, "hitcolour"))             /* the hits' colour at its defaults (odd/even in the middle, no pluck) */
     {
         int d, ok = 1;

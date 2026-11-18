@@ -154,6 +154,8 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_D3_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0), M(P_D4_OE,"odd/even",SEC_DRUMS,CURVE_LIN,1,0, 0,1, .5f,.2f,.8f,0),
  M(P_D1_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D2_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
  M(P_D3_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0), M(P_D4_HPLUCK,"pluck",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,.7f,0),
+ M(P_V1_DEPTH,"depth",SEC_VOICE1,CURVE_LIN,1,0, 0,1, .3f,0,1,0), M(P_V2_DEPTH,"depth",SEC_VOICE2,CURVE_LIN,1,0, 0,1, .3f,0,1,0),
+ M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,0, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,0, 0,1, .5f,0,1,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -547,6 +549,12 @@ static void apply_style(Synth *s) {
         float poe = A ? .35f : (C || MA) ? .6f : .45f, ow = A ? .25f : .45f;
         if (frand(r) < poe) { if (frand(r) < .5f) TR(s, oe, .5f - ow, .45f); else TR(s, oe, .55f, .5f + ow); }
         else TR(s, oe, .5f, .5f);
+        /* Depth: most rolls reach below (Ambient and the genres' deep, Machine's less); Clarity: open to strict, a
+           little stricter where the notes are many (Ambient, Cosmic) */
+        if (A) TR(s, P_V1_DEPTH + l, .35f, .85f);
+        else if (frand(r) < (MA ? .55f : .8f)) TR(s, P_V1_DEPTH + l, MA ? .15f : .25f, MA ? .55f : .75f);
+        else TR(s, P_V1_DEPTH + l, 0.f, 0.f);
+        TR(s, P_V1_CLARITY + l, (A || C) ? .45f : .25f, (A || C) ? .9f : .8f);
         float ppk = A ? .2f : C ? .4f : MA ? .55f : .45f;
         if (frand(r) < ppk) {
             if (A) TR(s, pk, .05f, .3f);
@@ -722,6 +730,7 @@ static const uint8_t MOD_DST[][2] = {     /* the place, its most (hundredths) */
     {P_D2_BRIGHT, 50}, {P_D4_VOICE, 50}, {P_D3_VOICE, 40}, {P_FLT_CUT, 30}, {P_FLT_RES, 40}, {P_FZ_MIX, 40}, {P_DL_SEND, 50},
     {P_DL_TIME, 30}, {P_DL_TONE, 50}, {P_RV_SEND, 50}, {P_RV_SIZE, 40}, {P_RV_MOD, 60}, {P_RV_DAMP, 50}, {P_CMP_PUMP, 40},
     {P_V1_ODDEVEN, 50}, {P_V2_ODDEVEN, 50}, {P_V1_PLUCK, 40}, {P_V2_PLUCK, 40}, {P_D2_OE, 40}, {P_D3_OE, 40},   /* (1.0.5) */
+    {P_V1_DEPTH, 40}, {P_V2_DEPTH, 40},
 };
 static const uint8_t MA_DST[] = {P_RH_DENS, P_RH_THREES, P_RH_TURN, P_RH_SWING, P_RH_SELRATE, P_RH_PULL, P_RH_FEED, P_RH_FINE,
                                  P_RH_FORM, P_RH_MOTION, P_RH_COUNT, P_RH_GRIP};

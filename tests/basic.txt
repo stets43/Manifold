@@ -278,17 +278,17 @@ expect mx_src 0
 turn K2 1
 wait 50
 expect mx_src 1
-expect mx_dst 207
+expect mx_dst 211
 expect mx_depth 25
 turn K4 3
 wait 30
 expect mx_depth 28
 turn K3 1
 wait 30
-expect mx_dst 208
+expect mx_dst 212
 turn K3 -1
 wait 2000
-expect mx_dst 207
+expect mx_dst 211
 expect knob_moved0 >0
 shot page_matrix.png
 # a layer's motion onto the Motion knob: the generators on a knob
@@ -297,7 +297,7 @@ wait 30
 expect mx_src 17
 turn K3 3
 wait 1000
-expect mx_dst 210
+expect mx_dst 214
 tap HOME
 wait 300
 shot home_knob_routed.png
@@ -672,7 +672,7 @@ expect bank 1
 expect patches_all 4
 expect patches 529
 # 1.0.5: a patch saved by 1.0.4 (MNP9) loads: its sound, the patterns off (their defaults), the keys' pull on, and its
-# matrix route to the Groove knob moved past the new parameters (176 -> 208)
+# matrix route to the Groove knob moved past the new parameters (176 -> 212)
 expect make9_28 1
 press HOME
 wait 30
@@ -686,10 +686,10 @@ expect pat0 0
 expect pat1 0
 expect pat2 0
 expect pat3 0
-expect last_route 208
+expect last_route 212
 expect keys_pull 1
 # and one saved by the withdrawn drum-hits test build (MNPB): loads, its hit parameters and routes to them dropped,
-# its knob route moved (216 -> 208)
+# its knob route moved (216 -> 212)
 expect makeB_29 1
 press HOME
 wait 30
@@ -699,11 +699,11 @@ key 13 up
 wait 30
 release HOME
 wait 1500
-expect last_route 208
+expect last_route 212
 expect first_route 0
 expect keys_pull 1
 expect colour 1
-# and one saved by an earlier 1.0.5 test build (MNPA, before the voices' colour): its route moved (196 -> 208)
+# and one saved by an earlier 1.0.5 test build (MNPA, before the voices' colour): its route moved (196 -> 212)
 expect makeA_30 1
 press HOME
 wait 30
@@ -713,11 +713,11 @@ key 14 up
 wait 30
 release HOME
 wait 1500
-expect last_route 208
+expect last_route 212
 expect keys_pull 1
 expect colour 1
 expect hitcolour 1
-# and one saved by a later test build (MNPC, the voices' colour but not the hits'): its route moved (200 -> 208)
+# and one saved by a later test build (MNPC, the voices' colour but not the hits'): its route moved (200 -> 212)
 expect makeC_31 1
 press HOME
 wait 30
@@ -727,7 +727,7 @@ key 15 up
 wait 30
 release HOME
 wait 1500
-expect last_route 208
+expect last_route 212
 expect hitcolour 1
 # the colour's knobs: the voices' on Timbre, the hits' on Groove
 expect knobof_195 0
@@ -739,6 +739,20 @@ expect dstname_175 1
 expect dstname_182 1
 expect dstname_202 1
 expect dstname_206 1
+# and one saved before the undertones (MNPD): its route moved (208 -> 212)
+expect makeD_32 1
+press HOME
+wait 30
+key 16 down
+wait 50
+key 16 up
+wait 30
+release HOME
+wait 1500
+expect last_route 212
+# Depth on Timbre; Clarity on no knob (it switches partials)
+expect knobof_207 0
+expect knobof_210 -1
 # the genre styles: PRESET to House (5), Hip-hop (1), Breakbeat (7): each roll puts a trained pattern on the kick, and
 # the drums play
 tap PLAY

@@ -68,6 +68,8 @@ DSP_CTL int knob_of_r(int id) {
     if (id >= P_D1_LEN && id <= P_D4_LEN) return -1;                       /* (a loop's length: by hand) */
     if (id >= P_V1_ODDEVEN && id <= P_V2_PLUCK) return 0;                  /* the voices' colour: Timbre */
     if (id >= P_D1_OE && id <= P_D4_HPLUCK) return 1;                      /* the hits' colour and pluck: Groove */
+    if (id == P_V1_DEPTH || id == P_V2_DEPTH) return 0;                    /* the voices' depth: Timbre */
+    if (id == P_V1_CLARITY || id == P_V2_CLARITY) return -1;               /* (Clarity: by hand; it switches partials) */
     switch (g_param_meta[id].section) {
     case SEC_VOICE1: case SEC_VOICE2: return 0;
     case SEC_METER: case SEC_DRUMS: return (id >= P_D1_DENS && (id - P_D1_DENS) % DR_STRIDE == P_D1_LEVEL - P_D1_DENS) ? -1 : 1;

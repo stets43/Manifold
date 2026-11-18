@@ -435,7 +435,9 @@ the colour, not the volume.
 | | K3 | **Register** | Octave down, As tuned, Octave up | the whole layer an octave down or up |
 | | K4 | **Layer level** | 0–100 % | the layer's volume |
 | Colour | K1 | **Odd / even** | 0–100 % | the partials above the fundamental blended toward a square's (odd, falling 1/k: hollow, reedy) under 50 %, toward the even ones (octaves: nasal, organ-like) over it. 50 % is the bank as it is; the fundamental is never changed |
-| | K2 | **Pluck** | Off … 100 % | after a note's level rises (or a drum hits it), its upper partials fade faster than the lower: the top first, as a plucked or struck string. Higher is faster (1.5 s … 25 ms). It also lightens the load: fewer partials sound |
+| | K2 | **Pluck** | Off … 100 % | after a note's level rises (or a drum hits it), its upper partials fade faster than the lower: the top first, as a plucked or struck string. Higher is faster (1.5 s … 25 ms). It also lightens the load: fewer partials sound. The undertones do not fade |
+| | K3 | **Depth** | 0–100 % | how much of each note reaches below it: its undertones an octave, two and three down (in tune). At 100 % the first is as loud as the fundamental. The low end's weight; on the Timbre knob |
+| | K4 | **Clarity** | Open … 100 % | how many partials, of all the layer's notes, each octave may hold: the low octaves the fewest. Up, the low end belongs to the lowest notes and the chords above stay clear; Open, everything reaches down. On no knob: it switches partials, so set it by hand (a turn can step) |
 
 ![Colour](img/manual/voice1-4.png)
 
@@ -631,8 +633,8 @@ route never falls back to Linear; only setting it to Linear by hand does.
 
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 
-**The drums never change pitch.** A hit swells a note that is already sounding and colours it. The kick also lets
-the note's fundamental through in full (normally partials under 40 Hz are softened), so it has weight. If the drum
+**The drums never change pitch.** A hit swells a note that is already sounding and colours it, its undertones (Depth)
+with it, so a kick on any note has weight. If the drum
 layer is silent, the hit lands on the note under its loudest point.
 
 With the drums on, the synth sits about 4 dB lower to make room.
@@ -1164,12 +1166,18 @@ tone(F) = 1 / (1 + (F / f_c)⁴)  (−24 dB/oct),   f_c = 250 · 2^{6·Tone} Hz
 bloom(k) = (2^{−0.36·Bloom·(1 − loudness)})^{k − 1}
 ```
 
-Partials 7, 11, 13 and 14, which belong to no scale but the harmonic series, are held back. Phases follow
-φₖ = π·D·k², D = Phase/8 (Schroeder's low-crest-factor phases at D = 1/16, Phase = 50 %). Partials below
-40 Hz are softened (12 dB/oct; 90 Hz before 1.0.5), with the level made up from the partials above. Every partial
-then takes a gain by its frequency, the voices' balance: up to +6.5 dB under 120 Hz, a broad dip of up to −2.5 dB
-over 300–900 Hz, up to +3 dB at 4–8 kHz (between half-octave steps, a straight line in dB). Without it the
-instrument's long-term spectrum was a mid-range hump, 10 dB light under 100 Hz: an amplified guitar's. Wave adds each oscillator's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x);
+A note has 16 oscillators: its harmonics 1–13 (k above, up to 13), then its undertones an octave, two and three
+below (½, ¼, ⅛ of its pitch: octaves, so always in tune), at 1.2·D, 1.2·D², 1.2·D³ of the fundamental before the
+whole is set to unit energy (D = Depth). Every partial is a whole multiple of one phase per note that runs at an eighth
+of its pitch, so the undertones stay locked to the note. Nothing low is cut; no partial under 20 Hz is ever played.
+Clarity then limits, for all of a layer's notes together, how many partials each octave (from 20 Hz: 20–40, 40–80,
+…) may hold: 1, 2, 3, 5, 8, 13, 21, … at full, 16 times that at half (1 + 15·(1 − Clarity)²), no limit at 0. Every
+note's fundamental plays; from the lowest note up, each note's undertones and harmonics, nearest first, take the
+room that is left. A note's place does not depend on whether it sounds, so nothing comes and goes as notes do: the low
+notes keep the low octaves. (It lightens the load too: rolled, about a fifth fewer oscillators.) Partials 7, 11 and
+13, which belong to no scale but the harmonic series, are held back. Phases follow φₖ = π·D·k², D = Phase/8
+(Schroeder's low-crest-factor phases at D = 1/16, Phase = 50 %); the undertones start in phase with the note. Wave
+adds each harmonic's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x; not the undertones': a 3rd of one is out of tune);
 Detune doubles partials 1–3 with copies up to 14 cents away. No partial above 0.45·*f*ₛ is played.
 
 The oscillator budget is 64 per layer. When a layer needs more, a floor rises (from −44 dB relative to each note) so

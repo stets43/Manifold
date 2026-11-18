@@ -226,7 +226,10 @@ DSP_INL void rv_step(Fx *f, float rin, float fr, float gd, const int *apl, float
     /* every line reads between steps, its length gliding across the block (g_rf0 .. g_rf1): a modulated line, or a
        still one while its length moves (Size turned or modulated, Tuned following the notes). A still line's length
        is a whole number of steps, so it reads whole samples, as before */
-    #define RV_RD(i) do { float y = rd16(f->rbuf[i], RV_BUF, (float)rw - (g_rf0[i] + (g_rf1[i] - g_rf0[i]) * fr), 1.f / 8192.f); \
+    /* (a lean read: a line is shorter than its buffer, so one wrap; whole samples come out exactly) */
+    #define RV_RD(i) do { float pos = (float)rw - (g_rf0[i] + (g_rf1[i] - g_rf0[i]) * fr); if (pos < 0.f) pos += (float)RV_BUF; \
+                          int i0 = (int)pos; float fq = pos - (float)i0; const int16_t *bf = f->rbuf[i]; \
+                          float y0 = (float)bf[i0], y = (y0 + ((float)bf[i0 + 1 < RV_BUF ? i0 + 1 : 0] - y0) * fq) * (1.f / 8192.f); \
                           RV_LINE(i, y); } while (0)
     RV_RD(0); RV_RD(1); RV_RD(2); RV_RD(3); RV_RD(4); RV_RD(5); RV_RD(6); RV_RD(7);
     #undef RV_RD

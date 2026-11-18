@@ -102,6 +102,13 @@ DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
     v->delay = delay < 0 ? 0 : delay > SUB - 1 ? SUB - 1 : delay;
     v->pend = 1;
     s->dr.hits++; s->dr.flash[d] = 1.f;
+    {   /* the hit's Odd/even push at full, as its layer's bank coloured: worked out once a hit (in the flash: rare), the
+           render blends each note toward it by its share */
+        float of = (pval(s, P_D1_OE + d) - .5f) * 2.f;
+        s->dr.of[d] = of;
+        if (of > .02f || of < -.02f)
+            DSP_FAR(hit_colour)(s, l, fclamp(pval(s, P_V1_ODDEVEN + l) + .5f * of, 0.f, 1.f), s->dr.oa[d]);
+    }
 }
 
 void drums_hit(Synth *s, int d, int node, float vel) { (void)node; if (d >= 0 && d < NUM_DRUMS) DSP_FAR(hit)(s, d, vel, 0); }
@@ -177,7 +184,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         if (v->pend) {                                        /* the hit lands this tick */
             off = v->delay; v->pend = 0; v->t = 0.f; v->on = 1;
             c->h0 = c->h1;                                    /* (where the voice is: 0 on a new one, hit() saw to it) */
-            c->layer = (int8_t)v->layer; c->node = (int8_t)v->node; c->kick = d == 0;
+            c->layer = (int8_t)v->layer; c->node = (int8_t)v->node; c->d = (uint8_t)d;
         } else c->h0 = c->h1;
         if (!v->on) continue;
         float t1 = v->t + (float)(SUB - off);

@@ -137,8 +137,12 @@ typedef enum {
        Bright does; the middle: none), and Pluck, the note plucked by the hit (0: the layer's own) */
     P_D1_OE, P_D2_OE, P_D3_OE, P_D4_OE,
     P_D1_HPLUCK, P_D2_HPLUCK, P_D3_HPLUCK, P_D4_HPLUCK,
+    /* each voice's reach below its pitch: Depth, how much of its energy goes to its undertones (an octave, two, three
+       below: in tune), and Clarity, how many partials of all the notes each octave may hold (0: any) */
+    P_V1_DEPTH, P_V2_DEPTH, P_V1_CLARITY, P_V2_CLARITY,
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_D (P_D4_HPLUCK + 1)                   /* the 1.0.5 test build's before the undertones ("MNPD") */
 #define NUM_PARAMS_C (P_V2_PLUCK + 1)                    /* the 1.0.5 test build's with the voices' colour ("MNPC") */
 #define NUM_PARAMS_A (P_KEY_PULL + 1)                    /* the 1.0.5 test builds' patches before the voices' colour ("MNPA") */
 #define NUM_PARAMS_9 (P_MASTER + 1)                      /* the parameters of the patches before 1.0.5 ("MNP9") */
@@ -314,7 +318,9 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 /* a drum's hit on a voice for one control tick: the voice (layer, node), its level at the tick's start and end (the
    end reached from sample off: where a new hit lands), and the character it puts on the voice at the tick's middle:
    the partials' tilt (log2 a partial), the Wave push, and the kick's lift of the 90 Hz fade. (Never the pitch) */
-typedef struct { int8_t layer, node; uint8_t off, kick; float h0, h1, tilt, snap, w, oe, pl; } DrumHit;   /* (oe: its Odd/even push, -1..1; pl: its Pluck) */   /* w: the character's strength, by the hit's envelope */
+#define MAX_HARM   16         /* oscillators a note: its harmonics 1..13, then its undertones 1/2, 1/4, 1/8 */
+#define NH         13         /* (the harmonics' slots: 0..12; the undertones': 13, 14, 15) */
+typedef struct { int8_t layer, node; uint8_t off, d; float h0, h1, tilt, snap, w, oe, pl; } DrumHit;   /* (oe: its Odd/even push, -1..1; pl: its Pluck) */   /* w: the character's strength, by the hit's envelope */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
     float g;                   /* this hit's velocity */
@@ -335,6 +341,8 @@ typedef struct {
     float shape_e;             /* ... and the envelope itself (it lengthens the decay) */
     float duck, dk0, dk1;      /* the kick's sidechain: its envelope (0 none .. 1 full), the gain on the other voices at
                                   this tick's start and end */
+    float oa[NUM_DRUMS][MAX_HARM];   /* each drum's Odd/even push at full, as its layer's bank coloured (drums_tick) */
+    float of[NUM_DRUMS];             /* ... and that push (-1..1): a note takes the share its hit gives it */
 } Drums;
 #define MAX_PTS 8
 #define NUM_ERATES 13
@@ -416,11 +424,11 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 /* Voices: a bank of oscillators per note (voice.c)                    */
 /* ------------------------------------------------------------------ */
-#define MAX_HARM   16         /* oscillators a note: its harmonics 1..16 */
 #define OSC_N      4096       /* the oscillators' wave tables */
 typedef struct {
     uint32_t ph2;             /* the detuned copy's phase (the note's first partials, doubled a few cents away) */
-    uint32_t ph;              /* the note's phase (2^32 a cycle): oscillator k reads k times it, plus its offset */
+    uint32_t ph;              /* the note's phase at an eighth of its pitch (2^32 a cycle): every partial is a whole
+                                 multiple of it (harmonic k: 8k; the undertones 4, 2, 1), plus its offset */
     float a;                  /* loudness at the start of this block */
     float gv;                 /* the voice cap's crossfade: 1 rendered, 0 not (ramps, never jumps) */
     uint8_t on;               /* it was rendered last block (else its phases start aligned) */
@@ -430,8 +438,7 @@ typedef struct {
     float hq;                 /* seconds since a hit last plucked it */
     float pq;                 /* Pluck's step between partials, as it was last block (it opens over a few blocks, not in one) */
     float oe;                 /* a hit's Odd/even push on it, smoothed the same way */
-    float cf;                 /* the frequency its contour gains (cg) were worked out for */
-    float cg[MAX_HARM];       /* the voices' contour on each of its partials (voice.c), kept while its pitch holds */
+    int8_t hd;                /* the drum whose push it is (its colour: Drums.oa) */
 } VoiceSt;
 typedef struct {
     GenSt   g;
@@ -440,6 +447,8 @@ typedef struct {
     float   amc[MAX_HARM];         /* and with the layer's Odd/even (voices_tick) */
     float   amp_t[MAX_HARM];       /* ... its target */
     float   pho[MAX_HARM];         /* each oscillator's phase offset now, cycles (Phase's law, turned by Spin) */
+    uint16_t pmask[MAX_NODES];     /* Clarity: which of each note's partials may play (a bit a slot; voices_tick) */
+    float   mkey[4];               /* (what the mask was worked out for) */
     float   spin;                  /* Spin's angle, cycles */
     float   level_g;               /* the layer's output gain (Level, gain staging), smoothed */
     float   eavg;                  /* the layer's loudness energy (sum of a_n^2), averaged */
@@ -528,6 +537,7 @@ void synth_silence(Synth *s);               /* everything silent at once (panic)
 void voices_init(void);
 void voices_build(Synth *s);                /* the bank's function, at once (a rebuild) */
 void bank_fn(float c, float w, float te, float st, int kmax, float *a);   /* the bank's function (unit energy) */
+void hit_colour(const Synth *s, int l, float o, float *out);           /* layer l's bank under Odd/even o */
 void voices_tick(Synth *s, int layer);      /* per control tick: the bank's function (levels, phases) from the controls */
 void layer_render(Synth *s, int layer, float *L, float *R, int n);
 int  knob_of_r(int id);                     /* (knob_of, in RAM: the tick's) */

@@ -48,9 +48,10 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   top with a length Settle sets, and rolls give the kick's duck more depth. A drum's **Bright** tilts by the octave at the
   note's energy (brighter, not louder). Each layer's new **Colour** page: **Odd / even** (hollow ↔ even-rich) and
   **Pluck** (the upper partials fade first after a note rises); at their defaults the sound is as before. Each drum
-  can pluck the note it hits and push its Odd / even; all of it rolled per style and on the Timbre and Groove knobs. **Fuller low end**: the voices'
-  partials keep their fundamentals down to 40 Hz (was 90 Hz) and follow a balance across the spectrum (more under
-  120 Hz, less at 300–900 Hz, a little air). **Reverb Size** moves without clicks (turned or modulated). Older patches load with the
+  can pluck the note it hits and push its Odd / even; all of it rolled per style and on the Timbre and Groove knobs. **Undertones**: each note has
+  harmonics 1–13 and its undertones an octave, two and three below (in tune), by the new **Depth**; nothing low is
+  cut (nothing under 20 Hz is played). **Clarity** limits how many partials each octave holds across the notes, the
+  low ones fewest, so the bass is deep and the chords stay clear (and it saves CPU). **Reverb Size** moves without clicks (turned or modulated). Older patches load with the
   patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with
