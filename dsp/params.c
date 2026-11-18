@@ -121,7 +121,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_RV_SEND,"reverb mix",SEC_FX,CURVE_LIN,1,0, 0,1, .35f,.15f,.8f,1),
  M(P_RV_SIZE,"reverb size",SEC_FX,CURVE_LIN,1,0, .3f,1, .7f,.3f,1,1),
  M(P_RV_DECAY,"reverb decay",SEC_FX,CURVE_LOG,1,0, .3f,60, .5f,.25f,.85f,1),
- M(P_RV_DAMP,"reverb damp",SEC_FX,CURVE_LIN,1,0, 0,1, .4f,.15f,.75f,1),
+ M(P_RV_DAMP,"reverb damp",SEC_FX,CURVE_LIN,1,0, 0,1, .55f,.35f,.8f,1),
  M(P_RV_PRE,"predelay",SEC_FX,CURVE_LIN,1,0, 0,.1f, .2f,0,.6f,0),
  M(P_RV_MOD,"reverb mod",SEC_FX,CURVE_LIN,1,0, 0,1, .4f,.1f,.8f,1),
  M(P_RV_TUNED,"reverb tuned",SEC_FX,CURVE_DISC,0,0, 0,2, 0,0,.6f,0),
@@ -258,7 +258,7 @@ void params_roll_knobs_part(Synth *s, int i0, int i1) {    /* (the knobs' paths 
         w[0] = w[1] = w[2] = w[3] = 0;
         /* the ones a player reaches for are always on their knob: the filter, the reverb and delay, the bank's centre,
            band and tilt and the voices' Depth (the low end: Timbre), the rhythm's density and swing, the motions' rates */
-        int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_DL_SEND || i == P_DL_FB
+        int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_RV_DAMP || i == P_DL_SEND || i == P_DL_FB
                 || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH
                 || i == P_V1_DEPTH || i == P_V2_DEPTH;
         if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
@@ -713,7 +713,8 @@ static void apply_style(Synth *s) {
         if (G) { TR(s, P_RV_SEND, .15f, .35f); TR(s, P_RV_SIZE, .6f, .9f); TR(s, P_RV_DECAY, 1.5f, 4.5f); }
         if (A) { TR(s, P_RV_SEND, .5f, .8f); TR(s, P_RV_SIZE, .9f, 1.f); TR(s, P_RV_DECAY, 12.f, 45.f); }
         if (C) { TR(s, P_RV_SEND, .4f, .7f); TR(s, P_RV_SIZE, .85f, 1.f); TR(s, P_RV_DECAY, 6.f, 25.f); }
-        TR(s, P_RV_DAMP, .15f, .4f); TR(s, P_RV_MOD, .45f, .8f); TD(s, P_RV_TUNED, 0); TR(s, P_DL_TO_RV, .1f, .4f);
+        TR(s, P_RV_DAMP, A ? .45f : .4f, .75f);   /* (the top rings 44-70 % as long as the rest: a room's, not a plate's) */
+        TR(s, P_RV_MOD, .45f, .8f); TD(s, P_RV_TUNED, 0); TR(s, P_DL_TO_RV, .1f, .4f);
         TR(s, P_CMP_THRESH, -18.f, -8.f);
         TR(s, P_CMP_RATIO, G ? 2.f : 1.3f, G ? 3.5f : 2.f);
         TR(s, P_CMP_PUMP, HO ? .15f : 0.f, HO ? .45f : G ? .3f : 0.f);

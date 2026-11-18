@@ -53,7 +53,9 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   cut (nothing under 20 Hz is played). **Clarity** limits how many partials each octave holds across the notes, the
   low ones fewest, so the bass is deep and the chords stay clear (and it saves CPU). A drum's **Bright** goes both ways: Dark
   tilts its hit toward the undertones (a kick's or tom's fall, without a pitch sweep), Bright toward the top, at half
-  the old range, the fundamental never more than 6 dB down; on the Timbre knob. Wave's harmonics now sit under Tone. **Reverb Size** moves without clicks (turned or modulated). Older patches load with the
+  the old range, the fundamental never more than 6 dB down; on the Timbre knob. Wave's harmonics now sit under Tone. **The reverb** no
+  longer folds its top back into the tail (a 9 kHz input low-pass), its Damp really darkens the tail (now on the Space
+  knob, rolled darker), and its tails decay as set (their 16-bit lines were truncated, which cut them short). **Reverb Size** moves without clicks (turned or modulated). Older patches load with the
   patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with

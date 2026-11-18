@@ -418,7 +418,8 @@ typedef struct {
     float lim_seg[LIM_LA / 8], lim_pk, lim_g, lim_tgt; int lim_w, lim_n;
     float lim_gr;             /* the limiter's gain reduction now, dB (<= 0; the screen's meter) */
     float odc_x[2], odc_y[2];
-    float rv_h[3], rv_o[2]; int rv_ph;   /* the half-rate reverb: its input's last three, its last output, which sample */
+    float rv_h[4], rv_o[2]; int rv_ph;   /* the half-rate reverb: its input low-pass's state (two biquads), its last
+                                            output, which sample */
 } Fx;
 
 /* ------------------------------------------------------------------ */

@@ -109,7 +109,7 @@ DSP_CTL void fx_update(Synth *s) {
         }
         if (L > 4500.f) L = 4500.f; if (L < 50.f) L = 50.f;
         f->rlen_tgt[i] = (float)(int)(L * .5f + .5f) * 2.f;   /* (a whole number of the reverb's steps: still, it reads whole ones) */
-        float th = t60 * (1.f - .85f * damp);
+        float th = t60 * (1.f - .75f * damp);   /* the top's decay: as long as the rest at Damp 0, a quarter of it at full */
         C.r_glo[i] = fexp2(-9.9658f * f->rlen[i] / (t60 * SR));
         C.r_ghi[i] = fexp2(-9.9658f * f->rlen[i] / (th * SR));
     }
@@ -123,7 +123,8 @@ DSP_CTL void fx_update(Synth *s) {
     C.r_pre = pval(s, P_RV_PRE) * SR;
     const float rs = .5f;                              /* the reverb's steps are two samples long */
     C.r_prei = (int)(C.r_pre * rs);
-    C.r_lp = .51f;                                     /* the lines' damping: 0.3 a sample was the corner (1 - 0.7^2) */
+    C.r_lp = .325f;                                    /* the lines' damping split: 1.5 kHz (it was 2.7: Damp hardly
+                                                          moved the tail, which rang as long at 12 kHz as at 250 Hz) */
     C.r_mod = pnorm(s, P_RV_MOD);
     C.r_to = pnorm(s, P_DL_TO_RV);
 
@@ -203,7 +204,8 @@ DSP_INL float rd16(const int16_t *b, int len, float pos, float sc) {
     return ((float)b[i0] + ((float)b[i1] - (float)b[i0]) * fr) * sc;
 }
 DSP_INL int16_t to16(float v, float sc) {
-    v *= sc; if (v > 32767.f) v = 32767.f; if (v < -32767.f) v = -32767.f; return (int16_t)v;
+    v *= sc; if (v > 32767.f) v = 32767.f; if (v < -32767.f) v = -32767.f;
+    return (int16_t)(v < 0.f ? v - .5f : v + .5f);   /* (rounded: a cast cuts toward zero, a loss the tails then gated on) */
 }
 
 /* one step of the FDN reverb: the pre-delay, the input diffusion, the eight lines, their mix. The lines' lengths
@@ -314,12 +316,18 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         f->dacc += g_drate;
         if (f->dacc >= 1.f) { f->dacc -= 1.f; f->dbuf[f->dw] = to16(f->dlp2, 16384.f); f->dw = (f->dw + 1) & (DLN - 1); }
 
-        /* 4b. FDN reverb, every other sample: the input through a [1 3 3 1] low-pass, the output a straight line
-           between steps (a sample late) */
+        /* 4b. FDN reverb, every other sample: the input through a 4-pole low-pass at 9 kHz (Butterworth: -14 dB at
+           12 kHz, -28 at 15: what is above 12 kHz would fold back down into the tail at half the rate; the [1 3 3 1]
+           it had let a 15 kHz tone back in at 9 kHz only 7 dB down), the output a straight line between steps */
         float rin = 0.5f * (x[0] + x[1]) * C.r_send + 0.5f * (yl + yr) * C.r_to;
         if (C.r_freeze) rin = 0.f;
-        float rl, rr, u = (f->rv_h[0] + 3.f * (f->rv_h[1] + f->rv_h[2]) + rin) * .125f;
-        f->rv_h[0] = f->rv_h[1]; f->rv_h[1] = f->rv_h[2]; f->rv_h[2] = rin;
+        float rl, rr, u;
+        {   float *h = f->rv_h;                                   /* (two biquads, transposed direct form II) */
+            float y1 = .03797304f * rin + h[0];
+            h[0] = .07594608f * rin + .4129187f * y1 + h[1]; h[1] = .03797304f * rin - .07900857f * y1;
+            u = y1 + h[2];
+            h[2] = 2.f * y1 + .56545007f * u + h[3]; h[3] = y1 - .47759225f * u;
+        }
         if ((f->rv_ph ^= 1) != 0) {
             float nl, nr; rv_step(f, u, (float)(t + 1) * (1.f / SUB), gd, AP_LEN, &nl, &nr);
             rl = .5f * (f->rv_o[0] + nl); rr = .5f * (f->rv_o[1] + nr); f->rv_o[0] = nl; f->rv_o[1] = nr;

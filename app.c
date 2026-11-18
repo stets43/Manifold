@@ -1002,6 +1002,9 @@ static void value_text(int id, float n, char *b, int max)
         int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);   /* (dark .. as is .. bright) */
         if (pc < 3) text_cpy(t, "As is", sizeof t);
         else { text_cpy(t, n < .5f ? "Dark " : "Bright ", sizeof t); { char u[6]; int_text(pc, u); text_cat(t, u); } text_cat(t, "%"); }
+    } else if (id == P_RV_DAMP) {                    /* how long the top rings, of the rest's decay */
+        text_cpy(t, "Top ", sizeof t); { char u[6]; int_text((int32_t)((1.f - .75f * n) * 100.0f + 0.5f), u); text_cat(t, u); }
+        text_cat(t, "% as long");
     } else if (id == P_V1_CLARITY || id == P_V2_CLARITY) {
         if (n <= .001f) text_cpy(t, "Open", sizeof t);
         else { int_text((int32_t)(n * 100.0f + 0.5f), t); text_cat(t, "%"); }

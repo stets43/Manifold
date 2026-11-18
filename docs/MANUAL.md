@@ -234,7 +234,7 @@ the knob as you turn it.
 | --- | --- | --- |
 | **Timbre** | both voices (their Colour too), the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices |
 | **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
-| **Space** | the effects | filter cutoff and resonance, reverb mix, size and decay, delay send and feedback |
+| **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
 Levels (layer levels, drum levels, master) and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
@@ -732,7 +732,7 @@ The chain: **fuzz → filter → delay and reverb sends → compressor → maste
 | **Reverb** | K1 | **Reverb mix** | |
 | | K2 | **Reverb size** | room size |
 | | K3 | **Reverb decay** | 0.3–60 s |
-| | K4 | **Reverb damp** | high-frequency damping |
+| | K4 | **Reverb damp** | how long the top of the tail rings against the rest: as long at 0 (a plate's), a quarter as long at full (a soft room's). The screen says how long ("Top 55 % as long"); on the Space knob |
 | **Space** | K1 | **Predelay** | 0–100 ms |
 | | K2 | **Reverb mod** | slow movement in the tail (chorus-like) |
 | | K3 | **Reverb tuned** | On: the reverb's delay lines snap to periods of the scale's notes, so the tail rings in key |
@@ -1208,9 +1208,11 @@ Fuzz: two cascaded gain stages into slightly asymmetric soft clippers with band-
 blend from a 500 Hz low-pass to a 1.4 kHz high-pass. Filter: one resonant state-variable filter, its low, band and
 high outputs crossfaded by Filter type. Delay: a bucket-brigade-style line whose write rate sets the time. Reverb: an
 8-line feedback delay network at half the sample rate (mutually prime lengths of 34–99 ms scaled by Size, four of them
-modulated), with allpass diffusion; Tuned snaps each line to a whole number of periods of a scale note. Compressor:
+modulated), with allpass diffusion; its input through a 4-pole 9 kHz low-pass first (so nothing above 12 kHz folds
+back into the tail), its lines' damping split at 1.5 kHz (the top's decay 1 − 0.75·Damp of the rest's), its 16-bit
+lines rounded, not cut; Tuned snaps each line to a whole number of periods of a scale note. Compressor:
 a bus compressor with parallel mix; Pump ducks it on layer 1's onsets. Limiter: peak detection over eight 8-sample segments 64 samples
-ahead, a 7-sample attack and ~280 ms release, ceiling −0.5 dBFS; then a soft clip.
+ahead, a 16-sample attack and ~280 ms release, ceiling −0.5 dBFS; then a soft clip.
 
 ### Licence and credits
 
