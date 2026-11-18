@@ -400,7 +400,10 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             float *A = !hm || k == 1 ? aC : k == 2 ? a2 : k == 3 ? a3 : (k & 1) ? aO : aE;   /* (undertones: the centre) */
             uint32_t ph = ph8 * PM[j] + (uint32_t)(L->pho[j] * 4294967296.f), ik = inc8 * PM[j];
             const float *D = !hm ? 0 : 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
-            float w = D ? wq : 0.f;
+            /* Wave's 2nd and 3rd of this partial sit at 2 and 3 times its frequency: under Tone there, not here (taken
+               at 2.5 times: their middle). Before, they kept this partial's level and climbed over Tone's slope by an
+               octave and a half: the top end hot whatever Tone said */
+            float w = D ? wq * (1.f + r2 * r2) / (1.f + 39.06f * r2 * r2) : 0.f;
             int cp = dup && k <= 3 && nosc < hard;        /* (its detuned copy: under the cap) */
             if (cp) ai *= .8125f;                      /* (shared with its detuned copy: the pair at the same power) */
             if (w == 0.f) {                                         /* the plain oscillator */

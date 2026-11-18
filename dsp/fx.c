@@ -14,10 +14,10 @@
  * The reverb runs at half the sample rate (build F, for the budget): its input through a [1 3 3 1] low-pass, every
  * other sample, its output joined up by a straight line. Line lengths and pre-delay in half-rate steps.
  *
- * Gain staging: DRIVE puts the mix into the compressor around -16 dBFS RMS, the compressor glues it (a few dB),
- * the limiter takes the peaks, so a roll comes out loud (about -14 dBFS RMS) and can still be pushed into the limiter.
+ * Gain staging: DRIVE puts the mix into the compressor around -18 dBFS RMS, the compressor glues it (a few dB),
+ * the limiter takes only the peaks (a roll about -15 to -17 dBFS RMS; Master pushes it further if wanted).
  * The limiter: peaks over 8-sample segments, the loudest of the 8 segments ahead (64 samples) sets the target gain;
- * the gain falls to it with a 7-sample time constant (all there long before the peak arrives) and recovers in ~280 ms (slow enough not to ride a bass note's own cycles).
+ * the gain falls to it with a 16-sample time constant (all there before the peak arrives) and recovers in ~280 ms (slow enough not to ride a bass note's own cycles).
  * Coefficients are refreshed once per control tick in fx_update().
  */
 #define MANIFOLD_DSP_UNIT
@@ -25,7 +25,8 @@
 #include "mstring.h"
 
 #define DLN 16384
-#define DRIVE 2.5f            /* +8 dB into the compressor */
+#define DRIVE 2.0f            /* +6 dB into the compressor (it was +8: the rhythmic styles sat in the limiter half the
+                                 time, up to 9-12 dB, and its fast gain turned into heat at the top: ear fatigue) */
 #define LIM_CEIL .944f        /* -0.5 dBFS */
 static const float RV_BASE[8] = {1493, 1931, 2213, 2617, 2999, 3413, 3907, 4373};   /* mutually prime, ~34 to 99 ms */
 static const int AP_LEN[4] = {71, 54, 190, 139};   /* (half-rate steps: 142, 107, 379, 277 samples) */
@@ -357,7 +358,8 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
             float d0 = f->lim_d[0][f->lim_w], d1 = f->lim_d[1][f->lim_w];
             f->lim_d[0][f->lim_w] = o[0]; f->lim_d[1][f->lim_w] = o[1];
             f->lim_w = (f->lim_w + 1) & (LIM_LA - 1);
-            f->lim_g += (f->lim_tgt < f->lim_g ? .15f : .00008f) * (f->lim_tgt - f->lim_g);
+            f->lim_g += (f->lim_tgt < f->lim_g ? .06f : .00008f) * (f->lim_tgt - f->lim_g);   /* (down over ~16 samples: still
+                                                                                       there before the peak, 64 ahead, and smoother) */
             o[0] = d0 * f->lim_g; o[1] = d1 * f->lim_g;
         }
         for (int c = 0; c < 2; c++) {

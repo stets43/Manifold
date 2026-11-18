@@ -1177,7 +1177,8 @@ room that is left. A note's place does not depend on whether it sounds, so nothi
 notes keep the low octaves. (It lightens the load too: rolled, about a fifth fewer oscillators.) Partials 7, 11 and
 13, which belong to no scale but the harmonic series, are held back. Phases follow φₖ = π·D·k², D = Phase/8
 (Schroeder's low-crest-factor phases at D = 1/16, Phase = 50 %); the undertones start in phase with the note. Wave
-adds each harmonic's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x; not the undertones': a 3rd of one is out of tune);
+adds each harmonic's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x; not the undertones': a 3rd of one is out of tune),
+under Tone where they sound (at 2.5 times the partial's frequency), not where the partial does;
 Detune doubles partials 1–3 with copies up to 14 cents away. No partial above 0.45·*f*ₛ is played.
 
 The oscillator budget is 64 per layer. When a layer needs more, a floor rises (from −44 dB relative to each note) so
