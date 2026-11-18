@@ -20,7 +20,7 @@
  *
  * The character, on the voice, at full strength while the hit is within 18 dB of its peak, then fading with it (not
  * by the hit's share of the voice's level: a loud note no longer waters it down): Bright tilts the partials up at
- * the start (up to +5.4 dB a partial), Settle is how fast they come back (300 ms down to 9 ms) and how far below they
+ * the start (up to +2.7 dB a partial), Settle is how fast they come back (300 ms down to 9 ms) and how far below they
  * settle; Snap pushes the voice's Wave (its 2nd and 3rd harmonic, past Wave's own top), falling over a length Settle
  * sets (71 ms .. 9 ms). The kick lifts the voice's
  * 90 Hz fade, so its fundamental stays. A hit never touches the voice's pitch: the voice is the synth's note, in tune.
@@ -184,15 +184,11 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         float e = env_at(t1, v->ls, A, H, Dc, cv);
         v->env = e; v->t = t1;
         c->off = (uint8_t)off;
-        {   /* a drum's level: as it was up to about 0.6, then up to 1.8x at full (the hit up to about 2x the layer's level:
-               the attack's contrast with the note) */
-            float lv = pval(s, DP(d, P_D1_LEVEL)), l2 = lv * lv;
-            c->h1 = e * v->g * lv * (1.f + .82f * l2 * l2) * lev;
-        }
+        c->h1 = e * v->g * pval(s, DP(d, P_D1_LEVEL)) * lev;
         /* the character, at the tick's middle */
         float tm = (t1 - .5f * (float)SUB) * (1.f / SR); if (tm < 0.f) tm = 0.f;
         float st = pval(s, DP(d, P_D1_SETTLE)), ts = .3f * fexp2(-5.f * st), se = fexp2(-tm / ts * 1.4427f);
-        c->tilt = .9f * pval(s, DP(d, P_D1_BRIGHT)) * se - .2f * st * (1.f - se);
+        c->tilt = .45f * pval(s, DP(d, P_D1_BRIGHT)) * se - .2f * st * (1.f - se);
         {   /* Snap: up to twice the push at the top (as it was low down), over a length Settle sets: 71 ms .. 25 ms (its
                middle) .. 9 ms */
             float sn = pval(s, DP(d, P_D1_SNAP)), tsn = .025f * fexp2(-3.f * (st - .5f));
@@ -203,7 +199,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         if (d == 0) kick = v->env * v->g;
     }
     {   /* the duck: the kick's envelope squared, released over 150 ms; its gain on the other voices */
-        float dk = on ? .95f * pval(s, P_DR_DUCK) : 0.f, k2 = kick * kick;
+        float dk = on ? .75f * pval(s, P_DR_DUCK) : 0.f, k2 = kick * kick;
         D->duck = k2 > D->duck ? k2 : D->duck * fexp2(-(float)SUB / (.15f * SR) * 1.4427f);
         D->dk0 = D->dk1; D->dk1 = 1.f - dk * D->duck;
     }

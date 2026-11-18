@@ -44,9 +44,8 @@ and every partial is a whole-number multiple of its note. Four performance knobs
   drum'n'bass). Wider tempos in every style; Ambient, Cosmic and Wild down to sparse, slow, evolving; a deeper,
   richer matrix in every roll (no self-feedback routes); Machine modulates its own rhythm. **Keys pull the points**
   (Layer 1 → Keys): off, a key plays just its note. The keys play both layers by default. **Harder drums**: a hit's
-  Bright and Snap act at full strength however loud the note is (no longer by the hit's share of it), Bright up to
-  twice as far, Snap past Wave's top with a length Settle sets, a drum's Level up to 1.8× at the top, the layers 2.5 dB
-  lower under the drums, a deeper kick duck. Older patches load with the
+  Bright and Snap act at full strength however loud the note is (no longer by the hit's share of it), Snap past Wave's
+  top with a length Settle sets, and rolls give the kick's duck more depth. Older patches load with the
   patterns off; 1.0.4 cannot read patches saved by 1.0.5.
 - **1.0.4** (2026-11-13): 64 patch slots in four banks (A–D) of 16. A tap on SAVE shows the Patches page (the
   banks, the active bank's slots); SAVE + key and HOME + key use the active bank; the settings are kept with

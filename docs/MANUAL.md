@@ -585,7 +585,7 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K2 | **Fills** | how often the second half of a fourth bar plays a busier relative |
 | | K3 | **Swing on** | the level Swing bends for the patterns: 8ths or 16ths |
 | **Drums** | K1–K4 | **Kick, Snare, Hat, Tom** density | each drum's share of the events (0 = that drum off) |
-| **Levels** | K1–K4 | **Kick, Snare, Hat, Tom** level | each drum's level (Off … +5 dB: above about 60 % it climbs faster, for hits that stand out of the mix). A light by the name flashes on each hit |
+| **Levels** | K1–K4 | **Kick, Snare, Hat, Tom** level | each drum's level (Off … 0 dB). A light by the name flashes on each hit |
 | **Mix** | K1 | **Drums** | on / off |
 | | K2 | **Drum layer** | which layer's notes the drums ride: Layer 1, Layer 2, or **Split** (kick and tom on the lower-sounding layer, snare and hat on the higher) |
 | | K3 | **Drum level** | all the drums |
@@ -610,12 +610,12 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Place** | K1–K4 | per drum | which events it prefers: Strongest … Weakest (kick strongest, hat weakest). When a drum follows a layer: which point it follows |
 | **Shape & duck** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
 | | K2 | **Shape depth** | how much |
-| | K3 | **Kick duck** | sidechain: the kick ducks the synth (up to about −26 dB at full) |
+| | K3 | **Kick duck** | sidechain: the kick ducks the synth |
 | **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too. A drum with a pattern plays its pattern instead |
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
 | **Mutes** | K1–K4 | per drum | what it mutes on the instants it plays: Nothing, the kick, the snare, the hat, the tom, or the linear drums |
-| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +5.4 dB a partial), however loud the note already is |
+| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +2.7 dB a partial), however loud the note already is |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
 
@@ -1136,11 +1136,10 @@ env(t) = ex + Curve · (lin − ex),   ex = 2^{−5.77 t/Decay}  (−35 dB at De
 so Curve blends exponential and straight. It is recomputed each tick from the current
 parameters, so modulation reshapes a hit that is still ringing. The hit rides a sounding note on the drum layer
 (Voice picks lowest … highest), raising that note's level by the envelope (its own gain, independent of the layer's
-level staging; Level rises as before to about 0.6, then up to 1.8× at full) and, at full strength while the hit is
-within 18 dB of its peak (then fading with it), tilting the partials (Bright, up to +5.4 dB per partial, settling over
-300 … 9 ms) and pushing Wave (Snap, past Wave's own top, over 71 … 25 … 9 ms as Settle goes 0 … ½ … 1). With the
-drums on, the layers sit 6.9 dB under their Level (4.4 dB before 1.0.5), leaving the hits room under the limiter. The
-kick's duck multiplies the other voices by 1 − 0.95·Duck·env², released over 150 ms. No drum ever changes a frequency.
+level staging) and, at full strength while the hit is within 18 dB of its peak (then fading with it; before 1.0.5,
+in proportion to the hit's share of the note's level), tilting the partials (Bright, up to +2.7 dB per partial,
+settling over 300 … 9 ms) and pushing Wave (Snap, past Wave's own top, over 71 … 25 … 9 ms as Settle goes 0 … ½ … 1).
+The kick's duck multiplies the other voices by 1 − 0.75·Duck·env², released over 150 ms. No drum ever changes a frequency.
 
 ### The voices
 
