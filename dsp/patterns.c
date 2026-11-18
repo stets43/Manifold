@@ -3,7 +3,9 @@
  * lines, sparse to busy, neighbours alike) and the corpus entries the rolls walk (params.c). */
 #include "synth.h"
 
-const PatLine PAT_LIB[] = {
+/* (PAT_LIB, PAT_OFF, PAT_CNT in RAM: the audio tick reads them, and code in the RAM window must not reach into the
+ * flash: a cache miss there stalls the audio. PAT_ENT is the roll's, in the flash.) */
+PatLine PAT_LIB[] = {
     /* K: 44 lines */
     {0x00000401u, 0x00000000u, 16},   /* x.........x..... */
     {0x00000405u, 0x00000000u, 16},   /* x.x.......x..... */
@@ -104,8 +106,8 @@ const PatLine PAT_LIB[] = {
     {0x000094A5u, 0x00000000u, 16},   /* x.x..x.x..x.x..x */
     {0x0000FFFFu, 0x00000000u, 16},   /* xxxxxxxxxxxxxxxx */
 };
-const uint8_t PAT_OFF[NUM_DRUMS] = {0, 44, 64, 78};
-const uint8_t PAT_CNT[NUM_DRUMS] = {44, 20, 14, 17};
+uint8_t PAT_OFF[NUM_DRUMS] = {0, 44, 64, 78};
+uint8_t PAT_CNT[NUM_DRUMS] = {44, 20, 14, 17};
 
 /* the entries: genre (0 house, 1 breakbeat, 2 drum'n'bass, 3 hip-hop), each role's line (1-based; 0 linear), BPM
  * low and high, swing low and high (hundredths), the swing's level (8 or 16), weight (tenths) */
