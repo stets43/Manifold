@@ -232,7 +232,7 @@ the knob as you turn it.
 
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
-| **Timbre** | both voices (their Colour too) | Tone, Center, Band, Tilt and Depth of the voices |
+| **Timbre** | both voices (their Colour too), the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices |
 | **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size and decay, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
@@ -625,7 +625,7 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
 | **Mutes** | K1–K4 | per drum | what it mutes on the instants it plays: Nothing, the kick, the snare, the hat, the tom, or the linear drums |
-| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | the hit tilts the note's partials up at its start (up to +6 dB an octave, the note's energy kept: brighter, not louder), however loud the note already is |
+| **Kick / Snare / Hat / Tom sound** | K1 | **Bright** | Dark … As is … Bright. Bright: the hit tilts the note's partials up at its start (up to +3 dB an octave); Dark: down toward its undertones, bringing them in (an octave down at up to the fundamental's level): a hit that starts low and settles up, the fall a pitch sweep gives a kick or a tom. The note's energy is kept and its fundamental never drops more than 6 dB. On the Timbre knob |
 | | K2 | **Settle** | how fast that brightness settles (300 ms … 9 ms) and how far |
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
 | | K4 | **Pluck** | the hit plucks the note it rides: its upper partials fade first after the hit, as the layer's own Pluck does (1.5 s … 25 ms). Off: the layer's own. The note stays plucked until it rises by itself (or, 2 s without a plucking hit, lets go over a second) |
@@ -1149,7 +1149,8 @@ so Curve blends exponential and straight. It is recomputed each tick from the cu
 parameters, so modulation reshapes a hit that is still ringing. The hit rides a sounding note on the drum layer
 (Voice picks lowest … highest), raising that note's level by the envelope (its own gain, independent of the layer's
 level staging) and, at full strength while the hit is within 18 dB of its peak (then fading with it; before 1.0.5,
-in proportion to the hit's share of the note's level), tilting the partials (Bright, up to +6 dB an octave at the note's energy,
+in proportion to the hit's share of the note's level), tilting the partials (Bright, ±3 dB an octave at the note's energy, the fundamental at most 6 dB down; Dark brings in
+the undertones,
 settling over 300 … 9 ms) and pushing Wave (Snap, past Wave's own top, over 71 … 25 … 9 ms as Settle goes 0 … ½ … 1).
 The kick's duck multiplies the other voices by 1 − 0.75·Duck·env², released over 150 ms. No drum ever changes a frequency.
 

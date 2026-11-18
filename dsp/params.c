@@ -87,7 +87,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(D##_DECAY,"decay",SEC_DRUMS,CURVE_LOG,1,0, .02f,3, dc,dc - .12f,dc + .1f,1), \
  M(D##_CURVE,"curve",SEC_DRUMS,CURVE_LIN,1,0, 0,1, cv,0,.6f,0), \
  M(D##_LEVEL,"level",SEC_DRUMS,CURVE_LIN,1,0, 0,1, lv,lv,lv,0), \
- M(D##_BRIGHT,"bright",SEC_DRUMS,CURVE_LIN,1,0, 0,1, br,.1f,.8f,0), \
+ M(D##_BRIGHT,"bright",SEC_DRUMS,CURVE_LIN,1,0, -1,1, .5f + .3f * br,.15f,.85f,0), \
  M(D##_SETTLE,"settle",SEC_DRUMS,CURVE_LIN,1,0, 0,1, se,.3f,.9f,0), \
  M(D##_SNAP,"snap",SEC_DRUMS,CURVE_LIN,1,0, 0,1, sn,0,.8f,0)
  DRUM_P(P_D1,0.55f,0,0,0.135f,0.1f,0.621f,0.2f,1,0.3f,0.5f,0.4f),
@@ -661,7 +661,10 @@ static void apply_style(Synth *s) {
             float lv = LV[d] * fexp2((frand(r) - .5f) * 1.f);   /* within +-3 dB of the mix */
             TR(s, DP(d, P_D1_LEVEL), lv > 1.f ? 1.f : lv, lv > 1.f ? 1.f : lv);
             float hb = d == 2 ? .2f : d == 1 ? .1f : 0.f;            /* (the hat and snare a little brighter) */
-            TR(s, DP(d, P_D1_BRIGHT), fclamp(K[3] + hb, 0.f, 1.f), fclamp(K[4] + hb, 0.f, 1.f));
+            /* Bright (-1 dark .. 1): the kit's range at about two thirds of what it was (the hits ran hot); the kick, and
+               the tom half the time, dark instead: a fall from the undertones, the drop a pitch sweep would give */
+            if (d == 0 ? frand(r) < .7f : d == 3 ? frand(r) < .5f : 0) TR(s, DP(d, P_D1_BRIGHT), d == 0 ? -.7f : -.6f, -.15f);
+            else TR(s, DP(d, P_D1_BRIGHT), fclamp(.65f * K[3] + hb, 0.f, 1.f), fclamp(.65f * K[4] + hb, 0.f, 1.f));
             TR(s, DP(d, P_D1_SETTLE), fclamp(K[5] + hb, 0.f, 1.f), fclamp(K[6] + hb, 0.f, 1.f));
             TR(s, DP(d, P_D1_SNAP), K[7], K[8]);
         }
@@ -669,9 +672,9 @@ static void apply_style(Synth *s) {
            high and open (an open hat, a shaker); breakbeat a tight kick, a bright snare */
         if (HH) { TR(s, P_D1_DECAY, .6f, 1.4f); TR(s, P_D1_CURVE, 0.f, .15f); TR(s, P_D1_VOICE, 0.f, .05f);
                   TR(s, P_D3_DECAY, .025f, .06f); TR(s, P_D3_HOLD, 0.f, 0.f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); }
-        if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .5f, .8f);
-                  TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); TR(s, P_D4_BRIGHT, .6f, .9f); TR(s, P_D4_SNAP, .2f, .6f); }
-        if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .45f, .8f); TR(s, P_D3_DECAY, .03f, .1f); }
+        if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .25f, .55f);
+                  TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); if (frand(r) < .5f) TR(s, P_D4_BRIGHT, .3f, .6f); else TR(s, P_D4_BRIGHT, -.6f, -.2f); TR(s, P_D4_SNAP, .2f, .6f); }
+        if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .25f, .55f); TR(s, P_D3_DECAY, .03f, .1f); }
         /* each hit's colour on its note (1.0.5): Pluck, so the note it rides sounds struck (most on the snare and tom);
            Odd/even, a push toward hollow or even that settles with the hit (most on the hat and snare). Ambient: none */
         {
@@ -730,8 +733,8 @@ static const uint8_t MOD_DST[][2] = {     /* the place, its most (hundredths) */
     {P_V2_PHASE, 80}, {P_V2_SPIN, 70}, {P_V2_TONE, 40}, {P_V2_WIDTH, 70}, {P_G1_A, 70}, {P_G1_B, 70}, {P_G1_REACH, 50},
     {P_G1_ENERGY, 40}, {P_G1_SPREAD, 60}, {P_G1_CONTOUR, 50}, {P_G2_A, 70}, {P_G2_B, 70}, {P_G2_REACH, 50}, {P_G2_SPREAD, 60},
     {P_PATH_SCALE, 40}, {P_PATH_ROT, 80}, {P_PATH_X, 50}, {P_PATH_Y, 50}, {P_RH_DENS, 35}, {P_RH_SWING, 40}, {P_RH_FINE, 40},
-    {P_RH_THREES, 40}, {P_RH_TURN, 50}, {P_RH_GRIP, 60}, {P_D1_DECAY, 40}, {P_D3_DECAY, 50}, {P_D2_SNAP, 50}, {P_D3_BRIGHT, 50},
-    {P_D2_BRIGHT, 50}, {P_D4_VOICE, 50}, {P_D3_VOICE, 40}, {P_FLT_CUT, 30}, {P_FLT_RES, 40}, {P_FZ_MIX, 40}, {P_DL_SEND, 50},
+    {P_RH_THREES, 40}, {P_RH_TURN, 50}, {P_RH_GRIP, 60}, {P_D1_DECAY, 40}, {P_D3_DECAY, 50}, {P_D2_SNAP, 50}, {P_D3_BRIGHT, 30},
+    {P_D2_BRIGHT, 30}, {P_D4_VOICE, 50}, {P_D3_VOICE, 40}, {P_FLT_CUT, 30}, {P_FLT_RES, 40}, {P_FZ_MIX, 40}, {P_DL_SEND, 50},
     {P_DL_TIME, 30}, {P_DL_TONE, 50}, {P_RV_SEND, 50}, {P_RV_SIZE, 40}, {P_RV_MOD, 60}, {P_RV_DAMP, 50}, {P_CMP_PUMP, 40},
     {P_V1_ODDEVEN, 50}, {P_V2_ODDEVEN, 50}, {P_V1_PLUCK, 40}, {P_V2_PLUCK, 40}, {P_D2_OE, 40}, {P_D3_OE, 40},   /* (1.0.5) */
     {P_V1_DEPTH, 40}, {P_V2_DEPTH, 40},

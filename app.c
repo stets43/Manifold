@@ -998,6 +998,10 @@ static void value_text(int id, float n, char *b, int max)
             if (ms < 1000.0f) { int_text((int32_t)(ms + 0.5f), t); text_cat(t, " ms"); }
             else { fix_text(ms * 0.001f, 1, t); text_cat(t, " s"); }
         }
+    } else if (id >= P_D1_DENS && id < P_D1_DENS + NUM_DRUMS * DR_STRIDE && (id - P_D1_DENS) % DR_STRIDE == P_D1_BRIGHT - P_D1_DENS) {
+        int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);   /* (dark .. as is .. bright) */
+        if (pc < 3) text_cpy(t, "As is", sizeof t);
+        else { text_cpy(t, n < .5f ? "Dark " : "Bright ", sizeof t); { char u[6]; int_text(pc, u); text_cat(t, u); } text_cat(t, "%"); }
     } else if (id == P_V1_CLARITY || id == P_V2_CLARITY) {
         if (n <= .001f) text_cpy(t, "Open", sizeof t);
         else { int_text((int32_t)(n * 100.0f + 0.5f), t); text_cat(t, "%"); }

@@ -368,18 +368,27 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
            20 Hz floor (in the mask) keep them out */
         /* a hit's Bright (a tilt per octave, settling: drums.c): a weight for each partial, then all of them together at
            the note's energy as it was (brighter, not louder: at most +-12 dB) */
-        float wk[MAX_HARM]; int wo = tilt != 0.f;
+        /* Bright up tilts toward the harmonics; Bright down (Dark) toward the undertones, and brings them in (up to the
+           fundamental's level an octave down, half two down, a quarter three) even where Depth has none: a hit that
+           starts low and settles up to the note, the kick's and the tom's fall without a pitch sweep. Both at the
+           note's energy (the partials that play: Clarity's mask), and the fundamental never more than 6 dB down: the
+           crack stays, the note does not turn into its top (or its bottom) */
+        float wk[MAX_HARM], ab[MAX_HARM]; int wo = tilt != 0.f; const float *ap = av;
         if (wo) {
-            float e0 = 0.f, e1 = 0.f, b = 1.f;
+            float e0 = 0.f, e1 = 0.f, b = 1.f, dk = tilt < 0.f ? -2.f * tilt * av[0] : 0.f;
             NOUNROLL for (int j = 0; j < MAX_HARM; j++) {
-                float fk = f * PR[j], r2 = fk * fk * ifc2, a = av[j] * (j < NH ? b : 1.f) / (1.f + r2 * r2);
+                float fk = f * PR[j], r2 = fk * fk * ifc2, tn = (j < NH ? b : 1.f) / (1.f + r2 * r2);
+                ab[j] = av[j] + (j >= NH ? dk * (float)(8 >> (j - NH)) * .125f : 0.f);   /* (1, 1/2, 1/4 of it) */
                 float w = fexp2(tilt * LOG2R[j]);
-                wk[j] = w; e0 += a * a; e1 += a * a * w * w;
+                wk[j] = w;
+                if (pmk & (1u << j)) { float a = av[j] * tn, a2 = ab[j] * tn; e0 += a * a; e1 += a2 * a2 * w * w; }
                 if (j < NH) b *= dm;
             }
             float nr = e1 > 1e-12f ? e0 / e1 : 1.f; if (nr > 16.f) nr = 16.f; if (nr < 1.f / 16.f) nr = 1.f / 16.f;
             nr *= frsqrt(nr);                             /* (its root: no call into the flash) */
-            NOUNROLL for (int k = 0; k < MAX_HARM; k++) wk[k] *= nr;
+            float w0 = wk[0] * nr, cap = w0 < .5f ? .5f / (1.f - w0) : 1.f;   /* (the fundamental: at most -6 dB) */
+            NOUNROLL for (int k = 0; k < MAX_HARM; k++) wk[k] = 1.f + cap * (wk[k] * nr - 1.f);
+            ap = ab;
         }
         for (int t = 0; t < n; t++) { aC[t] = 0.f; aO[t] = 0.f; aE[t] = 0.f; aD[t] = 0.f; a2[t] = 0.f; a3[t] = 0.f; }
         /* each partial: a harmonic (slots 0..12: Bloom and Pluck step down along them) or an undertone (13..15: they
@@ -389,7 +398,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             float sb = hm ? bm * pm : 1.f;
             if (hm) { bm *= dm; pm *= pq; }
             if (!(pmk & (1u << j))) continue;                 /* (Clarity's mask, and the 20 Hz floor) */
-            float fk = f * PR[j], r2 = fk * fk * ifc2, ak = av[j] * sb * reg / (1.f + r2 * r2);
+            float fk = f * PR[j], r2 = fk * fk * ifc2, ak = ap[j] * sb * reg / (1.f + r2 * r2);
             if (wo) ak *= wk[j];
             if (ak < thr) continue;                       /* (under -42 dB of the note, or the cap's floor: not played) */
             if (nosc >= hard && j > 0) continue;              /* (a burst past the cap, before the floor has risen) */
