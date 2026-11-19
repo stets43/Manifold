@@ -64,10 +64,11 @@ uint8_t g_knob_dry;                          /* the patch is Dry (1.0.6): Space 
 const char *knob_name(int k) { return k == 2 && g_knob_dry ? "Shape" : k >= 0 && k < NUM_MACRO ? KNOB_N[k] : "?"; }
 /* A Dry patch (1.0.6): the effects off every knob but the compressor's; Space, shown as Shape, has the envelopes and
    the room the instrument makes itself: each drum's attack, hold, decay, curve, settle, snap and pluck, the duck, the
-   layers' contour, the voices' pluck, width and spin, and the compressor; Pump (its rhythm) goes to Groove */
+   layers' contour, the voices' pluck, width and spin, and the compressor's attack; Pump (its rhythm) goes to Groove */
 static int knob_dry(int id) {
     if (id == P_CMP_PUMP) return 1;
-    if (id >= P_CMP_THRESH && id <= P_CMP_MIX) return 2;
+    if (id == P_CMP_ATT) return 2;            /* (the compressor's attack only: its depth, release and mix moved the loudness) */
+    if (id >= P_CMP_THRESH && id <= P_CMP_MIX) return -1;
     if (g_param_meta[id].section == SEC_FX) return -1;
     if ((id >= P_D1_HPLUCK && id <= P_D4_HPLUCK) || id == P_DR_DUCK || id == P_G1_CONTOUR || id == P_G2_CONTOUR ||
         id == P_V1_PLUCK || id == P_V2_PLUCK || id == P_V1_WIDTH || id == P_V2_WIDTH || id == P_V1_SPIN || id == P_V2_SPIN)
@@ -121,7 +122,7 @@ DSP_CTL float knob_offset(const Synth *s, int id) {
     const int8_t *w = s->kpath[id];
     float a = m < 0.f ? -m : m, near = (float)(m < 0.f ? w[1] : w[2]), far = (float)(m < 0.f ? w[0] : w[3]);
     float v = a < .5f ? near * (a * 2.f) : near + (far - near) * (a * 2.f - 1.f);
-    return v * (1.f / 127.f);
+    return v * (k == 2 && g_knob_dry ? 2.f / 127.f : 1.f / 127.f);   /* (Shape, on a Dry patch: twice as far) */
 }
 
 DSP_CTL void mod_apply(Synth *s) {

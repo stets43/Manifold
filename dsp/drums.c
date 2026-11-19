@@ -34,6 +34,12 @@
 #include "synth.h"
 #include "mstring.h"
 
+#ifndef DR_DCOMP
+#define DR_DCOMP 1.f              /* (1.0.6) how much of a Dry hit's energy change (Shape's lengths) its level gives back */
+#endif
+#ifndef DR_ECAP
+#define DR_ECAP .4f               /* (s) past this a hit's length is mostly cut by the next one: it adds no more */
+#endif
 #define DR_HG 1.f               /* (a hit's level, 0..1; voice.c DR_OUT sets its loudness) */
 
 static const char *const DRUM_N[NUM_DRUMS] = {"Kick", "Snare", "Hat", "Tom"};
@@ -95,6 +101,24 @@ int drum_fixed(const Synth *s, int d, float x, int *layer) {
     }
     if (sb >= 0) { *layer = sl; return sb; }
     return best;
+}
+
+/* (1.0.6) a hit's energy, in seconds at full level: attack, hold and the decay as its curve shapes it (capped where
+   the next hit would cut it) - from the patch's own values (b) or where the knobs have them */
+static float dr_len(const Synth *s, int d, int b) {
+    const float *x = b ? s->base : s->mod; float r[4]; static const uint8_t I[4] = {P_D1_ATTACK, P_D1_HOLD, P_D1_DECAY, P_D1_CURVE};
+    for (int k = 0; k < 4; k++) {
+        const ParamMeta *m = &g_param_meta[DP(d, I[k])]; float v = fclamp(x[DP(d, I[k])], 0.f, 1.f);
+        r[k] = m->curve == CURVE_LOG ? m->lo * fexp2(v * flog2(m->hi / m->lo)) : m->lo + v * (m->hi - m->lo);
+    }
+    float e = r[0] * (1.f / 3.f) + r[1] + r[2] * (.125f + r[3] * .208f);
+    return e > DR_ECAP ? DR_ECAP : e < 1e-3f ? 1e-3f : e;
+}
+/* the level a Dry patch's hit gets back for it (flash: once a tick, Dry only) */
+void dr_lcomp(Synth *s) {
+    if (!g_knob_dry && s->dr.v[0].lc == 1.f) return;
+    for (int d = 0; d < NUM_DRUMS; d++)
+        s->dr.v[d].lc = g_knob_dry ? fexp2(fclamp(-.5f * DR_DCOMP * flog2(dr_len(s, d, 0) / dr_len(s, d, 1)), -2.f, 2.f)) : 1.f;
 }
 
 #include "ctl_on.h"
@@ -184,6 +208,7 @@ DSP_CTL static float env_at(float t, float ls, float A, float H, float D, float 
 
 DSP_CTL void drums_tick(Synth *s, float dt) {
     Drums *D = &s->dr;
+    DSP_FAR(dr_lcomp)(s);
     for (int d = 0; d < NUM_DRUMS; d++) D->flash[d] *= .96f;
     {   /* Shape by: the layer's loudest point's envelope (continuous), the gain's target for this block */
         int sh = pint(s, P_DR_SHAPE); float g = 1.f, e = .5f;
@@ -242,7 +267,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         float e = env_at(t1, v->ls, A, H, Dc, cv);
         v->env = e; v->t = t1;
         c->off = (uint8_t)off;
-        c->h1 = e * v->g * pval(s, DP(d, P_D1_LEVEL)) * lev;
+        c->h1 = e * v->g * pval(s, DP(d, P_D1_LEVEL)) * lev * v->lc;   /* (lc, Dry: Shape moves the lengths, not much the loudness) */
         /* the character, at the tick's middle */
         float tm = (t1 - .5f * (float)SUB) * (1.f / SR); if (tm < 0.f) tm = 0.f;
         float st = pval(s, DP(d, P_D1_SETTLE)), ts = .3f * fexp2(-5.f * st), se = fexp2(-tm / ts * 1.4427f);

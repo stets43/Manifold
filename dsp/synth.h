@@ -331,6 +331,7 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 typedef struct { int8_t layer, node; uint8_t off, d; float h0, h1, tilt, snap, w, oe, pl; } DrumHit;   /* (oe: its Odd/even push, -1..1; pl: its Pluck) */   /* w: the character's strength, by the hit's envelope */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
+    float lc;                  /* (1.0.6) Dry: the level Shape's lengths give back (dr_lcomp) */
     float g;                   /* this hit's velocity */
     float t;                   /* samples since the hit (where the envelope is) */
     float ls;                  /* the level a hit started from (a retrigger rises from where it is, no click) */

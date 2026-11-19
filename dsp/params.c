@@ -865,15 +865,17 @@ static void dry_shape_paths(Synth *s) {
                 int bloom = (side ? 1.f : -1.f) == bd;
                 float lo, hi;
                 switch (k) {
-                case 0: if (lg) { lo = bloom ? .15f : -.2f;  hi = bloom ? .32f : -.08f; }   /* decay */
-                        else    { lo = bloom ? -.04f : -.14f; hi = bloom ? .05f : -.06f; } break;
-                case 1: if (lg) { lo = bloom ? .1f : -.15f;  hi = bloom ? .3f : -.05f; }    /* hold */
-                        else    { lo = bloom ? -.05f : -.05f; hi = 0.f; } break;
-                case 2: if (lg) { lo = bloom ? 0.f : -.05f; hi = bloom ? .1f : 0.f; }       /* attack */
-                        else    { lo = -.05f; hi = 0.f; } break;
-                case 3: if (lg) { lo = bloom ? -.15f : 0.f;  hi = bloom ? -.05f : .1f; }    /* snap */
-                        else    { lo = bloom ? .05f : 0.f;  hi = bloom ? .2f : .1f; } break;
-                default: lo = -.12f; hi = .12f; break;                                       /* settle, curve */
+                /* (1.0.6: far wider than first built, where a turn did little: the kick's decay from a click to
+                   seconds; and Shape's offsets are doubled on a Dry patch, mod.c) */
+                case 0: if (lg) { lo = bloom ? .35f : -.2f; hi = bloom ? .6f : -.12f; }      /* decay (the pull: a tight thump, never a click) */
+                        else    { lo = bloom ? -.06f : -.3f; hi = bloom ? .06f : -.15f; } break;
+                case 1: if (lg) { lo = bloom ? .4f : -.3f;  hi = bloom ? .8f : -.1f; }      /* hold */
+                        else    { lo = -.1f; hi = 0.f; } break;
+                case 2: if (lg) { lo = bloom ? .1f : -.2f; hi = bloom ? .35f : 0.f; }       /* attack */
+                        else    { lo = -.15f; hi = 0.f; } break;
+                case 3: if (lg) { lo = bloom ? -.4f : 0.f;  hi = bloom ? -.15f : .3f; }     /* snap */
+                        else    { lo = bloom ? .2f : 0.f;  hi = bloom ? .5f : .3f; } break;
+                default: lo = -.35f; hi = .35f; break;                                       /* settle, curve */
                 }
                 float far = lo + (hi - lo) * frand(r), near = far * (.4f + .6f * frand(r));
                 w[side ? 3 : 0] = (int8_t)(fclamp(far, -1.f, 1.f) * 127.f);
@@ -946,10 +948,10 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         if (frand(r) < .85f) t[P_RV_TUNED] = disc(P_RV_TUNED, 0);
         if (t[P_DL_FB] > .65f && t[P_DL_SEND] > .4f) t[P_DL_SEND] = .25f;
     }
-    /* (1.0.6) a third of the rolls Dry, in every style: any roll of the sound (a tap of REC too, which keeps the
+    /* (1.0.6) a quarter of the rolls Dry, in every style: any roll of the sound (a tap of REC too, which keeps the
        effects' settings: Dry only takes them out), unless the effects are locked */
     if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS]))
-        t[P_DRY] = disc(P_DRY, frand(r) < .33f);
+        t[P_DRY] = disc(P_DRY, frand(r) < .25f);
     g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
     roll_together(s);
     params_roll_mod(s);

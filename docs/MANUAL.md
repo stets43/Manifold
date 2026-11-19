@@ -184,7 +184,7 @@ what the buttons do on this page.
 | --- | --- |
 | PLAY (tap) | start / stop the generators and the rhythm (the keys always play) |
 | PLAY (hold) | the performance keys appear on the white keys (see below) |
-| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a third of the time it makes the patch Dry, the effects' settings kept for when it is wet again) |
+| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a quarter of the time it makes the patch Dry, the effects' settings kept for when it is wet again) |
 | REC (double tap) | roll everything except the scale |
 | REC (hold 0.7 s) | mutate: a small nudge to every continuous setting |
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
@@ -237,7 +237,7 @@ the knob as you turn it.
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills, the layers' levels (±3 dB at most, one up as the other goes down: which layer leads) | layer 1's Rate and Reach, the layers' levels; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
-**A Dry patch** (FX → Output, K4; a third of all rolls) has no fuzz, filter, delay or reverb: they are not run at all,
+**A Dry patch** (FX → Output, K4; a quarter of all rolls) has no fuzz, filter, delay or reverb: they are not run at all,
 which also leaves the FM-1 more headroom. Their settings are kept, so turning Dry off brings them back (fading in
 and out over about 30 ms). Space becomes **Shape**: the room the instrument makes itself instead of an effect's.
 
@@ -245,7 +245,7 @@ and out over about 30 ms). Space becomes **Shape**: the room the instrument make
 | --- | --- | --- |
 | **Timbre** | as above, but for the voices' Width, Spin and Pluck | as above |
 | **Groove** | as above, but for the drums' envelopes, Snap, Pluck and the duck; with the compressor's **Pump** | Density, Swing, Pump, the drums' levels |
-| **Shape** | each drum's Attack, Hold, Decay, Curve, Settle, Snap and Pluck; the kick's duck; the layers' Contour; the voices' Pluck, Width and Spin; the compressor (threshold, ratio, attack, release, mix) | the drums' envelopes as a kit: one way the kick and the tom bloom long and open while the snare and the hat stay tight and snappy, the other way it all pulls in close (which way, and how far, is rolled); the layers' Contour; the voices' Width |
+| **Shape** | each drum's Attack, Hold, Decay, Curve, Settle, Snap and Pluck; the kick's duck; the layers' Contour; the voices' Pluck, Width and Spin; the compressor's attack | the drums' envelopes as a kit: one way the kick and the tom bloom long and open while the snare and the hat stay tight and snappy, the other way it all pulls in close (which way, and how far, is rolled); the layers' Contour; the voices' Width |
 | **Motion** | as above, but for the layers' Contour | as above |
 
 A Dry roll also sets the kit's roles: the kick and the tom long, the snare and the hat short and snappy. Its routes
@@ -333,7 +333,7 @@ relatives.
 
 **What a roll changes:**
 
-- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (a third Dry).
+- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (a quarter Dry).
   Its knobs' paths stay as they were; a double tap (or REC + HOME) gives a Dry patch Shape's kit paths too.
 - **REC (double tap)** rolls everything but the scale: the sound, the matrix, the LFOs, the effects and the knobs.
 - **REC + a page button** rolls only that page. **REC + SEL** is the only roll that changes the scale.
