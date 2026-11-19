@@ -143,8 +143,10 @@ typedef enum {
     /* each layer's Balance: how its motion's energy is shared among the notes, Dark (toward the bass) .. Balanced
        (every note alike, whatever the motion favours) .. Bright (toward the middle) */
     P_G1_BAL, P_G2_BAL,
+    P_DRY,                     /* (1.0.6) the effects out: fuzz, filter, delay, reverb; the Space knob is Shape */
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_F (P_G2_BAL + 1)                      /* 1.0.5's ("MNPF") */
 #define NUM_PARAMS_E (P_V2_CLARITY + 1)                  /* the 1.0.5 test build's before Balance ("MNPE") */
 #define NUM_PARAMS_D (P_D4_HPLUCK + 1)                   /* the 1.0.5 test build's before the undertones ("MNPD") */
 #define NUM_PARAMS_C (P_V2_PLUCK + 1)                    /* the 1.0.5 test build's with the voices' colour ("MNPC") */
@@ -428,6 +430,7 @@ typedef struct {
     float odc_x[2], odc_y[2];
     float rv_h[4], rv_o[2]; int rv_ph;   /* the half-rate reverb: its input low-pass's state (two biquads), its last
                                             output, which sample */
+    float fxw;                /* (1.0.6) the effects in: 1 wet, 0 Dry (gliding ~30 ms between); at 0 they are not run */
 } Fx;
 
 /* ------------------------------------------------------------------ */
@@ -551,6 +554,9 @@ void hit_colour(const Synth *s, int l, float o, float *out);           /* layer 
 void voices_tick(Synth *s, int layer);      /* per control tick: the bank's function (levels, phases) from the controls */
 void layer_render(Synth *s, int layer, float *L, float *R, int n);
 int  knob_of_r(int id);                     /* (knob_of, in RAM: the tick's) */
+int  knob_of_rd(int id, int dry);
+int  knob_of_dry(int id, int dry);          /* knob_of for a patch Dry or not (the roll's) */
+extern uint8_t g_knob_dry;                  /* the patch is Dry: Space is Shape */
 int  knob_of(int id);                       /* the performance knob a parameter rides: 0 Timbre, 1 Groove, 2 Space, 3 Motion; -1 none */
 const char *knob_name(int k);
 float knob_offset(const Synth *s, int id);  /* the parameter's offset now, from its knob's position along its path */

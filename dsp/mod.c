@@ -60,10 +60,30 @@ DSP_CTL void lfo_tick(Synth *s, float dt) {
      Timbre   both voices (the oscillator banks)        Groove   the rhythm and the drums
      Space    the effects                               Motion   both generators, the path, the LFOs */
 static const char *const KNOB_N[NUM_MACRO] = {"Timbre", "Groove", "Space", "Motion"};
-const char *knob_name(int k) { return k >= 0 && k < NUM_MACRO ? KNOB_N[k] : "?"; }
-DSP_CTL int knob_of_r(int id) {
+uint8_t g_knob_dry;                          /* the patch is Dry (1.0.6): Space is Shape (mod_apply keeps it) */
+const char *knob_name(int k) { return k == 2 && g_knob_dry ? "Shape" : k >= 0 && k < NUM_MACRO ? KNOB_N[k] : "?"; }
+/* A Dry patch (1.0.6): the effects off every knob but the compressor's; Space, shown as Shape, has the envelopes and
+   the room the instrument makes itself: each drum's attack, hold, decay, curve, settle, snap and pluck, the duck, the
+   layers' contour, the voices' pluck, width and spin, and the compressor; Pump (its rhythm) goes to Groove */
+static int knob_dry(int id) {
+    if (id == P_CMP_PUMP) return 1;
+    if (id >= P_CMP_THRESH && id <= P_CMP_MIX) return 2;
+    if (g_param_meta[id].section == SEC_FX) return -1;
+    if ((id >= P_D1_HPLUCK && id <= P_D4_HPLUCK) || id == P_DR_DUCK || id == P_G1_CONTOUR || id == P_G2_CONTOUR ||
+        id == P_V1_PLUCK || id == P_V2_PLUCK || id == P_V1_WIDTH || id == P_V2_WIDTH || id == P_V1_SPIN || id == P_V2_SPIN)
+        return 2;
+    if (id >= P_D1_DENS && id < P_D1_DENS + NUM_DRUMS * DR_STRIDE) {
+        int k = (id - P_D1_DENS) % DR_STRIDE + P_D1_DENS;
+        if (k == P_D1_ATTACK || k == P_D1_HOLD || k == P_D1_DECAY || k == P_D1_CURVE || k == P_D1_SETTLE || k == P_D1_SNAP)
+            return 2;
+    }
+    return 9;                                /* (as when wet) */
+}
+int knob_of_rd(int id, int dry) {
     if (id < 0 || id >= NUM_PARAMS || !g_param_meta[id].moddable) return -1;
-    if (id == P_MASTER || id == P_V1_LEVEL || id == P_V2_LEVEL || id == P_DR_LEVEL || id == P_TEMPER) return -1;
+    if (dry) { int k = knob_dry(id); if (k != 9) return k; }
+    if (id == P_V1_LEVEL || id == P_V2_LEVEL) return 3;                    /* (1.0.6) the layers' levels: Motion (+-3 dB) */
+    if (id == P_MASTER || id == P_DR_LEVEL || id == P_TEMPER) return -1;
     if ((id >= P_D1_ROT && id <= P_D4_ROT) || id == P_RH_FILL) return 3;   /* the patterns' rotations, the fills: Motion */
     if (id >= P_D1_LEN && id <= P_D4_LEN) return -1;                       /* (a loop's length: by hand) */
     if (id >= P_V1_ODDEVEN && id <= P_V2_PLUCK) return 0;                  /* the voices' colour: Timbre */
@@ -75,13 +95,26 @@ DSP_CTL int knob_of_r(int id) {
     if (id == P_G1_BAL || id == P_G2_BAL) return 0;                        /* the notes' balance (dark .. bright): Timbre */
     switch (g_param_meta[id].section) {
     case SEC_VOICE1: case SEC_VOICE2: return 0;
-    case SEC_METER: case SEC_DRUMS: return (id >= P_D1_DENS && (id - P_D1_DENS) % DR_STRIDE == P_D1_LEVEL - P_D1_DENS) ? -1 : 1;
+    case SEC_METER: case SEC_DRUMS: return 1;                              /* (1.0.6: the drums' levels too, +-4 dB) */
     case SEC_FX: return 2;
     case SEC_GEN1: case SEC_GEN2: case SEC_LFO: return 3;
     default: return -1;
     }
 }
-int knob_of(int id) { return DSP_FAR(knob_of_r)(id); }      /* (the interface's and the roll's call, from the flash) */
+/* the tick reads which knob from a table (worked out in the flash when the patch turns Dry or wet: the rules are long,
+   and the RAM for code is short) */
+static int8_t g_knob[NUM_PARAMS];
+static uint8_t g_knob_made = 2;              /* (the table's Dry; 2: not made yet) */
+static void knob_table(int dry) {
+    for (int i = 0; i < NUM_PARAMS; i++) g_knob[i] = (int8_t)knob_of_rd(i, dry);
+    g_knob_made = (uint8_t)dry;
+}
+DSP_CTL int knob_of_r(int id) {
+    if (g_knob_made != g_knob_dry) DSP_FAR(knob_table)(g_knob_dry);
+    return id >= 0 && id < NUM_PARAMS ? g_knob[id] : -1;
+}
+int knob_of(int id) { return DSP_FAR(knob_of_r)(id); }
+int knob_of_dry(int id, int dry) { return knob_of_rd(id, dry); }   /* (the roll's: the patch it makes) */      /* (the interface's and the roll's call, from the flash) */
 DSP_CTL float knob_offset(const Synth *s, int id) {
     int k = knob_of_r(id); if (k < 0) return 0.f;
     float m = s->kmod[k]; if (m == 0.f) return 0.f;
@@ -93,6 +126,7 @@ DSP_CTL float knob_offset(const Synth *s, int id) {
 
 DSP_CTL void mod_apply(Synth *s) {
     float *src = s->src;
+    g_knob_dry = (uint8_t)(s->target[P_DRY] > .5f);
     for (int j = 0; j < NUM_LFO; j++) src[SRC_LFO1 + j] = s->lfo[j].value;
     for (int m = 0; m < NUM_MACRO; m++) src[SRC_MACRO1 + m] = s->macro[m];
     src[SRC_ENV] = s->eng.env_follow * 4.f > 1.f ? 1.f : s->eng.env_follow * 4.f;

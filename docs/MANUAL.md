@@ -233,11 +233,25 @@ the knob as you turn it.
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
 | **Timbre** | both voices (their Colour too), both layers' Balance, the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices; Balance |
-| **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
+| **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too), the drums' levels (±4 dB at most) | Density, Swing, the drums' levels; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
-| **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
+| **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills, the layers' levels (±3 dB at most, one up as the other goes down: which layer leads) | layer 1's Rate and Reach, the layers' levels; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
-Levels (layer levels, drum levels, master) and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
+**A Dry patch** (FX → Output, K4; a third of all rolls) has no fuzz, filter, delay or reverb: they are not run at all,
+which also leaves the FM-1 more headroom. Their settings are kept, so turning Dry off brings them back (fading in
+and out over about 30 ms). Space becomes **Shape**: the room the instrument makes itself instead of an effect's.
+
+| Knob (Dry) | Part of the instrument | Always on its path |
+| --- | --- | --- |
+| **Timbre** | as above, but for the voices' Width, Spin and Pluck | as above |
+| **Groove** | as above, but for the drums' envelopes, Snap, Pluck and the duck; with the compressor's **Pump** | Density, Swing, Pump, the drums' levels |
+| **Shape** | each drum's Attack, Hold, Decay, Curve, Settle, Snap and Pluck; the kick's duck; the layers' Contour; the voices' Pluck, Width and Spin; the compressor (threshold, ratio, attack, release, mix) | the drums' envelopes as a kit: one way the kick and the tom bloom long and open while the snare and the hat stay tight and snappy, the other way it all pulls in close (which way, and how far, is rolled); the layers' Contour; the voices' Width |
+| **Motion** | as above, but for the layers' Contour | as above |
+
+A Dry roll also sets the kit's roles: the kick and the tom long, the snare and the hat short and snappy. Its routes
+in the matrix go nowhere near the effects.
+
+The master, the drum bus level and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
 HOME** locks them so rolls keep them. The knobs can also be turned by the modulation matrix: see
 [Knobs as destinations](#knobs-as-destinations). A white tick on a knob's bar shows where the matrix has it.
 
@@ -742,6 +756,7 @@ The chain: **fuzz → filter → delay and reverb sends → compressor → maste
 | **Output** | K1 | **Comp mix** | parallel compression: dry … fully compressed |
 | | K2 | **Pump** | the compressor ducks on layer 1's onsets |
 | | K3 | **Master** | the output level (0–150 %) |
+| | K4 | **Dry** | **On**: no fuzz, filter, delay or reverb (not run); the Space knob is **Shape**. See [The performance knobs](#the-performance-knobs) |
 
 After the master, a look-ahead **limiter** holds peaks at −0.5 dBFS, and a soft clip catches anything that still gets
 past. Patches come out loud (about −14 dBFS on average) without distorting.

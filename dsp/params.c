@@ -159,6 +159,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
     tick by tick, and work the mask out each time) */
  M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,1, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,1, 0,1, .5f,0,1,0),
  M(P_G1_BAL,"balance",SEC_GEN1,CURVE_LIN,1,0, -1,1, .5f,0,1,0), M(P_G2_BAL,"balance",SEC_GEN2,CURVE_LIN,1,0, -1,1, .5f,0,1,0),
+ M(P_DRY,"dry",SEC_FX,CURVE_DISC,0,0, 0,2, 0,0,0,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -206,9 +207,14 @@ static int mod_loop(int src, int dst) {
     int g2 = (dst >= P_G2_FUNC && dst <= P_G2_ROUTE) || dst == P_G2_BAL;
     return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
 }
+static uint8_t g_roll_dry;                    /* the roll makes a Dry patch (1.0.6): no route to the effects */
+static int fx_off(int id) {                   /* an effect a Dry patch has not got (the compressor it has) */
+    return g_param_meta[id].section == SEC_FX && !(id >= P_CMP_THRESH && id <= P_CMP_PUMP);
+}
 static int rand_moddable(uint32_t *r) {
     for (;;) {
         int id = (int)(frand(r) * NUM_PARAMS) % NUM_PARAMS;
+        if (g_roll_dry && fx_off(id)) continue;
         if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL
             && !(id >= P_D1_PAT && id <= P_D4_LEN)) return id;   /* (a pattern moves only where a style puts it) */
     }
@@ -261,8 +267,9 @@ void params_roll_knobs_part(Synth *s, int i0, int i1) {    /* (the knobs' paths 
            band and tilt, the voices' Depth and the notes' Balance (the low end: Timbre), the rhythm's density and swing, the motions' rates */
         int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_RV_DAMP || i == P_DL_SEND || i == P_DL_FB
                 || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH
-                || i == P_V1_DEPTH || i == P_V2_DEPTH || i == P_G1_BAL || i == P_G2_BAL;
-        if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
+                || i == P_V1_DEPTH || i == P_V2_DEPTH || i == P_G1_BAL || i == P_G2_BAL
+                || i == P_G1_CONTOUR || i == P_G2_CONTOUR || i == P_V1_WIDTH || i == P_V2_WIDTH || i == P_CMP_PUMP;   /* (1.0.6: Shape's and Pump, on a Dry patch) */
+        if (knob_of_dry(i, s->target[P_DRY] > .5f) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
         const ParamMeta *m = &g_param_meta[i];
         float span = m->rhi - m->rlo + .15f; if (span < .45f) span = .45f; if (span > 1.f) span = 1.f;
         float dir = frand(r) < .5f ? -1.f : 1.f;              /* the two ends go opposite ways, mostly: a turn is a journey */
@@ -805,6 +812,88 @@ void params_roll(Synth *s, uint32_t seed) {
 /* the roll in parts, each a fraction of a block's work, so a roll run from the audio's interrupt (synth_roll_step) is
    spread over a few blocks: 0 the parameters, the effects' pairs, the matrix's random routes; 1, 2 the knobs' paths
    (each half); 3 the style, its matrix, Wild's patterns */
+/* (1.0.6) after the style: the levels' paths, and a Dry patch's kit, routes and Shape */
+static void level_paths(Synth *s) {          /* the drums' levels on Groove (+-4 dB), the layers' on Motion (+-3 dB, the two
+                                                opposite: a turn shifts which layer leads); always on their knobs */
+    uint32_t *r = &s->rng;
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int id = DP(d, P_D1_LEVEL); int8_t *w = s->kpath[id]; float v = s->target[id];
+        float dir = frand(r) < .5f ? -1.f : 1.f;
+        for (int side = 0; side < 2; side++) {
+            float db = (2.f + 2.f * frand(r)) * (side ? dir : -dir), nd = db * (.3f + .7f * frand(r));
+            w[side ? 3 : 0] = (int8_t)(fclamp(v * (fexp2(db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            w[side ? 2 : 1] = (int8_t)(fclamp(v * (fexp2(nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+        }
+    }
+    {   float v1 = s->target[P_V1_LEVEL], v2 = s->target[P_V2_LEVEL], dir = frand(r) < .5f ? -1.f : 1.f;
+        for (int side = 0; side < 2; side++) {
+            float db = (1.5f + 1.5f * frand(r)) * (side ? dir : -dir), nd = db * (.3f + .7f * frand(r));
+            s->kpath[P_V1_LEVEL][side ? 3 : 0] = (int8_t)(fclamp(v1 * (fexp2(db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V1_LEVEL][side ? 2 : 1] = (int8_t)(fclamp(v1 * (fexp2(nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V2_LEVEL][side ? 3 : 0] = (int8_t)(fclamp(v2 * (fexp2(-db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V2_LEVEL][side ? 2 : 1] = (int8_t)(fclamp(v2 * (fexp2(-nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+        }
+    }
+}
+/* a Dry patch's drums as a kit: the kick (1) and the tom (4) long, the snare (2) and the hat (3) short and snappy */
+static void dry_kit(Synth *s) {
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int lg = d == 0 || d == 3;
+        if (lg) { TR(s, DP(d, P_D1_DECAY), d ? .3f : .45f, d ? .9f : 1.5f); TR(s, DP(d, P_D1_HOLD), .005f, .02f); }
+        else if (d == 1) { TR(s, DP(d, P_D1_DECAY), .07f, .18f); TR(s, DP(d, P_D1_HOLD), 0.f, .004f); TR(s, DP(d, P_D1_SNAP), .5f, .85f); }
+        else { TR(s, DP(d, P_D1_DECAY), .02f, .055f); TR(s, DP(d, P_D1_HOLD), 0.f, .002f); TR(s, DP(d, P_D1_SNAP), .4f, .8f); }
+    }
+}
+/* Shape's paths for the drums' envelopes: one way (rolled) the kick and the tom bloom, long and open, while the snare
+   and the hat stay tight (tighter, snappier); the other way all of it pulls in close. Within that, rolled */
+static void dry_shape_paths(Synth *s) {
+    uint32_t *r = &s->rng;
+    float bd = frand(r) < .5f ? -1.f : 1.f;    /* the side of the knob that blooms */
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int lg = d == 0 || d == 3;
+        static const uint8_t P[6] = {P_D1_DECAY, P_D1_HOLD, P_D1_ATTACK, P_D1_SNAP, P_D1_SETTLE, P_D1_CURVE};
+        for (int k = 0; k < 6; k++) {
+            int id = DP(d, P[k]); int8_t *w = s->kpath[id];
+            for (int side = 0; side < 2; side++) {
+                int bloom = (side ? 1.f : -1.f) == bd;
+                float lo, hi;
+                switch (k) {
+                case 0: if (lg) { lo = bloom ? .15f : -.2f;  hi = bloom ? .32f : -.08f; }   /* decay */
+                        else    { lo = bloom ? -.04f : -.14f; hi = bloom ? .05f : -.06f; } break;
+                case 1: if (lg) { lo = bloom ? .1f : -.15f;  hi = bloom ? .3f : -.05f; }    /* hold */
+                        else    { lo = bloom ? -.05f : -.05f; hi = 0.f; } break;
+                case 2: if (lg) { lo = bloom ? 0.f : -.05f; hi = bloom ? .1f : 0.f; }       /* attack */
+                        else    { lo = -.05f; hi = 0.f; } break;
+                case 3: if (lg) { lo = bloom ? -.15f : 0.f;  hi = bloom ? -.05f : .1f; }    /* snap */
+                        else    { lo = bloom ? .05f : 0.f;  hi = bloom ? .2f : .1f; } break;
+                default: lo = -.12f; hi = .12f; break;                                       /* settle, curve */
+                }
+                float far = lo + (hi - lo) * frand(r), near = far * (.4f + .6f * frand(r));
+                w[side ? 3 : 0] = (int8_t)(fclamp(far, -1.f, 1.f) * 127.f);
+                w[side ? 2 : 1] = (int8_t)(fclamp(near, -1.f, 1.f) * 127.f);
+            }
+        }
+    }
+}
+static void roll_finish(Synth *s) {
+    uint32_t *r = &s->rng;
+    int dry = s->target[P_DRY] > .5f;
+    if (dry && !s->locked[SEC_DRUMS]) dry_kit(s);
+    if (dry && !s->locked[SEC_LFO])            /* (the style's routes to the effects: elsewhere) */
+        for (int k = 0; k < MOD_SLOTS; k++) {
+            ModSlot *m = &s->slot[k];
+            if (m->src && m->dst < NUM_PARAMS && fx_off(m->dst)) {
+                g_roll_dry = 1;
+                m->dst = (uint8_t)rand_moddable(r);
+                if (mod_loop(m->src, m->dst)) m->src = 0;
+            }
+        }
+    if (!s->locked[SEC_KNOBS]) {
+        level_paths(s);
+        if (dry) dry_shape_paths(s);
+    }
+}
+
 void params_roll_part(Synth *s, int part, uint32_t seed) {
     if (part == 1 || part == 2) {
         if (!s->locked[SEC_KNOBS]) params_roll_knobs_part(s, part == 1 ? 0 : NUM_PARAMS / 2, part == 1 ? NUM_PARAMS / 2 : NUM_PARAMS);
@@ -819,6 +908,7 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
             static const uint8_t GG[3] = {PG_HOUSE, PG_BREAKS, PG_HIPHOP};
             roll_patterns(s, GG[(int)(frand(r) * 3.f) % 3], 0, 1);
         }
+        roll_finish(s);
         return;
     }
     s->rng = seed * 2654435761u + 1u;
@@ -837,7 +927,9 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         else { t[P_FLT_MORPH] = .75f + .1f * frand(r); t[P_FLT_CUT] = .2f + .2f * frand(r); }
         if (frand(r) < .85f) t[P_RV_TUNED] = disc(P_RV_TUNED, 0);
         if (t[P_DL_FB] > .65f && t[P_DL_SEND] > .4f) t[P_DL_SEND] = .25f;
+        t[P_DRY] = disc(P_DRY, frand(r) < .33f);   /* (1.0.6) a third of the rolls Dry, in every style */
     }
+    g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
     roll_together(s);
     params_roll_mod(s);
 }

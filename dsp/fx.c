@@ -35,7 +35,8 @@ static const float DL_TAPS[5] = {1.f, .75f, 2.f/3, .5f, .8f};
 /* coefficient block, refreshed per tick */
 static struct {
     float fz_g1, fz_mix, fz_tone, fz_hp, fz_lp, fz_hp2, fz_tl, fz_th;
-    float m_a1, m_a2, m_a3, m_k, m_wl, m_wb, m_wh;
+    float m_a1, m_a2, m_a3, m_k, m_wl, m_wb, m_wh, m_wd;   /* (m_wd: the dry signal's share, while Dry fades in or out) */
+    float fxw; int fx_on;                           /* (1.0.6) the effects' share; they run (not Dry, or fading) */
     float d_send, d_fb, d_tone_a, d_D_tgt, d_rate_tgt, d_tap, d_aa;
     float r_dry, r_send, r_glo[8], r_ghi[8], r_pre, r_mod, r_to, r_out, r_lp;
     int   r_prei;                                   /* the pre-delay in the reverb's steps */
@@ -56,6 +57,58 @@ void fx_init(Fx *f) {
     for (int i = 0; i < 8; i++) f->rlen[i] = f->rlen_tgt[i] = RV_BASE[i] * .7f;
     f->dD = 4000.f; g_drate = 1.f;
     f->cgain = 1.f;
+    f->fxw = 1.f;
+}
+/* (1.0.6) the effects back from Dry: what the delay, the reverb and the filter held when they stopped is let go, so
+   they start from silence, not from a tail minutes old (from the flash: it is rare) */
+static void fx_clear(Fx *f) {
+    memset(f->dbuf, 0, sizeof f->dbuf); memset(f->rbuf, 0, sizeof f->rbuf); memset(f->ap_buf, 0, sizeof f->ap_buf);
+    memset(f->pre, 0, sizeof f->pre); memset(f->morph, 0, sizeof f->morph);
+    memset(f->rv_h, 0, sizeof f->rv_h); f->rv_o[0] = f->rv_o[1] = 0.f;
+    f->dlp1 = f->dlp2 = f->dout_lp[0] = f->dout_lp[1] = f->dfb_hp = 0.f;
+    for (int i = 0; i < 8; i++) f->rlp[i] = 0.f;
+    f->dc_x[0] = f->dc_x[1] = f->dc_y[0] = f->dc_y[1] = 0.f;
+}
+
+/* fx_update's rarer half, from the flash: the compressor's coefficients and Dry's fade (1.0.6) */
+static void fx_update_far(Synth *s) {
+    Fx *f = &s->fx;
+    /* BBD delay: fixed buffer, write rate sets the time */
+    float beat = 60.f / pval(s, P_TEMPO);
+    int di = (int)(pnorm(s, P_DL_TIME) * 9.999f);
+    float tsec = beat * DL_DIV[di]; if (tsec > 3.f) tsec = 3.f; if (tsec < .02f) tsec = .02f;
+    float Dmax = (float)(DLN - 8);
+    float rate = Dmax / (tsec * SR); if (rate > 1.f) rate = 1.f; if (rate < .125f) rate = .125f;
+    C.d_rate_tgt = rate;
+    C.d_D_tgt = tsec * SR * rate; if (C.d_D_tgt > Dmax) C.d_D_tgt = Dmax;
+    C.d_tap = DL_TAPS[pint(s, P_DL_TAP)];
+    C.d_send = pnorm(s, P_DL_SEND);
+    C.d_fb = pval(s, P_DL_FB);
+    float tone_fc = 600.f * fexp2(pnorm(s, P_DL_TONE) * 4.3f);
+    C.d_tone_a = 1.f - fexp2(-TWO_PI * tone_fc / SR * 1.4427f);
+
+    /* compressor */
+    C.c_att = 1.f - fexp2(-1.4427f / (pval(s, P_CMP_ATT) * .001f * SR));
+    C.c_rel = 1.f - fexp2(-1.4427f / (pval(s, P_CMP_REL) * .001f * SR));
+    C.c_thresh = pval(s, P_CMP_THRESH);
+    C.c_ratio = pval(s, P_CMP_RATIO);
+    C.c_mix = pnorm(s, P_CMP_MIX);
+    C.c_makeup = fexp2(-C.c_thresh * (1.f - 1.f / C.c_ratio) * .5f * 0.1661f);   /* half the static reduction back */
+    C.c_pump = pnorm(s, P_CMP_PUMP);
+    C.master = pval(s, P_MASTER);
+
+    /* Dry: the fuzz, the filter, the delay and the reverb out (the compressor and the limiter stay), faded
+       over ~30 ms each way; out, they are not run at all */
+    {   float w = f->fxw, tg = pint(s, P_DRY) ? 0.f : 1.f;
+        if (tg > w) { if (w <= 0.f) DSP_FAR(fx_clear)(f); w += .05f; if (w > 1.f) w = 1.f; }
+        else if (tg < w) { w -= .05f; if (w < 0.f) w = 0.f; }
+        f->fxw = w;
+        C.fxw = w; C.fx_on = w > 0.f;
+        C.fz_mix *= w; C.d_send *= w; C.r_send *= w; C.r_to *= w;
+        C.r_dry = C.r_dry * w + (1.f - w);
+        C.m_wl *= w; C.m_wb *= w; C.m_wh *= w; C.m_wd = 1.f - w;
+    }
+
 }
 
 #include "ctl_on.h"
@@ -82,20 +135,6 @@ DSP_CTL void fx_update(Synth *s) {
     C.m_wl = m < .5f ? 1.f - 2.f * m : 0.f;
     C.m_wb = 1.f - fabsf(2.f * m - 1.f);
     C.m_wh = m > .5f ? 2.f * m - 1.f : 0.f;
-
-    /* BBD delay: fixed buffer, write rate sets the time */
-    float beat = 60.f / pval(s, P_TEMPO);
-    int di = (int)(pnorm(s, P_DL_TIME) * 9.999f);
-    float tsec = beat * DL_DIV[di]; if (tsec > 3.f) tsec = 3.f; if (tsec < .02f) tsec = .02f;
-    float Dmax = (float)(DLN - 8);
-    float rate = Dmax / (tsec * SR); if (rate > 1.f) rate = 1.f; if (rate < .125f) rate = .125f;
-    C.d_rate_tgt = rate;
-    C.d_D_tgt = tsec * SR * rate; if (C.d_D_tgt > Dmax) C.d_D_tgt = Dmax;
-    C.d_tap = DL_TAPS[pint(s, P_DL_TAP)];
-    C.d_send = pnorm(s, P_DL_SEND);
-    C.d_fb = pval(s, P_DL_FB);
-    float tone_fc = 600.f * fexp2(pnorm(s, P_DL_TONE) * 4.3f);
-    C.d_tone_a = 1.f - fexp2(-TWO_PI * tone_fc / SR * 1.4427f);
 
     /* FDN reverb */
     float size = pval(s, P_RV_SIZE), t60 = pval(s, P_RV_DECAY), damp = pnorm(s, P_RV_DAMP);
@@ -128,15 +167,7 @@ DSP_CTL void fx_update(Synth *s) {
     C.r_mod = pnorm(s, P_RV_MOD);
     C.r_to = pnorm(s, P_DL_TO_RV);
 
-    /* compressor */
-    C.c_att = 1.f - fexp2(-1.4427f / (pval(s, P_CMP_ATT) * .001f * SR));
-    C.c_rel = 1.f - fexp2(-1.4427f / (pval(s, P_CMP_REL) * .001f * SR));
-    C.c_thresh = pval(s, P_CMP_THRESH);
-    C.c_ratio = pval(s, P_CMP_RATIO);
-    C.c_mix = pnorm(s, P_CMP_MIX);
-    C.c_makeup = fexp2(-C.c_thresh * (1.f - 1.f / C.c_ratio) * .5f * 0.1661f);   /* half the static reduction back */
-    C.c_pump = pnorm(s, P_CMP_PUMP);
-    C.master = pval(s, P_MASTER);
+    DSP_FAR(fx_update_far)(s);              /* (the compressor and Dry: from the flash, the RAM for code is short) */
 
     /* BBD: rate and anti-alias filter glide at control rate */
     g_drate += 0.016f * (C.d_rate_tgt - g_drate);
@@ -281,15 +312,15 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         }
     }
 
-    /* 2. the filter (LP / BP / HP blend), per channel over the block */
-    for (int c = 0; c < 2; c++) {
+    /* 2. the filter (LP / BP / HP blend), per channel over the block (Dry: not run; fading: the dry signal's share) */
+    if (C.fx_on) for (int c = 0; c < 2; c++) {
         float *X = c ? R : L, i1 = f->morph[c].ic1, i2 = f->morph[c].ic2;
-        float a1 = C.m_a1, a2 = C.m_a2, a3 = C.m_a3, k = C.m_k, wl = C.m_wl, wb = C.m_wb * C.m_k, wh = C.m_wh;
+        float a1 = C.m_a1, a2 = C.m_a2, a3 = C.m_a3, k = C.m_k, wl = C.m_wl, wb = C.m_wb * C.m_k, wh = C.m_wh, wd = C.m_wd;
         for (int t = 0; t < n; t++) {
             float v0 = X[t], v3 = v0 - i2;
             float v1 = a1 * i1 + a2 * v3, v2 = i2 + a2 * i1 + a3 * v3;
             i1 = 2.f * v1 - i1; i2 = 2.f * v2 - i2;
-            X[t] = wl * v2 + wb * v1 + wh * (v0 - k * v1 - v2);
+            X[t] = wl * v2 + wb * v1 + wh * (v0 - k * v1 - v2) + wd * v0;
         }
         f->morph[c].ic1 = i1; f->morph[c].ic2 = i2;
     }
@@ -298,13 +329,15 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
     for (int t = 0; t < n; t++) {
         float gd = gds[t];
         float x[2] = {L[t], R[t]};
+        float yl = 0.f, yr = 0.f, rl = 0.f, rr = 0.f;
+        if (C.fx_on) {                                           /* (Dry: the delay and the reverb not run) */
 
         /* 4a. BBD delay */
         f->dD += 0.0004f * (C.d_D_tgt - f->dD);
         float aa = C.d_aa;
         float wc = (float)f->dw + f->dacc;
-        float yl = rd16(f->dbuf, DLN, wc - 1.f - f->dD, 1.f / 16384.f);
-        float yr = rd16(f->dbuf, DLN, wc - 1.f - f->dD * C.d_tap, 1.f / 16384.f);
+        yl = rd16(f->dbuf, DLN, wc - 1.f - f->dD, 1.f / 16384.f);
+        yr = rd16(f->dbuf, DLN, wc - 1.f - f->dD * C.d_tap, 1.f / 16384.f);
         f->dout_lp[0] += aa * (yl - f->dout_lp[0]); f->dout_lp[1] += aa * (yr - f->dout_lp[1]);
         yl = f->dout_lp[0] + gd; yr = f->dout_lp[1] - gd;   /* int16 reads are exact zeros: guard */
         float fbs = 0.5f * (yl + yr);
@@ -321,7 +354,7 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
            it had let a 15 kHz tone back in at 9 kHz only 7 dB down), the output a straight line between steps */
         float rin = 0.5f * (x[0] + x[1]) * C.r_send + 0.5f * (yl + yr) * C.r_to;
         if (C.r_freeze) rin = 0.f;
-        float rl, rr, u;
+        float u;
         {   float *h = f->rv_h;                                   /* (two biquads, transposed direct form II) */
             float y1 = .03797304f * rin + h[0];
             h[0] = .07594608f * rin + .4129187f * y1 + h[1]; h[1] = .03797304f * rin - .07900857f * y1;
@@ -332,8 +365,10 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
             float nl, nr; rv_step(f, u, (float)(t + 1) * (1.f / SUB), gd, AP_LEN, &nl, &nr);
             rl = .5f * (f->rv_o[0] + nl); rr = .5f * (f->rv_o[1] + nr); f->rv_o[0] = nl; f->rv_o[1] = nr;
         } else { rl = f->rv_o[0]; rr = f->rv_o[1]; }
+        yl = (yl + rl) * C.fxw; yr = (yr + rr) * C.fxw;          /* (the tails fade with Dry too) */
+        }
 
-        float oL = (x[0] * C.r_dry + yl + rl) * DRIVE, oR = (x[1] * C.r_dry + yr + rr) * DRIVE;
+        float oL = (x[0] * C.r_dry + yl) * DRIVE, oR = (x[1] * C.r_dry + yr) * DRIVE;
 
         /* 5. compressor: detector every sample, gain computer every 8 */
         float pk = fabs_(oL) > fabs_(oR) ? fabs_(oL) : fabs_(oR);

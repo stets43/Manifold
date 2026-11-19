@@ -44,7 +44,11 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   listens: the layers' notes (started and stopped at a floor under each layer's peak, at most 24 new notes a second a
   layer by default), the keys, the drums (a General MIDI kit, or pitched), the knobs as CC 21–24 and the clock.
   **MPE** sends each note on its own channel with the pitch bend that puts it at its exact just pitch. Latch and
-  Panic no longer leave notes hanging on the receiver. Bluetooth audio: each of a device's audio inputs is asked for
+  Panic no longer leave notes hanging on the receiver. **Dry patches**: a third of the rolls (or FX → Output → Dry)
+  have no fuzz, filter, delay or reverb, not run at all (about 40 % less work in the simulator), and the Space knob becomes **Shape**:
+  the drums' envelopes as a kit (the kick and tom bloom, the snare and hat stay tight), the layers' contour, the
+  voices' pluck, width and spin, the duck and the compressor; Pump goes to Groove. The drums' levels ride Groove
+  (±4 dB) and the layers' levels Motion (±3 dB, opposite) in every patch. Bluetooth audio: each of a device's audio inputs is asked for
   SBC in turn (one offering AAC or its own codec first was refused); a device holding an old pairing with the FM-1 is
   answered "key missing" as the spec has it, and a re-pairing it stops part way is given up after 8 s, the crash
   report saying why.

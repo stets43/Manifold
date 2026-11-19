@@ -83,7 +83,8 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5046u          /* "MNPF" (1.0.5): MNP9 with the patterns' 20, the colour's 12, the undertones' 4 and Balance's 2 parameters after */
+#define PATCH_MAGIC 0x4D4E5047u          /* "MNPG" (1.0.6): MNP9 with the patterns' 20, the colour's 12, the undertones' 4, Balance's 2 and Dry after */
+#define PATCH_MAGIC_F 0x4D4E5046u        /* "MNPF" (1.0.5): read, wet */
 #define PATCH_MAGIC_E 0x4D4E5045u        /* "MNPE": a 1.0.5 test build's, before Balance: read, it at its default */
 #define PATCH_MAGIC_D 0x4D4E5044u        /* "MNPD": a 1.0.5 test build's, before the undertones: read, those at their defaults */
 #define PATCH_MAGIC_C 0x4D4E5043u        /* "MNPC": a 1.0.5 test build's, before the hits' colour: read, those at their defaults */
@@ -119,6 +120,7 @@ PATCH_OLD(patchA_t, NUM_PARAMS_A);
 PATCH_OLD(patchC_t, NUM_PARAMS_C);
 PATCH_OLD(patchD_t, NUM_PARAMS_D);
 PATCH_OLD(patchE_t, NUM_PARAMS_E);
+PATCH_OLD(patchF_t, NUM_PARAMS_F);
 #undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
@@ -542,6 +544,7 @@ PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
 PATCH_UP(patch_upC, patchC_t, NUM_PARAMS_C)
 PATCH_UP(patch_upD, patchD_t, NUM_PARAMS_D)
 PATCH_UP(patch_upE, patchE_t, NUM_PARAMS_E)
+PATCH_UP(patch_upF, patchF_t, NUM_PARAMS_F)
 #undef PATCH_UP
 
 typedef struct {                         /* MNPB's layout */
@@ -597,6 +600,9 @@ static int patch_read(int slot, patch_t *p)
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchD_t) && p->magic == PATCH_MAGIC_D && p->nparams == NUM_PARAMS_D && p->nslots == MOD_SLOTS) {
         patch_upD(p);                    /* (a later one's still: the undertones at their defaults) */
+        p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchF_t) && p->magic == PATCH_MAGIC_F && p->nparams == NUM_PARAMS_F && p->nslots == MOD_SLOTS) {
+        patch_upF(p);                    /* (1.0.5's: wet) */
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchE_t) && p->magic == PATCH_MAGIC_E && p->nparams == NUM_PARAMS_E && p->nslots == MOD_SLOTS) {
         patch_upE(p);                    /* (the one before Balance: Balanced) */
@@ -699,7 +705,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_F || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -866,6 +872,7 @@ static void param_name(int id, char *b, int max)
     case P_DL_TO_RV: n = "Delay into reverb"; break;
     case P_LFO_COUPLE: n = "LFO coupling"; break;
     case P_RV_FREEZE: n = "Reverb freeze"; break;
+    case P_DRY: n = "Dry"; break;
     case P_FLT_MORPH: n = "Filter type"; break;
     case P_FLT_CUT: n = "Filter cutoff"; break;
     case P_FLT_RES: n = "Filter resonance"; break;
@@ -978,6 +985,7 @@ static void value_text(int id, float n, char *b, int max)
         case P_RH_SELRATE: text_cpy(t, selrate_name(i), sizeof t); break;
         case P_RH_COUNT: int_text(i + 2, t); text_cat(t, " events"); break;
         case P_RV_FREEZE: case P_RV_TUNED: text_cpy(t, i ? "On" : "Off", sizeof t); break;
+        case P_DRY: text_cpy(t, i ? "On: Shape" : "Off", sizeof t); break;
         case P_LFO1_SHAPE: case P_LFO2_SHAPE: case P_LFO3_SHAPE: case P_LFO4_SHAPE: case P_LFO5_SHAPE:
         case P_LFO6_SHAPE: text_cpy(t, PICK(LFO_N, i), sizeof t); break;
         case P_LFO1_SYNC: case P_LFO2_SYNC: case P_LFO3_SYNC: case P_LFO4_SYNC: case P_LFO5_SYNC:
@@ -1201,7 +1209,7 @@ static const sub_t SUB_FX[] = {
     {"Reverb", {P_RV_SEND, P_RV_SIZE, P_RV_DECAY, P_RV_DAMP}},
     {"Space", {P_RV_PRE, P_RV_MOD, P_RV_TUNED, P_RV_FREEZE}},
     {"Compressor", {P_CMP_THRESH, P_CMP_RATIO, P_CMP_ATT, P_CMP_REL}},
-    {"Output", {P_CMP_MIX, P_CMP_PUMP, P_MASTER, _}},
+    {"Output", {P_CMP_MIX, P_CMP_PUMP, P_MASTER, P_DRY}},
 };
 static const sub_t SUB_VOICE2[] = {
     {"Tone", {P_V2_TONE, P_V2_TILT, P_V2_SPIN, P_V2_WAVE}},
@@ -3117,6 +3125,7 @@ MAKE_OLD(make_oldB, patchB_t, NUM_PARAMS_B, PATCH_MAGIC_B, NUM_PARAMS_A)
 MAKE_OLD(make_oldC, patchC_t, NUM_PARAMS_C, PATCH_MAGIC_C, NUM_PARAMS_C)
 MAKE_OLD(make_oldD, patchD_t, NUM_PARAMS_D, PATCH_MAGIC_D, NUM_PARAMS_D)
 MAKE_OLD(make_oldE, patchE_t, NUM_PARAMS_E, PATCH_MAGIC_E, NUM_PARAMS_E)
+MAKE_OLD(make_oldF, patchF_t, NUM_PARAMS_F, PATCH_MAGIC_F, NUM_PARAMS_F)
 #undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
@@ -3200,6 +3209,12 @@ int app_expect(const char *what, int *got)
         *got = S.slot[0].src;
     else if (!strcmp(what, "bal1"))                  /* layer 1's Balance, 0 (dark) .. 100 (bright) */
         *got = (int)(S.base[P_G1_BAL] * 100.0f + 0.5f);
+    else if (!strcmp(what, "dry"))                  /* (1.0.6) the patch is Dry */
+        *got = pint(&S, P_DRY);
+    else if (!strcmp(what, "fxw"))                  /* the effects' share now, % */
+        *got = (int)(S.fx.fxw * 100.f + .5f);
+    else if (!strncmp(what, "knobdry_", 8))          /* the knob a parameter rides on a Dry patch */
+        *got = knob_of_dry(atoi(what + 8), 1);
     else if (!strcmp(what, "keys_pull"))
         *got = pint(&S, P_KEY_PULL);
     else if (!strcmp(what, "swlev"))
@@ -3212,6 +3227,8 @@ int app_expect(const char *what, int *got)
         *got = make_oldC(atoi(what + 6));
     else if (!strncmp(what, "makeD_", 6))           /* and the one before the undertones (MNPD) */
         *got = make_oldD(atoi(what + 6));
+    else if (!strncmp(what, "makeF_", 6))           /* and 1.0.5's (MNPF) */
+        *got = make_oldF(atoi(what + 6));
     else if (!strncmp(what, "makeE_", 6))           /* and the one before Balance (MNPE) */
         *got = make_oldE(atoi(what + 6));
     else if (!strncmp(what, "pmask_", 6))           /* layer 1's Clarity mask on note n */
