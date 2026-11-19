@@ -184,7 +184,7 @@ what the buttons do on this page.
 | --- | --- |
 | PLAY (tap) | start / stop the generators and the rhythm (the keys always play) |
 | PLAY (hold) | the performance keys appear on the white keys (see below) |
-| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a quarter of the time it makes the patch Dry, the effects' settings kept for when it is wet again) |
+| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a quarter of the time it makes the patch Dry, which sets the effects to nothing; from a Dry patch to a wet one it rolls the effects too, unless they are locked) |
 | REC (double tap) | roll everything except the scale |
 | REC (hold 0.7 s) | mutate: a small nudge to every continuous setting |
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
@@ -237,9 +237,11 @@ the knob as you turn it.
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills, the layers' levels (±3 dB at most, one up as the other goes down: which layer leads) | layer 1's Rate and Reach, the layers' levels; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
-**A Dry patch** (FX → Output, K4; a quarter of all rolls) has no fuzz, filter, delay or reverb: they are not run at all,
-which also leaves the FM-1 more headroom. Their settings are kept, so turning Dry off brings them back (fading in
-and out over about 30 ms). Space becomes **Shape**: the room the instrument makes itself instead of an effect's.
+**A Dry patch** (a quarter of all rolls) starts with its effects doing nothing: no fuzz, the filter wide open, nothing
+sent to the delay or the reverb. An effect set so is not run at all, which leaves the FM-1 more headroom (the delay and
+the reverb stop once their tails have rung out; the filter glides out over about 30 ms). They are still there: turn one
+up on its FX page and it runs as in any patch. The Space knob becomes **Shape** (FX → Output, K4, **Space knob**:
+Shape or Effects): the room the instrument makes itself instead of an effect's.
 
 | Knob (Dry) | Part of the instrument | Always on its path |
 | --- | --- | --- |
@@ -773,7 +775,7 @@ The chain: **fuzz → filter → delay and reverb sends → compressor → maste
 | **Output** | K1 | **Comp mix** | parallel compression: dry … fully compressed |
 | | K2 | **Pump** | the compressor ducks on layer 1's onsets |
 | | K3 | **Master** | the output level (0–150 %) |
-| | K4 | **Dry** | **On**: no fuzz, filter, delay or reverb (not run); the Space knob is **Shape**. See [The performance knobs](#the-performance-knobs) |
+| | K4 | **Space knob** | **Effects**: the third performance knob is Space; **Shape**: it is Shape (a Dry patch's). See [The performance knobs](#the-performance-knobs) |
 
 After the master, a look-ahead **limiter** holds peaks at −0.5 dBFS, and a soft clip catches anything that still gets
 past. Patches come out loud (about −14 dBFS on average) without distorting.

@@ -209,6 +209,8 @@ static int mod_loop(int src, int dst) {
     return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
 }
 static uint8_t g_roll_dry;                    /* the roll makes a Dry patch (1.0.6): no route to the effects */
+static uint8_t g_dry_set;                     /* (1.0.6) this roll decided Dry (and so sets the effects to nothing) */
+static uint8_t g_fx_wake;                     /* (1.0.6) a sound roll from a Dry patch to a wet one: its effects rolled too */
 static uint8_t g_lock_fx;       /* the player's own locks on the effects and the knobs (not the roll's
                                                  mask: a sound roll leaves the effects alone, yet decides Dry) */
 static int fx_off(int id) {                   /* an effect a Dry patch has not got (the compressor it has) */
@@ -725,7 +727,7 @@ static void apply_style(Synth *s) {
         }
         TR(s, P_LFO_COUPLE, 0.f, .3f);
     }
-    if (!s->locked[SEC_FX]) {
+    if (!s->locked[SEC_FX] || g_fx_wake) {
         /* fuzz: Groove, Machine and Breaks often, Cosmic sometimes, a touch in Tongue, rarely Ambient */
         float pfz = (MA || BR) ? .4f : G ? .3f : C ? .2f : T ? .08f : .04f;
         if (frand(r) < pfz) { TR(s, P_FZ_MIX, .1f, (G || MA || BR) ? .5f : .25f); TR(s, P_FZ_SUSTAIN, .1f, .7f); TR(s, P_FZ_TONE, .25f, .7f); }
@@ -897,6 +899,12 @@ static void roll_finish(Synth *s) {
         int st = s->style % NUM_STYLES; float u = frand(r);
         s->target[P_DR_NOTES] = u < FB[st][0] ? 1.f : u < FB[st][0] + FB[st][1] ? .3f + .5f * frand(r) : 0.f;
     }
+    if (g_dry_set) {                           /* (1.0.6) Dry: the effects set to do nothing, so not run (fx.c); their
+                                                  other settings rolled as ever, for when they are turned up */
+        float *t = s->target;
+        t[P_FZ_MIX] = t[P_DL_SEND] = t[P_RV_SEND] = 0.f; t[P_RV_FREEZE] = disc(P_RV_FREEZE, 0);
+        t[P_FLT_CUT] = 1.f; t[P_FLT_RES] = t[P_FLT_MORPH] = 0.f;
+    }
     if (dry && !s->locked[SEC_DRUMS]) dry_kit(s);
     if (dry && !s->locked[SEC_LFO])            /* (the style's routes to the effects: elsewhere) */
         for (int k = 0; k < MOD_SLOTS; k++) {
@@ -932,6 +940,7 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         return;
     }
     s->rng = seed * 2654435761u + 1u;
+    int was_dry = s->target[P_DRY] > .5f;
     for (int i = 0; i < NUM_PARAMS; i++) {
         const ParamMeta *m = &g_param_meta[i];
         if (s->locked[m->section] || i == P_TEMPER) continue;   /* (locked: left as it is; Temper is the player's: never rolled) */
@@ -939,7 +948,22 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         if (m->rlo == 0 && m->rhi == 0) s->target[i] = m->curve == CURVE_DISC ? disc(i, 0) : 0;
     }
     float *t = s->target;
-    if (!s->locked[SEC_FX]) {
+    /* (1.0.6) a quarter of the rolls Dry, in every style: any roll of the sound (a tap of REC too), unless the effects
+       are locked. A Dry roll sets the effects to do nothing (roll_finish: they stay usable, turned up); a tap from a
+       Dry patch to a wet one rolls them too, as they were off */
+    g_dry_set = 0;
+    if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS])) {
+        t[P_DRY] = disc(P_DRY, frand(r) < .25f);
+        g_dry_set = (uint8_t)(t[P_DRY] > .5f);
+    }
+    g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
+    g_fx_wake = (uint8_t)(!g_lock_fx && s->locked[SEC_FX] && was_dry && !g_roll_dry);
+    if (g_fx_wake) for (int i = P_FZ_SUSTAIN; i <= P_DL_TO_RV; i++) {
+        const ParamMeta *m = &g_param_meta[i];
+        t[i] = (m->rlo == m->rhi && m->curve != CURVE_DISC) ? m->rlo : roll_one(m, r);
+        if (m->rlo == 0 && m->rhi == 0) t[i] = m->curve == CURVE_DISC ? disc(i, 0) : 0;
+    }
+    if (!s->locked[SEC_FX] || g_fx_wake) {
         /* filter type and cutoff are rolled together so the voice never vanishes */
         float u = frand(r);
         if (u < .75f) { t[P_FLT_MORPH] = .08f * frand(r); }
@@ -948,11 +972,6 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         if (frand(r) < .85f) t[P_RV_TUNED] = disc(P_RV_TUNED, 0);
         if (t[P_DL_FB] > .65f && t[P_DL_SEND] > .4f) t[P_DL_SEND] = .25f;
     }
-    /* (1.0.6) a quarter of the rolls Dry, in every style: any roll of the sound (a tap of REC too, which keeps the
-       effects' settings: Dry only takes them out), unless the effects are locked */
-    if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS]))
-        t[P_DRY] = disc(P_DRY, frand(r) < .25f);
-    g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
     roll_together(s);
     params_roll_mod(s);
 }

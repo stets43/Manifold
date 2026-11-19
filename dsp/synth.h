@@ -435,7 +435,7 @@ typedef struct {
     float odc_x[2], odc_y[2];
     float rv_h[4], rv_o[2]; int rv_ph;   /* the half-rate reverb: its input low-pass's state (two biquads), its last
                                             output, which sample */
-    float fxw;                /* (1.0.6) the effects in: 1 wet, 0 Dry (gliding ~30 ms between); at 0 they are not run */
+    float fxw;                /* (1.0.6) the filter in: 1, or 0 set wide open (gliding ~30 ms between); at 0 it is not run */
 } Fx;
 
 /* ------------------------------------------------------------------ */
@@ -672,6 +672,7 @@ const char *drum_layer_name(int v);
 void lfo_tick(Synth *s, float dt);
 void mod_apply(Synth *s);
 
+int  fx_tails_on(void);         /* (1.0.6) the delay and the reverb are running */
 void fx_init(Fx *f);
 void fx_update(Synth *s);
 void fx_process(Synth *s, float *L, float *R, int n, float trig_env);

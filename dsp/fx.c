@@ -36,7 +36,7 @@ static const float DL_TAPS[5] = {1.f, .75f, 2.f/3, .5f, .8f};
 static struct {
     float fz_g1, fz_mix, fz_tone, fz_hp, fz_lp, fz_hp2, fz_tl, fz_th;
     float m_a1, m_a2, m_a3, m_k, m_wl, m_wb, m_wh, m_wd;   /* (m_wd: the dry signal's share, while Dry fades in or out) */
-    float fxw; int fx_on;                           /* (1.0.6) the effects' share; they run (not Dry, or fading) */
+    int fx_on, t_on;                               /* (1.0.6) the filter runs (fxw > 0); the delay and the reverb run */
     float d_send, d_fb, d_tone_a, d_D_tgt, d_rate_tgt, d_tap, d_aa;
     float r_dry, r_send, r_glo[8], r_ghi[8], r_pre, r_mod, r_to, r_out, r_lp;
     int   r_prei;                                   /* the pre-delay in the reverb's steps */
@@ -45,6 +45,7 @@ static struct {
     float master;
 } C;
 static float g_drate = 1.f;
+static int32_t g_tq; static uint8_t g_ton;   /* (1.0.6) the delay and the reverb run; ticks their tails ring on with nothing sent */
 static int g_rint[8];
 static float g_rf0[8], g_rf1[8];   /* a moving line's length at the block's start and end (its reads between samples) */
 static uint8_t g_rmov;             /* which lines are moving (a bit each) */
@@ -55,19 +56,19 @@ void fx_init(Fx *f) {
     memset(f, 0, sizeof *f);
     f->lim_g = f->lim_tgt = 1.f;
     for (int i = 0; i < 8; i++) f->rlen[i] = f->rlen_tgt[i] = RV_BASE[i] * .7f;
-    f->dD = 4000.f; g_drate = 1.f;
+    f->dD = 4000.f; g_drate = 1.f; g_ton = 0; g_tq = 0;
     f->cgain = 1.f;
     f->fxw = 1.f;
 }
-/* (1.0.6) the effects back from Dry: what the delay, the reverb and the filter held when they stopped is let go, so
+/* (1.0.6) the delay and the reverb back after they stopped: what they held is let go, so
    they start from silence, not from a tail minutes old (from the flash: it is rare) */
+int fx_tails_on(void) { return g_ton; }   /* (for the tests) */
 static void fx_clear(Fx *f) {
     memset(f->dbuf, 0, sizeof f->dbuf); memset(f->rbuf, 0, sizeof f->rbuf); memset(f->ap_buf, 0, sizeof f->ap_buf);
-    memset(f->pre, 0, sizeof f->pre); memset(f->morph, 0, sizeof f->morph);
+    memset(f->pre, 0, sizeof f->pre);
     memset(f->rv_h, 0, sizeof f->rv_h); f->rv_o[0] = f->rv_o[1] = 0.f;
     f->dlp1 = f->dlp2 = f->dout_lp[0] = f->dout_lp[1] = f->dfb_hp = 0.f;
     for (int i = 0; i < 8; i++) f->rlp[i] = 0.f;
-    f->dc_x[0] = f->dc_x[1] = f->dc_y[0] = f->dc_y[1] = 0.f;
 }
 
 /* fx_update's rarer half, from the flash: the compressor's coefficients and Dry's fade (1.0.6) */
@@ -97,17 +98,26 @@ static void fx_update_far(Synth *s) {
     C.c_pump = pnorm(s, P_CMP_PUMP);
     C.master = pval(s, P_MASTER);
 
-    /* Dry: the fuzz, the filter, the delay and the reverb out (the compressor and the limiter stay), faded
-       over ~30 ms each way; out, they are not run at all */
-    {   float w = f->fxw, tg = pint(s, P_DRY) ? 0.f : 1.f;
-        if (tg > w) { if (w <= 0.f) DSP_FAR(fx_clear)(f); w += .05f; if (w > 1.f) w = 1.f; }
+    /* (1.0.6) an effect set where it does nothing is not run (a Dry roll sets them so; turned up, they run as ever):
+       the filter wide open, low-pass, no resonance - it glides out and back over ~30 ms (fxw), and starts again from
+       silence; the delay and the reverb with nothing sent (nor frozen) - once their tails have died away, then they
+       start from silence when something is sent again. (The fuzz at no mix: never was run.) */
+    {   float w = f->fxw, tg = pnorm(s, P_FLT_CUT) >= .995f && pnorm(s, P_FLT_RES) <= .005f && pnorm(s, P_FLT_MORPH) <= .005f ? 0.f : 1.f;
+        if (tg > w) { if (w <= 0.f) memset(f->morph, 0, sizeof f->morph); w += .05f; if (w > 1.f) w = 1.f; }
         else if (tg < w) { w -= .05f; if (w < 0.f) w = 0.f; }
         f->fxw = w;
-        C.fxw = w; C.fx_on = w > 0.f;
-        C.fz_mix *= w; C.d_send *= w; C.r_send *= w; C.r_to *= w;
-        C.r_dry = C.r_dry * w + (1.f - w);
+        C.fx_on = w > 0.f;
         C.m_wl *= w; C.m_wb *= w; C.m_wh *= w; C.m_wd = 1.f - w;
     }
+    if (C.d_send > .001f || C.r_send > .001f || C.r_freeze) {
+        if (!g_ton) { DSP_FAR(fx_clear)(f); g_ton = 1; }
+        /* how long the tails ring: the delay's repeats down 90 dB (and into the reverb), the reverb's to 90 dB */
+        float fb = C.d_fb < .01f ? .01f : C.d_fb, db = -6.0206f * flog2(fb);   /* (dB lost a repeat) */
+        float sec = tsec * (1.f + 90.f / (db > 1.f ? db : 1.f)) + 1.5f * pval(s, P_RV_DECAY) + C.r_pre / SR + .2f;
+        if (sec > 120.f) sec = 120.f;
+        g_tq = (int32_t)(sec * SR / (float)SUB);
+    } else if (g_ton && --g_tq <= 0) g_ton = 0;
+    C.t_on = g_ton;
 
 }
 
@@ -312,7 +322,7 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         }
     }
 
-    /* 2. the filter (LP / BP / HP blend), per channel over the block (Dry: not run; fading: the dry signal's share) */
+    /* 2. the filter (LP / BP / HP blend), per channel over the block (wide open: not run; gliding: the dry signal's share) */
     if (C.fx_on) for (int c = 0; c < 2; c++) {
         float *X = c ? R : L, i1 = f->morph[c].ic1, i2 = f->morph[c].ic2;
         float a1 = C.m_a1, a2 = C.m_a2, a3 = C.m_a3, k = C.m_k, wl = C.m_wl, wb = C.m_wb * C.m_k, wh = C.m_wh, wd = C.m_wd;
@@ -330,7 +340,7 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         float gd = gds[t];
         float x[2] = {L[t], R[t]};
         float yl = 0.f, yr = 0.f, rl = 0.f, rr = 0.f;
-        if (C.fx_on) {                                           /* (Dry: the delay and the reverb not run) */
+        if (C.t_on) {                                            /* (nothing sent, the tails gone: not run) */
 
         /* 4a. BBD delay */
         f->dD += 0.0004f * (C.d_D_tgt - f->dD);
@@ -365,7 +375,7 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
             float nl, nr; rv_step(f, u, (float)(t + 1) * (1.f / SUB), gd, AP_LEN, &nl, &nr);
             rl = .5f * (f->rv_o[0] + nl); rr = .5f * (f->rv_o[1] + nr); f->rv_o[0] = nl; f->rv_o[1] = nr;
         } else { rl = f->rv_o[0]; rr = f->rv_o[1]; }
-        yl = (yl + rl) * C.fxw; yr = (yr + rr) * C.fxw;          /* (the tails fade with Dry too) */
+        yl += rl; yr += rr;
         }
 
         float oL = (x[0] * C.r_dry + yl) * DRIVE, oR = (x[1] * C.r_dry + yr) * DRIVE;

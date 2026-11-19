@@ -876,7 +876,7 @@ static void param_name(int id, char *b, int max)
     case P_DL_TO_RV: n = "Delay into reverb"; break;
     case P_LFO_COUPLE: n = "LFO coupling"; break;
     case P_RV_FREEZE: n = "Reverb freeze"; break;
-    case P_DRY: n = "Dry"; break;
+    case P_DRY: n = "Space knob"; break;
     case P_DR_NOTES: n = "Drum notes"; break;
     case P_FLT_MORPH: n = "Filter type"; break;
     case P_FLT_CUT: n = "Filter cutoff"; break;
@@ -990,7 +990,7 @@ static void value_text(int id, float n, char *b, int max)
         case P_RH_SELRATE: text_cpy(t, selrate_name(i), sizeof t); break;
         case P_RH_COUNT: int_text(i + 2, t); text_cat(t, " events"); break;
         case P_RV_FREEZE: case P_RV_TUNED: text_cpy(t, i ? "On" : "Off", sizeof t); break;
-        case P_DRY: text_cpy(t, i ? "On: Shape" : "Off", sizeof t); break;
+        case P_DRY: text_cpy(t, i ? "Shape" : "Effects", sizeof t); break;
         case P_LFO1_SHAPE: case P_LFO2_SHAPE: case P_LFO3_SHAPE: case P_LFO4_SHAPE: case P_LFO5_SHAPE:
         case P_LFO6_SHAPE: text_cpy(t, PICK(LFO_N, i), sizeof t); break;
         case P_LFO1_SYNC: case P_LFO2_SYNC: case P_LFO3_SYNC: case P_LFO4_SYNC: case P_LFO5_SYNC:

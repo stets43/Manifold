@@ -44,8 +44,8 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   listens: the layers' notes (started and stopped at a floor under each layer's peak, at most 24 new notes a second a
   layer by default), the keys, the drums (a General MIDI kit, or pitched), the knobs as CC 21–24 and the clock.
   **MPE** sends each note on its own channel with the pitch bend that puts it at its exact just pitch. Latch and
-  Panic no longer leave notes hanging on the receiver. **Dry patches**: a quarter of the rolls (or FX → Output → Dry)
-  have no fuzz, filter, delay or reverb, not run at all (about 40 % less work in the simulator), and the Space knob becomes **Shape**:
+  Panic no longer leave notes hanging on the receiver. **Dry patches**: a quarter of the rolls
+  start with the fuzz, filter, delay and reverb set to nothing, and so not run (about 40 % less work in the simulator; turned up, they run as ever), and the Space knob becomes **Shape** (FX → Output → Space knob):
   the drums' envelopes as a kit (the kick and tom bloom, the snare and hat stay tight), the layers' contour, the
   voices' pluck, width and spin, the duck and the compressor's attack, over a wide range with the drums' loudness held roughly steady; Pump goes to Groove. The drums' levels ride Groove
   (±4 dB) and the layers' levels Motion (±3 dB, opposite) in every patch. **Drum notes, Follow … Fixed** (on Groove): from the drums riding the motion's notes
