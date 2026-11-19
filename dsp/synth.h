@@ -347,6 +347,8 @@ typedef struct {
                                   this tick's start and end */
     float oa[NUM_DRUMS][MAX_HARM];   /* each drum's Odd/even push at full, as its layer's bank coloured (drums_tick) */
     float of[NUM_DRUMS];             /* ... and that push (-1..1): a note takes the share its hit gives it */
+    uint8_t hn[NUM_DRUMS];           /* each drum's hits, counted (MIDI out watches them) */
+    uint32_t hs[NUM_DRUMS];          /* ... and where the last one lands (Synth.nsamp's count) */
 } Drums;
 #define MAX_PTS 8
 #define NUM_ERATES 13
@@ -501,6 +503,7 @@ typedef struct Synth {
     uint8_t cap_nodes;         /* layer 1 voices, 4..MAX_VOICES */
     uint8_t cap_harm;          /* oscillators per note, 4..MAX_HARM */
     uint8_t transport;         /* the meter runs */
+    uint32_t nsamp;            /* samples rendered so far (MIDI out times the drums' hits by it) */
     uint8_t mute_seq;          /* performance: the generators keep time but drive nothing (keys still play) */
     float lay_t[2], lay_g[2];  /* performance: layer gains, target and glide (0 muted, 1 open) */
     float trig_env, last_vel, rand_hold, rand_a, rand_b;   /* rand_hold: smooth between a per-bar a and b */

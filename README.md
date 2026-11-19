@@ -35,11 +35,16 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   performance knobs as destinations.
 - **Effects**: fuzz, morphing filter, tempo delay, an 8-line reverb that can be tuned to the scale or frozen, bus
   compressor, look-ahead limiter.
-- Rolls in eight styles, locks, undo, 64 patches in four banks with four scenes each, MIDI over USB and Bluetooth, Bluetooth audio
-  out to headphones and speakers.
+- Rolls in eight styles, locks, undo, 64 patches in four banks with four scenes each, MIDI in and out over USB and
+  Bluetooth (MPE out, in just intonation), Bluetooth audio out to headphones and speakers.
 
 ## Releases
 
+- **1.0.6** (in testing): **MIDI out** of what MANIFOLD plays, over USB and Bluetooth MIDI, only while something
+  listens: the layers' notes (started and stopped at a floor under each layer's peak, at most 24 new notes a second a
+  layer by default), the keys, the drums (a General MIDI kit, or pitched), the knobs as CC 21–24 and the clock.
+  **MPE** sends each note on its own channel with the pitch bend that puts it at its exact just pitch. Latch and
+  Panic no longer leave notes hanging on the receiver.
 - **1.0.5** (2026-11-18): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
   breakbeat, drum'n'bass and hip-hop patterns, played without a grid (swing bends them, Density thins them, fills,
   ghosts, rotation, polymetric loop lengths, mutes), rolled by a decision tree over the corpus. New styles **House**
@@ -96,7 +101,8 @@ python3 tools/build.py ../Manifold --release 1.0.5     # -> build/manifold-1.0.5
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,
-`cfg/eq_cfg_hw.bin`; Apache-2.0), checked by SHA-256. `tests/basic.txt` runs 144 checks in the simulator;
+`cfg/eq_cfg_hw.bin`; Apache-2.0), checked by SHA-256. `tests/basic.txt` runs 144 checks in the simulator and
+`tests/midi.txt` MIDI out's (`tools/midi_check.py` checks its log: every note-on its note-off, the rate cap);
 `tests/screens.txt` and `tests/guide.txt` make the screenshots. `tools/site.py` builds the website (the front page in
 `site/`, the manual, fm1-base's web installer and the firmware).
 
@@ -104,6 +110,7 @@ The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools
 
 ```
 app.c, app.h, fm1.toml    the app: pages, performance keys, scenes, patches, MIDI, Bluetooth audio
+midi_out.h                MIDI out: the layers' notes, keys, drums, knobs, clock; Standard and MPE
 dsp/gen.c                 the twelve motions, the eight envelopes, routes, keys, the drive
 dsp/rhythm.c              the stream, events, drum choice, the Lock engine
 dsp/drums.c               drum triggers, envelopes and character, on the synth's voices

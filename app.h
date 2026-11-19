@@ -10,6 +10,7 @@
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BLE_AT_BOOT (manifold_bt_on())   /* the radio at power-on: as the player left it (Setup) */
 int manifold_bt_on(void);
+#define APP_TICK                         /* MIDI out (1.0.6): the clock, the drums, the layers' notes (midi_out.h) */
 #define APP_OVERLOAD                     /* the platform tells us when a render ran past 90 % (counted, shown) */
 void app_overload(void);
 

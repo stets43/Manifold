@@ -102,7 +102,7 @@ DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
     v->g = fclamp(vel, 0.f, 1.f);
     v->delay = delay < 0 ? 0 : delay > SUB - 1 ? SUB - 1 : delay;
     v->pend = 1;
-    s->dr.hits++; s->dr.flash[d] = 1.f;
+    s->dr.hits++; s->dr.hs[d] = s->nsamp + (uint32_t)v->delay; s->dr.hn[d]++; s->dr.flash[d] = 1.f;
     {   /* the hit's Odd/even push at full, as its layer's bank coloured: worked out once a hit (in the flash: rare), the
            render blends each note toward it by its share */
         float of = (pval(s, P_D1_OE + d) - .5f) * 2.f;

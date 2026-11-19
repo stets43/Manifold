@@ -245,6 +245,7 @@ wait 1200
 shot setup-5.png
 turn SELECT 1
 wait 1200
+shot setup-midi.png
 # the Patches page (a SAVE tap): a few slots in bank A, one in bank B, A6 loaded
 tap HOME
 wait 300

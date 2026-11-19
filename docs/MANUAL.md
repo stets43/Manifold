@@ -758,8 +758,7 @@ From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps the
 | --- | --- | --- | --- |
 | **General** | K1 | **Color theme** | nine themes |
 | | K2 | **Key octave** | −3 … +3 (also OCT − / OCT +) |
-| | K3 | **MIDI channel** | Omni or 1–16, for MIDI in |
-| | K4 | **Keys to MIDI out** | the keys send notes over USB and Bluetooth MIDI |
+| | K3 | **MIDI channel** | Omni or 1–16, for MIDI in (and the knobs' CCs out, in Standard) |
 | **Bluetooth audio** | K1–K4 | | see [Bluetooth audio](#bluetooth-audio) |
 | **Load** | K1 | **Layer 1 voices** | 4–8 notes at once |
 | | K2 | **Layer 2 voices** | 4–8 |
@@ -767,6 +766,10 @@ From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps the
 | **Load cuts 2** | K1 | **Second core** | a status, not a control: **Layer 2 on core 2** (always, since 1.0.5), or **Given up: one core** if the second core ever failed (fm1-base then renders both layers on the first core until power-off, which crackles: power off and on) |
 | | K2 | **Peak** | the worst block since reset; turn to reset |
 | **Keys** | K1 | **Keys play** | Layer 1, Layer 2, Both layers, Drums |
+| **MIDI out** | K1–K4 | | see [MIDI out](#midi-out) |
+| **MIDI out notes** | K1–K3 | | |
+| **MIDI out channels** | K1–K4 | | |
+| **MIDI out drum notes** | K1–K4 | | |
 
 ### The load page
 
@@ -794,8 +797,59 @@ MANIFOLD is a USB MIDI device, and a Bluetooth MIDI device.
 | CC 21, 22, 23, 24 | the Timbre, Groove, Space and Motion knobs |
 | CC 120, CC 123 | everything off |
 
-**Out** (with Keys to MIDI out on): the keys send note on / off on channel 1, each as its nearest equal-tempered
-note, over USB and Bluetooth MIDI. The generators do not send MIDI. MANIFOLD does not send or follow MIDI clock.
+MANIFOLD does not follow incoming MIDI clock.
+
+### MIDI out
+
+What MANIFOLD plays can go out over USB and Bluetooth MIDI: the layers' notes, the keys, the drums, the knobs and the
+clock. **It sends only while something listens**: a computer (or another USB host) that has set up USB MIDI, or a
+Bluetooth MIDI link. A USB charger or power bank does not count. With nothing listening, MIDI out is idle. When a
+link arrives it is given the MPE set-up (in MPE), the knobs' CCs, a Start at the next bar (if MANIFOLD is playing)
+and then the notes as they sound; when it goes, it is forgotten. (The TRS jack is MIDI in only: the FM-1 has no
+output on it. For 5-pin DIN out, go through a USB host MIDI box.)
+
+![MIDI out](img/manual/setup-midi.png)
+
+| Tab | Knob | Setting | What it does |
+| --- | --- | --- | --- |
+| **MIDI out** | K1 | **Notes** | **Keys + layers** (the default), **Keys**, or **Off** |
+| | K2 | **Tuning** | **Standard**: each note as its nearest equal-tempered pitch. **MPE (just)**: each note on its own channel with a pitch bend that puts it at its exact just pitch |
+| | K3 | **Drums** | **Kit** (the default: General MIDI notes), **Pitched** (each hit as the pitch of the note it lands on), or **Off** |
+| | K4 | **Knobs and clock** | **Knobs + clock** (the default), **Knobs**, **Clock**, or **Off** |
+| **MIDI out notes** | K1 | **Note floor** | −12 … −36 dB (default −18): how far under the layer's loudest note a note must rise to start |
+| | K2 | **Notes a second** | the most new notes a layer starts in any second: 6, 12, **24** (the default: 32nd notes at 180 BPM), 48, 96, or no cap |
+| | K3 | **Level** | **Off** (the default) or **On**: each note's level as it moves, as channel pressure (MPE) or polyphonic aftertouch (Standard), 20 times a second |
+| **MIDI out channels** | K1–K4 | **Layer 1, Layer 2, Keys, Drums** | Standard: 1, 2, 3 and 10 by default. In MPE the notes take channels 2–15 and the kit 16 |
+| **MIDI out drum notes** | K1–K4 | **Kick, Snare, Hat, Tom** | the kit's notes: 36, 38, 42 and 45 by default |
+
+**The layers' notes.** A layer's notes swell and fade without beginning or end, so MIDI out decides: a note starts
+when it rises above the **Note floor** under the layer's peak (its loudest note, held and let down over about a
+second and a half), with a velocity from its level (30 at the floor, 127 at the peak), and stops 12 dB under the
+floor (so it does not flicker at the edge). A note lasts 30 ms at least. **Notes a second** caps how many new notes
+a layer starts in any second; a note the cap holds back waits its turn, the loudest first, so fast motions come out
+thinned rather than as a flood. Stopped (PLAY), the layers send nothing; the keys still do.
+
+**MPE.** One zone: channel 1 is its master, channels 2–15 its 14 notes (shared by the layers, the keys and pitched
+drums). Each note's pitch bend, sent just before its note-on, is set for a bend range of ±48 semitones, MPE's
+standard (0.6 cents a step). MANIFOLD sends the MPE configuration message when a link arrives and when you choose MPE,
+and most MPE instruments set themselves up from it; on one that does not, set its pitch-bend range to 48. With 14
+notes sounding, a key, or a layer note louder than the quietest one, takes the quietest one's channel. The kit goes
+on channel 16, outside the zone.
+
+**The drums** go out when the hit sounds (timed to the audio within a millisecond), each as a 20 ms note.
+
+**The knobs** you turn go out as CC 21–24 (Timbre, Groove, Space, Motion: the numbers MANIFOLD takes in), on the MIDI
+channel (channel 1 at Omni, and in MPE), 30 times a second at most. A knob moved by a scene, a roll or incoming MIDI
+is not sent, so a DAW playing back what it recorded does not fight itself. Nothing MANIFOLD receives is sent back.
+
+**The clock:** 24 pulses a quarter note at MANIFOLD's tempo, Start when it starts (at the beginning of a bar) and
+Stop when it stops. Swing is not in the clock. Over Bluetooth a computer receives MIDI in steps of about 7.5 ms, so
+for tight sync use USB.
+
+**No stuck notes.** Every note sent is kept until its note-off; a link takes a note-on only while its queue has room
+for every note-off it may owe. Releasing a latched key (a second press, or Latch off) sends its note-off, and
+**Panic** lets every note go and sends All Notes Off on each channel used. A roll, a patch load or a change of these
+settings lets the notes go first.
 
 ---
 
