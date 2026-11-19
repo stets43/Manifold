@@ -874,6 +874,12 @@ stream and with those that set it up themselves after pairing (most speakers do;
 will not connect, put it back in pairing mode, connect again, then open the web installer's **Read the crash report**
 straight away: it lists each step of the Bluetooth set-up and whether the FM-1 or the device turned it down.
 
+**A device that once paired with the FM-1** may keep that pairing when the FM-1 no longer has it (a set-up that
+failed half way, or the device forgotten on the FM-1). Such a device can stop part way through pairing again; since
+1.0.6 the FM-1 gives up after 8 s and the crash report says so. Remove the FM-1 from the device's paired devices (for
+headphones and speakers, usually a reset of their pairings), then connect again. Since 1.0.6 the FM-1 also asks each
+of a device's audio inputs in turn for SBC, so a device that offers AAC or its own codec first is no longer refused.
+
 ---
 
 ## Recipes

@@ -44,7 +44,10 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   listens: the layers' notes (started and stopped at a floor under each layer's peak, at most 24 new notes a second a
   layer by default), the keys, the drums (a General MIDI kit, or pitched), the knobs as CC 21–24 and the clock.
   **MPE** sends each note on its own channel with the pitch bend that puts it at its exact just pitch. Latch and
-  Panic no longer leave notes hanging on the receiver.
+  Panic no longer leave notes hanging on the receiver. Bluetooth audio: each of a device's audio inputs is asked for
+  SBC in turn (one offering AAC or its own codec first was refused); a device holding an old pairing with the FM-1 is
+  answered "key missing" as the spec has it, and a re-pairing it stops part way is given up after 8 s, the crash
+  report saying why.
 - **1.0.5** (2026-11-18): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
   breakbeat, drum'n'bass and hip-hop patterns, played without a grid (swing bends them, Density thins them, fills,
   ghosts, rotation, polymetric loop lengths, mutes), rolled by a decision tree over the corpus. New styles **House**
