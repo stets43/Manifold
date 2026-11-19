@@ -636,7 +636,7 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | **Shape, duck, notes** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
 | | K2 | **Shape depth** | how much |
 | | K3 | **Kick duck** | sidechain: the kick ducks the synth |
-| | K4 | **Drum notes** | **Follow**: each hit rides one of the notes the motion is sounding (Voice: lowest .. highest). **Fixed**: a kit, each drum on a set pitch every hit (see below) |
+| | K4 | **Drum notes** | **Follow** … **Fixed**: from each hit riding one of the notes the motion is sounding (Voice: lowest .. highest) to a kit, each drum on its own pitch (see below). On the Groove knob |
 | **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too. A drum with a pattern plays its pattern instead |
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
@@ -647,16 +647,20 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K4 | **Pluck** | the hit plucks the note it rides: its upper partials fade first after the hit, as the layer's own Pluck does (1.5 s … 25 ms). Off: the layer's own. The note stays plucked until it rises by itself (or, 2 s without a plucking hit, lets go over a second) |
 | **Odd / even** | K1–K4 | per drum | the hit pushes its note's colour toward hollow or even (as the layer's Odd / even), settling as its Bright does. None: the note's own |
 
-**Drum notes: Fixed** (1.0.6) makes the drums a kit at set pitches, after the TR-808's: the **kick** 45–76 Hz (the
-808's is tuned near 56), the **tom** 90–185 Hz (its three toms), the **snare** 200–320 Hz (its body near 238), and the
-**hat** at the top of the layout (up to 4 kHz). Each drum's **Voice** moves it within its range (the hat: an octave
-down from the top). The drum takes the scale's nearest note to that pitch, on the drum layer (Split: either layer),
-so it is always in tune; it plays that note every hit, sounding in the motion or not. In Fixed, each drum also has
-its own spectrum while its hit settles: the kick and the tom a round **body** (the fundamental, a little of the 2nd
-and 3rd, an undertone under the kick), the snare a **crack** (its middle partials, 3rd to 9th, over the fundamental),
-the hat **sizzle** (only its partials above 4.5 kHz, the 7th, 11th and 13th included, which clash like the 808's six
-square waves). Odd / even still colours them, and a hit is no louder for its spectrum. **Follow** is the drums as
-before. Rolls choose Fixed more often in House, Hip-hop, Machine and Breakbeat, seldom in Ambient and Cosmic.
+**Drum notes** (1.0.6) runs from **Follow** to **Fixed**. Each drum has a pitch and a band, after the TR-808's: the
+**kick** 45–76 Hz (the 808's is tuned near 56), the **tom** 90–185 Hz (its three toms), the **snare** 200–320 Hz (its
+body near 238), and the **hat** the top octave of the layout (up to 4 kHz); each drum's **Voice** sets its pitch in its
+band. At **Fixed**, a hit takes a note the motion is sounding inside its band (the one nearest its pitch), or else the
+scale's nearest note to its pitch, sounding or not: always in tune, always in its range. Turned toward **Follow**, the
+band widens (an octave each way at the middle), so the drums ride more of what the motion plays; at Follow they ride
+it as before. Half way, a kick locks to the bass notes near it and falls back to its own pitch when there are none.
+Toward Fixed each drum also takes its own spectrum while its hit settles: the kick and the tom a round **body** (the
+fundamental, a little of the 2nd and 3rd, an undertone under the kick), the snare a **crack** (its middle partials,
+3rd to 9th), the hat **sizzle** (only its partials above 4.5 kHz, the 7th, 11th and 13th included, which clash like the
+808's six square waves). Odd / even still colours them, and a hit is no louder for its spectrum. Rolls: Fixed about a
+quarter of the time in House, Hip-hop, Machine and Breakbeat, between (0.3–0.8) about 45 %, seldom either in Ambient
+and Cosmic. The kit's levels: the snare about 8 dB under the kick, the tom 6, the hat 13; the hat's decay a closed
+hat's (20–60 ms, longer only where a style opens it).
 
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 

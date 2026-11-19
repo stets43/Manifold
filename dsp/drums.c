@@ -43,46 +43,57 @@ const char *drum_name(int d) { return d >= 0 && d < NUM_DRUMS ? DRUM_N[d] : "?";
 const char *drum_src_name(int v) { return v >= 0 && v < NUM_DSRC ? DSRC_N[v] : "?"; }
 const char *drum_layer_name(int v) { return v >= 0 && v < NUM_DLAYERS ? DLAYER_N[v] : "?"; }
 
-/* the hit's Odd/even push at full, as its layer's bank coloured (Fixed: its drum's profile, the push at full): worked
-   out once a hit (in the flash: rare), the render blends each note toward it by its share */
-static void hit_spec(Synth *s, int d, int l, int node, int fx) {
+/* the hit's Odd/even push at full, as its layer's bank coloured: worked out once a hit (in the flash: rare), the
+   render blends each note toward it by its share. Toward Fixed (x > 0): that colour, then x of the way to its drum's
+   profile (Body, Crack, Sizzle), the push at full */
+static void hit_spec(Synth *s, int d, int l, int node, float x) {
     float of = (pval(s, P_D1_OE + d) - .5f) * 2.f;
-    s->dr.pf[d] = (uint8_t)fx;
-    if (fx) {
+    s->dr.pf[d] = (uint8_t)(x > .01f);
+    if (x > .01f) {
+        float pr[MAX_HARM];
         s->dr.of[d] = 1.f;
-        hit_profile(s, d, l, node, fclamp(.5f + .5f * of, 0.f, 1.f), s->dr.oa[d]);
+        hit_colour(s, l, fclamp(pval(s, P_V1_ODDEVEN + l) + .5f * of, 0.f, 1.f), s->dr.oa[d]);
+        hit_profile(s, d, l, node, fclamp(.5f + .5f * of, 0.f, 1.f), pr);
+        for (int j = 0; j < MAX_HARM; j++) s->dr.oa[d][j] += x * (pr[j] - s->dr.oa[d][j]);
     } else {
         s->dr.of[d] = of;
         if (of > .02f || of < -.02f)
             hit_colour(s, l, fclamp(pval(s, P_V1_ODDEVEN + l) + .5f * of, 0.f, 1.f), s->dr.oa[d]);
     }
 }
-/* (1.0.6) Fixed: each drum's note, a set pitch every hit, after the 808's: the kick 45..76 Hz (its 56), the tom 90..185
-   (its three toms), the snare 200..320 (its 238), the hat at the top of the layout (its sizzle above 5 kHz needs a
-   high note: up to 4 kHz, an octave below the highest by Voice). Voice moves each within its range. The scale's
-   nearest note to that pitch (the drum layer's; Split: either), so it is always in tune; silent or not, it plays.
-   -1: no note (an empty layout). In the flash: a hit's, rare */
-int drum_fixed(const Synth *s, int d, int *layer) {
-    int N = s->eng.n_nodes, dl = pint(s, P_DR_LAYER), best = -1;
-    float v = pval(s, DP(d, P_D1_VOICE)), bd = 1e9f, tgt;
-    float fmax = 0.f;
+/* (1.0.6) The drums' notes, Follow .. Fixed (x). Each drum has its pitch and its band, after the 808's: the kick
+   45..76 Hz (its 56), the tom 90..185 (its three toms), the snare 200..320 (its 238), the hat the top octave of the
+   layout up to 4 kHz (its sizzle, over 5 kHz, needs a high note); Voice sets the pitch within the band. Fixed (x = 1):
+   a note the motion is sounding in the band, the nearest to the pitch, or else the scale's nearest note to it,
+   sounding or not (always in tune). Toward Follow the band widens, by (1 - x) / x octaves each way: at 1/2 an octave,
+   near 0 the whole layout; at 0 the drum follows as it always did (pick_node). The drum layer's notes (Split: both
+   layers'). -1: no note. In the flash: a hit's, rare */
+int drum_fixed(const Synth *s, int d, float x, int *layer) {
+    int N = s->eng.n_nodes, dl = pint(s, P_DR_LAYER), best = -1, sb = -1, sl = 0;
+    float v = pval(s, DP(d, P_D1_VOICE)), bd = 1e9f, sd = 1e9f, tgt, lo, hi, fmax = 0.f;
     for (int l = 0; l < NUM_LAYERS; l++) {
         if (dl != DLAYER_SPLIT && l != (dl == DLAYER_L2)) continue;
         float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
         for (int i = 0; i < N; i++) { float f = s->eng.node[i].freq * oct; if (f < 4000.f && f > fmax) fmax = f; }
     }
-    tgt = d == 0 ? 45.f * fexp2(.75f * v) : d == 3 ? 90.f * fexp2(1.04f * v) : d == 1 ? 200.f * fexp2(.68f * v)
-        : fmax * fexp2(-v);
+    if (d == 0) { lo = 45.f; hi = 76.f; } else if (d == 3) { lo = 90.f; hi = 185.f; }
+    else if (d == 1) { lo = 200.f; hi = 320.f; } else { lo = fmax * .5f; hi = fmax; }
+    tgt = d == 2 ? fmax * fexp2(-v) : lo * fexp2(v * flog2(hi / lo));
+    {   float w = x >= 1.f ? 0.f : x <= .02f ? 12.f : (1.f - x) / x, wf = fexp2(w);   /* (the band, widened) */
+        lo /= wf; hi *= wf; }
     for (int l = 0; l < NUM_LAYERS; l++) {
         if (dl != DLAYER_SPLIT && l != (dl == DLAYER_L2)) continue;
+        const GenSt *g = &s->layer[l].g;
         float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
         for (int i = 0; i < N; i++) {
             float f = s->eng.node[i].freq * oct;
             if (f < 20.f || f >= 4000.f) continue;
             float dd = flog2(f / tgt); if (dd < 0.f) dd = -dd;
-            if (dd < bd) { bd = dd; best = i; *layer = l; }
+            if (dd < bd) { bd = dd; best = i; *layer = l; }                   /* (the scale's nearest: its own) */
+            if (g->a[i] > .02f && f >= lo * .999f && f <= hi * 1.001f && dd < sd) { sd = dd; sb = i; sl = l; }   /* (sounding, in its band) */
         }
     }
+    if (sb >= 0) { *layer = sl; return sb; }
     return best;
 }
 
@@ -138,9 +149,9 @@ DSP_CTL static int pick_layer(const Synth *s, int d) {
 DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
     DrumV *v = &s->dr.v[d];
     if (s->eng.n_nodes < 1) return;
-    int fx = pint(s, P_DR_NOTES), l = 0, node = -1;
-    if (fx) node = DSP_FAR(drum_fixed)(s, d, &l);              /* (1.0.6) Fixed: the drum's set pitch */
-    if (node < 0) { fx = 0; l = pick_layer(s, d); node = pick_node(s, l, pval(s, DP(d, P_D1_VOICE))); }
+    float fx = pval(s, P_DR_NOTES); int l = 0, node = -1;
+    if (fx > .01f) node = DSP_FAR(drum_fixed)(s, d, fx, &l);   /* (1.0.6) toward Fixed: its band, its pitch */
+    if (node < 0) { fx = 0.f; l = pick_layer(s, d); node = pick_node(s, l, pval(s, DP(d, P_D1_VOICE))); }
     if (v->on && (node != v->node || l != v->layer)) { v->old = v->cur; v->ls = 0.f; v->cur.h1 = 0.f; }   /* another voice: the last one fades */
     else v->ls = v->on ? v->env : 0.f;                      /* the same voice: rise from where it is */
     v->node = node; v->layer = l;

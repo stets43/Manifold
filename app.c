@@ -991,7 +991,6 @@ static void value_text(int id, float n, char *b, int max)
         case P_RH_COUNT: int_text(i + 2, t); text_cat(t, " events"); break;
         case P_RV_FREEZE: case P_RV_TUNED: text_cpy(t, i ? "On" : "Off", sizeof t); break;
         case P_DRY: text_cpy(t, i ? "On: Shape" : "Off", sizeof t); break;
-        case P_DR_NOTES: text_cpy(t, i ? "Fixed (a kit)" : "Follow", sizeof t); break;
         case P_LFO1_SHAPE: case P_LFO2_SHAPE: case P_LFO3_SHAPE: case P_LFO4_SHAPE: case P_LFO5_SHAPE:
         case P_LFO6_SHAPE: text_cpy(t, PICK(LFO_N, i), sizeof t); break;
         case P_LFO1_SYNC: case P_LFO2_SYNC: case P_LFO3_SYNC: case P_LFO4_SYNC: case P_LFO5_SYNC:
@@ -1057,6 +1056,11 @@ static void value_text(int id, float n, char *b, int max)
     } else if (id == P_RV_DAMP) {                    /* how long the top rings, of the rest's decay */
         text_cpy(t, "Top ", sizeof t); { char u[6]; int_text((int32_t)((1.f - .75f * n) * 100.0f + 0.5f), u); text_cat(t, u); }
         text_cat(t, "% as long");
+    } else if (id == P_DR_NOTES) {                  /* (1.0.6) Follow .. Fixed */
+        int pc = (int)(n * 100.0f + 0.5f);
+        if (pc <= 1) text_cpy(t, "Follow", sizeof t);
+        else if (pc >= 99) text_cpy(t, "Fixed (a kit)", sizeof t);
+        else { char u[6]; int_text(pc, u); text_cpy(t, u, sizeof t); text_cat(t, "% fixed"); }
     } else if (id == P_G1_BAL || id == P_G2_BAL) {  /* (dark .. balanced .. bright) */
         int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);
         if (pc < 3) text_cpy(t, "Balanced", sizeof t);
@@ -3216,7 +3220,7 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "bal1"))                  /* layer 1's Balance, 0 (dark) .. 100 (bright) */
         *got = (int)(S.base[P_G1_BAL] * 100.0f + 0.5f);
     else if (!strcmp(what, "drnotes"))              /* (1.0.6) the drums' notes: 0 Follow, 1 Fixed */
-        *got = pint(&S, P_DR_NOTES);
+        *got = (int)(S.target[P_DR_NOTES] * 100.0f + .5f);
     else if (!strncmp(what, "drhz_", 5)) {           /* drum n's last note, Hz */
         int d = atoi(what + 5) & 3; const DrumV *v = &S.dr.v[d];
         *got = v->node >= 0 ? (int)(S.eng.node[v->node].freq * fm_exp2f((float)(pint(&S, v->layer ? P_V2_REG : P_V1_REG) - 1)) + .5f) : -1;
