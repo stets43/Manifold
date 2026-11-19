@@ -61,18 +61,30 @@ typedef struct {
     int8_t last_patch;                   /* -1: none loaded; boot rolls set.seed */
     uint8_t theme;
     uint8_t bt_on, bt_auto;              /* Bluetooth radio at power-on; reconnect the last audio device */
-    uint8_t midi_out;                    /* the keys go out over USB / Bluetooth MIDI */
+    uint8_t midi_out;                    /* MIDI out's notes: 0 none, 1 the keys, 2 the keys and the layers (1.0.6) */
     uint8_t setup_sub;                   /* the setup page last shown (HOME twice lands there) */
     uint8_t cap_harm;                    /* partials per table (0 in older settings: all) */
     uint8_t keys_to;                     /* the keys play layer 1 (0), layer 2 (1), both (2) or the drums (3) */
-    uint8_t ver;                         /* the settings' version (0 before 1.0.5): 5, the keys on both layers once */
+    uint8_t ver;                         /* the settings' version (0 before 1.0.5): 5, the keys on both layers once; 6,
+                                            MIDI out's (1.0.6) */
+    /* (1.0.6) MIDI out */
+    uint8_t mo_mpe;                      /* the notes as MPE (just pitches) */
+    uint8_t mo_drums;                    /* 0 off, 1 the kit's notes, 2 pitched (the note each hit lands on) */
+    uint8_t mo_sync;                     /* bit 0 the knobs (CC 21..24), bit 1 the clock */
+    uint8_t mo_floor;                    /* dB under a layer's peak where its notes start: 12 .. 36 */
+    uint8_t mo_rate;                     /* new notes a second a layer: 6 12 24 48 96, no cap (MO_RATE) */
+    uint8_t mo_level;                    /* a note's level as it moves: pressure (MPE) or poly aftertouch */
+    uint8_t mo_ch[4];                    /* Standard: the channels (0-based) of layer 1, layer 2, the keys, the drums */
+    uint8_t mo_kit[NUM_DRUMS];           /* the kit's notes: kick, snare, hat, tom */
 } settings_t;
+#define SET_SIZE_5 ((offsetof(settings_t, ver) + 1u + 3u) & ~3u)   /* (1.0.5's size: up to ver, padded: 28) */
 static settings_t set;
 static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5046u          /* "MNPF" (1.0.5): MNP9 with the patterns' 20, the colour's 12, the undertones' 4 and Balance's 2 parameters after */
+#define PATCH_MAGIC 0x4D4E5047u          /* "MNPG" (1.0.6): MNP9 with the patterns' 20, the colour's 12, the undertones' 4, Balance's 2 and Dry after */
+#define PATCH_MAGIC_F 0x4D4E5046u        /* "MNPF" (1.0.5): read, wet */
 #define PATCH_MAGIC_E 0x4D4E5045u        /* "MNPE": a 1.0.5 test build's, before Balance: read, it at its default */
 #define PATCH_MAGIC_D 0x4D4E5044u        /* "MNPD": a 1.0.5 test build's, before the undertones: read, those at their defaults */
 #define PATCH_MAGIC_C 0x4D4E5043u        /* "MNPC": a 1.0.5 test build's, before the hits' colour: read, those at their defaults */
@@ -108,6 +120,7 @@ PATCH_OLD(patchA_t, NUM_PARAMS_A);
 PATCH_OLD(patchC_t, NUM_PARAMS_C);
 PATCH_OLD(patchD_t, NUM_PARAMS_D);
 PATCH_OLD(patchE_t, NUM_PARAMS_E);
+PATCH_OLD(patchF_t, NUM_PARAMS_F);
 #undef PATCH_OLD
 static patch_t pbuf __attribute__((section(".pool")));                     /* the patch in flight: a save's copy, or a load the render takes */
 static patch_t undo_buf __attribute__((section(".pool")));                 /* the patch as it was before the last roll */
@@ -303,11 +316,7 @@ static int key_to_node(uint32_t k)
     return order[r];
 }
 
-static int note_midi(int node)           /* the node's nearest equal-tempered note, for MIDI out */
-{
-    float root = S.val[P_ROOT];
-    return clamp((int32_t)(root + 12.0f * flog2(S.eng.node[node].ratio) + 0.5f), 0, 127);
-}
+#include "midi_out.h"                   /* MIDI out (1.0.6) */
 
 static volatile uint32_t midi_count;
 static void midi_in(void)                /* audio interrupt: notes play the nearest node, CCs move the macros */
@@ -362,6 +371,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         drain();
         midi_in();
     }
+    mo_blk_ms = plat_ms();               /* (MIDI out: this block plays a block from now; its hits go out then) */
+    mo_blk_s = S.nsamp;
     while (done < n) {
         uint32_t m = n - done > APP_BLOCK ? APP_BLOCK : n - done;
         ((__typeof__(&synth_process))app_far((void *)&synth_process))(&S, mix_l, mix_r, (int)m);
@@ -463,6 +474,21 @@ static const char *bta_state_text(int st)
 }
 
 /* ------------------------------------------------------------------ init --- */
+static void mo_defaults(void)            /* MIDI out (1.0.6): notes from the keys and the layers, Standard, the kit,
+                                            the knobs and the clock; it all stays idle until something listens */
+{
+    static const uint8_t ch[4] = {0, 1, 2, 9}, kit[NUM_DRUMS] = {36, 38, 42, 45};
+    set.midi_out = 2;
+    set.mo_mpe = 0;
+    set.mo_drums = 1;
+    set.mo_sync = 3;
+    set.mo_floor = 18;
+    set.mo_rate = 2;                     /* 24 a second: 32nd notes at 180 BPM */
+    set.mo_level = 0;
+    memcpy(set.mo_ch, ch, sizeof ch);
+    memcpy(set.mo_kit, kit, sizeof kit);
+    set.ver = 6;
+}
 static void settings_defaults(void)
 {
     memset(&set, 0, sizeof set);
@@ -481,6 +507,7 @@ static void settings_defaults(void)
     set.midi_out = 1;
     set.keys_to = 2;                     /* the keys play both layers (1.0.5) */
     set.ver = 5;
+    mo_defaults();
 }
 
 /* an MNP9 (or MNP8) patch read into a patch_t's room, laid out as one in place: each field moved to its new place,
@@ -517,6 +544,7 @@ PATCH_UP(patch_upA, patchA_t, NUM_PARAMS_A)
 PATCH_UP(patch_upC, patchC_t, NUM_PARAMS_C)
 PATCH_UP(patch_upD, patchD_t, NUM_PARAMS_D)
 PATCH_UP(patch_upE, patchE_t, NUM_PARAMS_E)
+PATCH_UP(patch_upF, patchF_t, NUM_PARAMS_F)
 #undef PATCH_UP
 
 typedef struct {                         /* MNPB's layout */
@@ -556,8 +584,12 @@ static int patch_read(int slot, patch_t *p)
     int n;
     if (slot < 0 || slot >= N_PATCH)
         return 0;
-    if (plat_store_size(patch_obj(slot)) == (int)sizeof(patchB_t))
-        return patch_read_b(slot, p);
+    if (plat_store_size(patch_obj(slot)) == (int)sizeof(patchB_t)) {   /* (the withdrawn MNPB's size: by its magic, as
+                                                    MNPG has the same 215 parameters and the same size) */
+        uint32_t mg = 0;
+        if (plat_store_head(patch_obj(slot), &mg, 4) == 4 && mg == PATCH_MAGIC_B)
+            return patch_read_b(slot, p);
+    }
     n = plat_store_load(patch_obj(slot), p, sizeof *p);
     if (n == (int)sizeof(patch9_t) && (p->magic == PATCH_MAGIC_9 || p->magic == PATCH_MAGIC_8) && p->nparams == NUM_PARAMS_9
         && p->nslots == MOD_SLOTS) {
@@ -572,6 +604,9 @@ static int patch_read(int slot, patch_t *p)
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchD_t) && p->magic == PATCH_MAGIC_D && p->nparams == NUM_PARAMS_D && p->nslots == MOD_SLOTS) {
         patch_upD(p);                    /* (a later one's still: the undertones at their defaults) */
+        p->magic = PATCH_MAGIC;
+    } else if (n == (int)sizeof(patchF_t) && p->magic == PATCH_MAGIC_F && p->nparams == NUM_PARAMS_F && p->nslots == MOD_SLOTS) {
+        patch_upF(p);                    /* (1.0.5's: wet) */
         p->magic = PATCH_MAGIC;
     } else if (n == (int)sizeof(patchE_t) && p->magic == PATCH_MAGIC_E && p->nparams == NUM_PARAMS_E && p->nslots == MOD_SLOTS) {
         patch_upE(p);                    /* (the one before Balance: Balanced) */
@@ -633,7 +668,8 @@ void app_init(void)
 {
     int k;
     uint32_t i;
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC ||
+    int sn = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    if ((sn != (int)sizeof set && sn != (int)SET_SIZE_5) || set.magic != SET_MAGIC ||
         set.oct < -3 || set.oct > 3 || set.style >= NUM_STYLES || set.cap_pad < 4 || set.cap_pad > MAX_VOICES ||
         set.keys_to > 3 ||
         set.midi_ch > 16 || set.last_patch >= N_PATCH || set.theme >= NTHEMES)
@@ -645,10 +681,15 @@ void app_init(void)
         set.keys_to = 2;
         set.ver = 5;
     }
+    if (set.ver < 6 || sn != (int)sizeof set || set.midi_out > 2 || set.mo_drums > 2 || set.mo_sync > 3 ||
+        set.mo_floor < 12 || set.mo_floor > 36 || set.mo_rate > 5 || set.mo_ch[0] > 15 || set.mo_ch[1] > 15 ||
+        set.mo_ch[2] > 15 || set.mo_ch[3] > 15)
+        mo_defaults();                   /* (settings from before 1.0.6: MIDI out's defaults) */
     if (set.cap_nodes < 4 || set.cap_nodes > GOV_MAX_ACTIVE)
         set.cap_nodes = GOV_MAX_ACTIVE;
     if (set.cap_harm < 4 || set.cap_harm > MAX_HARM)
         set.cap_harm = MAX_HARM;
+    mo_reset();                          /* (MIDI out: nothing held) */
     for (k = 0; k < 128; k++)
         midi_node[k] = -1;
     for (k = 0; k < (int)NKEYS; k++)
@@ -668,7 +709,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_F || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -835,6 +876,8 @@ static void param_name(int id, char *b, int max)
     case P_DL_TO_RV: n = "Delay into reverb"; break;
     case P_LFO_COUPLE: n = "LFO coupling"; break;
     case P_RV_FREEZE: n = "Reverb freeze"; break;
+    case P_DRY: n = "Space knob"; break;
+    case P_DR_NOTES: n = "Drum notes"; break;
     case P_FLT_MORPH: n = "Filter type"; break;
     case P_FLT_CUT: n = "Filter cutoff"; break;
     case P_FLT_RES: n = "Filter resonance"; break;
@@ -947,6 +990,7 @@ static void value_text(int id, float n, char *b, int max)
         case P_RH_SELRATE: text_cpy(t, selrate_name(i), sizeof t); break;
         case P_RH_COUNT: int_text(i + 2, t); text_cat(t, " events"); break;
         case P_RV_FREEZE: case P_RV_TUNED: text_cpy(t, i ? "On" : "Off", sizeof t); break;
+        case P_DRY: text_cpy(t, i ? "Shape" : "Effects", sizeof t); break;
         case P_LFO1_SHAPE: case P_LFO2_SHAPE: case P_LFO3_SHAPE: case P_LFO4_SHAPE: case P_LFO5_SHAPE:
         case P_LFO6_SHAPE: text_cpy(t, PICK(LFO_N, i), sizeof t); break;
         case P_LFO1_SYNC: case P_LFO2_SYNC: case P_LFO3_SYNC: case P_LFO4_SYNC: case P_LFO5_SYNC:
@@ -1012,6 +1056,11 @@ static void value_text(int id, float n, char *b, int max)
     } else if (id == P_RV_DAMP) {                    /* how long the top rings, of the rest's decay */
         text_cpy(t, "Top ", sizeof t); { char u[6]; int_text((int32_t)((1.f - .75f * n) * 100.0f + 0.5f), u); text_cat(t, u); }
         text_cat(t, "% as long");
+    } else if (id == P_DR_NOTES) {                  /* (1.0.6) Follow .. Fixed */
+        int pc = (int)(n * 100.0f + 0.5f);
+        if (pc <= 1) text_cpy(t, "Follow", sizeof t);
+        else if (pc >= 99) text_cpy(t, "Fixed (a kit)", sizeof t);
+        else { char u[6]; int_text(pc, u); text_cpy(t, u, sizeof t); text_cat(t, "% fixed"); }
     } else if (id == P_G1_BAL || id == P_G2_BAL) {  /* (dark .. balanced .. bright) */
         int pc = (int)((n < .5f ? .5f - n : n - .5f) * 200.0f + 0.5f);
         if (pc < 3) text_cpy(t, "Balanced", sizeof t);
@@ -1098,7 +1147,9 @@ static void value_text(int id, float n, char *b, int max)
  * items each, one item a knob: K1..K4, top to bottom. SELECT moves between the sub-pages. */
 enum { V_THEME = 1000, V_OCT, V_MIDI_CH, V_MIDI_OUT, V_BT_ON, V_BT_DEV, V_BT_LINK, V_BT_AUTO, V_CAP_PAD, V_CAP_UNI,
        V_CAP_NODES, V_WS_OS, V_FB_ST, V_CPU2, V_PEAK, V_STYLE, V_CAP_HARM, V_KEYS,
-       V_MX_ROUTE, V_MX_SRC, V_MX_DST, V_MX_DEPTH };
+       V_MX_ROUTE, V_MX_SRC, V_MX_DST, V_MX_DEPTH,
+       V_MO_TUNE, V_MO_DRUMS, V_MO_SYNC, V_MO_FLOOR, V_MO_RATE, V_MO_LEVEL, V_MO_CH1, V_MO_CH2, V_MO_CHK, V_MO_CHD,
+       V_MO_KIT1, V_MO_KIT2, V_MO_KIT3, V_MO_KIT4 };
 typedef struct { const char *name; int16_t it[4]; } sub_t;
 #define _ (-1)
 static const sub_t SUB_SCALE[] = {
@@ -1134,7 +1185,7 @@ static const sub_t SUB_METER[] = {           /* the rhythm and the drums it play
     {"Lock & motion", {P_RH_PULL, P_RH_MOTION, P_EVOLVE, P_RH_GRIP}},
     {"Hold", {P_D1_HOLD, P_D2_HOLD, P_D3_HOLD, P_D4_HOLD}},
     {"Place", {P_D1_PLACE, P_D2_PLACE, P_D3_PLACE, P_D4_PLACE}},
-    {"Shape & duck", {P_DR_SHAPE, P_DR_DEPTH, P_DR_DUCK, _}},
+    {"Shape, duck, notes", {P_DR_SHAPE, P_DR_DEPTH, P_DR_DUCK, P_DR_NOTES}},
     {"Follow", {P_D1_SRC, P_D2_SRC, P_D3_SRC, P_D4_SRC}},
     {"Rotate", {P_D1_ROT, P_D2_ROT, P_D3_ROT, P_D4_ROT}},
     {"Length", {P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN}},
@@ -1168,7 +1219,7 @@ static const sub_t SUB_FX[] = {
     {"Reverb", {P_RV_SEND, P_RV_SIZE, P_RV_DECAY, P_RV_DAMP}},
     {"Space", {P_RV_PRE, P_RV_MOD, P_RV_TUNED, P_RV_FREEZE}},
     {"Compressor", {P_CMP_THRESH, P_CMP_RATIO, P_CMP_ATT, P_CMP_REL}},
-    {"Output", {P_CMP_MIX, P_CMP_PUMP, P_MASTER, _}},
+    {"Output", {P_CMP_MIX, P_CMP_PUMP, P_MASTER, P_DRY}},
 };
 static const sub_t SUB_VOICE2[] = {
     {"Tone", {P_V2_TONE, P_V2_TILT, P_V2_SPIN, P_V2_WAVE}},
@@ -1178,11 +1229,15 @@ static const sub_t SUB_VOICE2[] = {
 };
 enum { SS_GENERAL, SS_BT, SS_LOAD, SS_LOAD2, SS_KEYS };
 static const sub_t SUB_SETUP[] = {
-    {"General", {V_THEME, V_OCT, V_MIDI_CH, V_MIDI_OUT}},
+    {"General", {V_THEME, V_OCT, V_MIDI_CH, _}},
     {"Bluetooth audio", {V_BT_ON, V_BT_DEV, V_BT_LINK, V_BT_AUTO}},
     {"Load", {V_CAP_NODES, V_CAP_PAD, V_CAP_HARM, _}},
     {"Load cuts 2", {V_CPU2, V_PEAK, _, _}},
     {"Keys", {V_KEYS, _, _, _}},
+    {"MIDI out", {V_MIDI_OUT, V_MO_TUNE, V_MO_DRUMS, V_MO_SYNC}},           /* (1.0.6) */
+    {"MIDI out notes", {V_MO_FLOOR, V_MO_RATE, V_MO_LEVEL, _}},
+    {"MIDI out channels", {V_MO_CH1, V_MO_CH2, V_MO_CHK, V_MO_CHD}},
+    {"MIDI out drum notes", {V_MO_KIT1, V_MO_KIT2, V_MO_KIT3, V_MO_KIT4}},
 };
 #undef _
 
@@ -1430,11 +1485,13 @@ static void mx_edit(int it, int32_t det)
 
 static void item_name(int it, char *b, int max)
 {
-    static const char *const N[] = {"Color theme", "Key octave", "MIDI channel", "Keys to MIDI out", "Bluetooth",
+    static const char *const N[] = {"Color theme", "Key octave", "MIDI channel", "Notes", "Bluetooth",
                                     "Device", "Connection", "Reconnect at power-on", "Layer 2 voices", "Oscillators a layer",
                                     "Layer 1 voices", "Fuzz 2x oversampling", "Reverb rate", "Second core",
                                     "Peak", "Style", "Partials", "Keys play", "Route", "Source", "Destination",
-                                    "Depth"};
+                                    "Depth", "Tuning", "Drums", "Knobs and clock", "Note floor", "Notes a second",
+                                    "Level", "Layer 1 channel", "Layer 2 channel", "Keys channel", "Drums channel",
+                                    "Kick note", "Snare note", "Hat note", "Tom note"};
     if (it >= V_THEME)
         text_cpy(b, N[it - V_THEME], max);
     else if (it >= 0)
@@ -1461,7 +1518,47 @@ static float item_value(int it, char *b, int max)
         else
             int_text(set.midi_ch, b);
         return (float)set.midi_ch / 16.0f;
-    case V_MIDI_OUT: text_cpy(b, set.midi_out ? "On" : "Off", max); return -1.0f;
+    case V_MIDI_OUT: text_cpy(b, set.midi_out == 2 ? "Keys + layers" : set.midi_out ? "Keys" : "Off", max); return -1.0f;
+    case V_MO_TUNE: text_cpy(b, set.mo_mpe ? "MPE (just)" : "Standard", max); return -1.0f;
+    case V_MO_DRUMS: text_cpy(b, set.mo_drums == 2 ? "Pitched" : set.mo_drums ? "Kit" : "Off", max); return -1.0f;
+    case V_MO_SYNC: {
+        static const char *const SY[] = {"Off", "Knobs", "Clock", "Knobs + clock"};
+        text_cpy(b, SY[set.mo_sync & 3u], max);
+        return -1.0f;
+    }
+    case V_MO_FLOOR: text_cpy(b, "-", max); int_text(set.mo_floor, t); text_cat(b, t); text_cat(b, " dB");
+        return (float)(set.mo_floor - 12) / 24.0f;
+    case V_MO_RATE:
+        if (set.mo_rate >= 5)
+            text_cpy(b, "No cap", max);
+        else {
+            int_text((int32_t)MO_RATE[set.mo_rate], b);
+            text_cat(b, " a layer");
+        }
+        return (float)set.mo_rate / 5.0f;
+    case V_MO_LEVEL: text_cpy(b, set.mo_level ? (set.mo_mpe ? "On: pressure" : "On: aftertouch") : "Off", max); return -1.0f;
+    case V_MO_CH1: case V_MO_CH2: case V_MO_CHK: case V_MO_CHD:
+        if (set.mo_mpe && it != V_MO_CHD) {
+            text_cpy(b, "MPE: 2-15", max);
+            return -1.0f;
+        }
+        if (set.mo_mpe) {
+            text_cpy(b, set.mo_drums == 2 ? "MPE: 2-15" : "16 (MPE)", max);
+            return -1.0f;
+        }
+        int_text(set.mo_ch[it - V_MO_CH1] + 1, b);
+        return (float)set.mo_ch[it - V_MO_CH1] / 15.0f;
+    case V_MO_KIT1: case V_MO_KIT2: case V_MO_KIT3: case V_MO_KIT4: {
+        static const char *const NN[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+        int n = set.mo_kit[it - V_MO_KIT1];
+        int_text(n, b);
+        text_cat(b, " (");
+        text_cat(b, NN[n % 12]);
+        int_text(n / 12 - 1, t);
+        text_cat(b, t);
+        text_cat(b, ")");
+        return (float)n / 127.0f;
+    }
     case V_BT_ON: text_cpy(b, set.bt_on ? "On" : "Off", max); return -1.0f;
     case V_BT_DEV: {
         char n[17];
@@ -1638,7 +1735,32 @@ static void edit_item(int it, int32_t det)
         break;
     case V_OCT: set.oct = (int8_t)clamp(set.oct + d, -3, 3); set_dirty = 1; break;
     case V_MIDI_CH: set.midi_ch = (uint8_t)clamp(set.midi_ch + d, 0, 16); set_dirty = 1; break;
-    case V_MIDI_OUT: set.midi_out = d > 0; set_dirty = 1; break;
+    case V_MIDI_OUT: mo_settings_changed(); set.midi_out = (uint8_t)clamp(set.midi_out + d, 0, 2); set_dirty = 1; break;
+    case V_MO_TUNE:
+        if ((d > 0) != set.mo_mpe) {
+            mo_settings_changed();
+            set.mo_mpe = d > 0;
+            mo_mode_set(set.mo_mpe);
+            set_dirty = 1;
+        }
+        break;
+    case V_MO_DRUMS: mo_settings_changed(); set.mo_drums = (uint8_t)clamp(set.mo_drums + d, 0, 2); set_dirty = 1; break;
+    case V_MO_SYNC: set.mo_sync = (uint8_t)clamp(set.mo_sync + d, 0, 3); set_dirty = 1; break;
+    case V_MO_FLOOR: set.mo_floor = (uint8_t)clamp(set.mo_floor + 3 * d, 12, 36); set_dirty = 1; break;
+    case V_MO_RATE: set.mo_rate = (uint8_t)clamp(set.mo_rate + d, 0, 5); set_dirty = 1; break;
+    case V_MO_LEVEL: set.mo_level = d > 0; set_dirty = 1; break;
+    case V_MO_CH1: case V_MO_CH2: case V_MO_CHK: case V_MO_CHD:
+        if (set.mo_mpe)
+            break;
+        mo_settings_changed();
+        set.mo_ch[it - V_MO_CH1] = (uint8_t)clamp(set.mo_ch[it - V_MO_CH1] + d, 0, 15);
+        set_dirty = 1;
+        break;
+    case V_MO_KIT1: case V_MO_KIT2: case V_MO_KIT3: case V_MO_KIT4:
+        mo_settings_changed();
+        set.mo_kit[it - V_MO_KIT1] = (uint8_t)clamp(set.mo_kit[it - V_MO_KIT1] + d, 0, 127);
+        set_dirty = 1;
+        break;
     case V_BT_ON: bt_power(d > 0); break;
     case V_BT_DEV: ui.bt_sel = clamp(ui.bt_sel + d, 0, bt_count() > 0 ? bt_count() - 1 : 0); break;
     case V_BT_LINK:
@@ -1911,6 +2033,7 @@ static void perf_key(int pk, int down)
             for (k = 0; k < NKEYS; k++)
                 if ((latched >> k & 1u) && key_node[k] >= 0) {
                     cmd(C_NOTE, 0, (uint32_t)key_node[k], 0.0f, 0);
+                    mo_key((int)k, -1, 0, 0);
                     key_node[k] = -1;
                 }
         latched = 0;
@@ -1941,7 +2064,7 @@ static void perf_key(int pk, int down)
         app_say("Keys", set.keys_to == 3 ? "Play the drums" : KEYS_N[set.keys_to]);
         break;
     case PK_UNDO: undo(); break;
-    case PK_PANIC: cmd(C_PANIC, 0, 0, 0.0f, 0); latched = 0; app_say("Panic", "all notes off"); break;
+    case PK_PANIC: cmd(C_PANIC, 0, 0, 0.0f, 0); latched = 0; mo_panic(); app_say("Panic", "all notes off"); break;
     }
 }
 
@@ -1988,6 +2111,7 @@ static void keys_in(uint32_t keys)
             }
             if (ui.latch && (latched & bit) && key_node[k] >= 0) {   /* latched: a second press lets it go */
                 cmd(C_NOTE, 0, (uint32_t)key_node[k], 0.0f, 0);
+                mo_key((int)k, -1, 0, 0);
                 key_node[k] = -1;
                 latched &= ~bit;
                 continue;
@@ -1999,9 +2123,7 @@ static void keys_in(uint32_t keys)
                     continue;
                 key_node[k] = (int8_t)nd;
                 cmd(C_NOTE, 1, (uint32_t)nd, (float)(v ? v : 100u) * (1.0f / 127.0f), 0);
-                if (set.midi_out)
-                    plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note_midi(nd) << 16 | (v ? v : 100u) << 24,
-                                   TO_USB | (FM1B_BLE ? TO_BLE : 0u));
+                mo_key((int)k, nd, (int)(v ? v : 100u), 1);
                 if (ui.latch)
                     latched |= bit;
             }
@@ -2011,9 +2133,7 @@ static void keys_in(uint32_t keys)
                 perf_key(pk, 0);          /* (the fill and the scenes act on release, wherever PLAY is) */
             if (key_node[k] >= 0 && !(latched & bit)) {
                 cmd(C_NOTE, 0, (uint32_t)key_node[k], 0.0f, 0);
-                if (set.midi_out)
-                    plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note_midi(key_node[k]) << 16,
-                                   TO_USB | (FM1B_BLE ? TO_BLE : 0u));
+                mo_key((int)k, -1, 0, 0);
                 key_node[k] = -1;
             }
         }
@@ -2212,6 +2332,7 @@ static void encoders_in(void)
                 float v = fm_clampf(S.macro[k] + (float)d * 0.03f, -1.0f, 1.0f);
                 cmd(C_MACRO, k, 0, v, 0);
                 S.macro[k] = v;
+                mo.knob_dirty |= (uint8_t)(1u << k);   /* (MIDI out: a knob you turned) */
                 int_text((int32_t)(v * 100.0f), t);
                 text_cat(t, "  ");
                 macro_targets((int)k, t + strlen_(t), (int)sizeof t - (int)strlen_(t));
@@ -2908,6 +3029,9 @@ void app_frame(void)
         built_seen = builds;
         sort_nodes();
     }
+    if (!S.build_req)
+        mo_pitches();                    /* (MIDI out: the notes' pitches, when they change) */
+    mo_knobs();
     bta_sim_tick();
     {   /* the battery's bars: the header shows them */
         static int last_batt = -2;
@@ -3011,6 +3135,7 @@ MAKE_OLD(make_oldB, patchB_t, NUM_PARAMS_B, PATCH_MAGIC_B, NUM_PARAMS_A)
 MAKE_OLD(make_oldC, patchC_t, NUM_PARAMS_C, PATCH_MAGIC_C, NUM_PARAMS_C)
 MAKE_OLD(make_oldD, patchD_t, NUM_PARAMS_D, PATCH_MAGIC_D, NUM_PARAMS_D)
 MAKE_OLD(make_oldE, patchE_t, NUM_PARAMS_E, PATCH_MAGIC_E, NUM_PARAMS_E)
+MAKE_OLD(make_oldF, patchF_t, NUM_PARAMS_F, PATCH_MAGIC_F, NUM_PARAMS_F)
 #undef MAKE_OLD
 int app_expect(const char *what, int *got)
 {
@@ -3020,6 +3145,48 @@ int app_expect(const char *what, int *got)
         *got = ui.sub[ui.page];
     else if (!strcmp(what, "transport"))
         *got = S.transport;
+    else if (!strcmp(what, "mo_ons"))               /* MIDI out (1.0.6): note-ons and note-offs sent, notes out now */
+        *got = (int)mo.ons;
+    else if (!strcmp(what, "mo_offs"))
+        *got = (int)mo.offs;
+    else if (!strcmp(what, "mo_open")) {
+        int i, c = 0;
+        for (i = 0; i < MO_V; i++)
+            c += mo_v[i].used && mo_v[i].dests;
+        *got = c;
+    } else if (!strcmp(what, "mo_ons_min"))         /* (at least so many note-ons: 4 when so) */
+        *got = (int)mo.ons >= 4 ? 4 : (int)mo.ons;
+    else if (!strcmp(what, "mo_open_max")) {         /* (notes out but the drums') */
+        int i, c = 0;
+        for (i = 0; i < MO_V; i++)
+            c += mo_v[i].used && mo_v[i].dests && mo_v[i].src != MS_DRUM;
+        *got = c;
+    } else if (!strcmp(what, "mo_up_usb"))
+        *got = mo.up[0];
+    else if (!strcmp(what, "mo_up_ble"))
+        *got = mo.up[1];
+    else if (!strcmp(what, "mo_notes"))
+        *got = set.midi_out;
+    else if (!strcmp(what, "mo_ccs"))               /* knob CCs sent */
+        *got = (int)mo.ccs;
+    else if (!strcmp(what, "mo_clk_run"))           /* the clock runs to USB */
+        *got = mo.clk_run[0];
+    else if (!strcmp(what, "mo_mpe"))
+        *got = set.mo_mpe;
+    else if (!strcmp(what, "mo_panic"))
+        { mo_panic(); *got = 1; }
+    else if (!strcmp(what, "mo_chans_ok")) {        /* MPE: every note out on its own member channel (2..15) */
+        int i, j, ok = 1;
+        for (i = 0; i < MO_V; i++)
+            if (mo_v[i].used && mo_v[i].dests && mo_v[i].src != MS_DRUM) {
+                if (set.mo_mpe && (mo_v[i].ch < 1 || mo_v[i].ch > 14))
+                    ok = 0;
+                for (j = i + 1; j < MO_V; j++)
+                    if (set.mo_mpe && mo_v[j].used && mo_v[j].dests && mo_v[j].ch == mo_v[i].ch)
+                        ok = 0;
+            }
+        *got = ok;
+    }
     else if (!strcmp(what, "nodes"))
         *got = S.eng.n_nodes;
     else if (!strncmp(what, "keep_", 5))            /* (the tests') remember a parameter's value now */
@@ -3052,6 +3219,17 @@ int app_expect(const char *what, int *got)
         *got = S.slot[0].src;
     else if (!strcmp(what, "bal1"))                  /* layer 1's Balance, 0 (dark) .. 100 (bright) */
         *got = (int)(S.base[P_G1_BAL] * 100.0f + 0.5f);
+    else if (!strcmp(what, "drnotes"))              /* (1.0.6) the drums' notes: 0 Follow, 1 Fixed */
+        *got = (int)(S.target[P_DR_NOTES] * 100.0f + .5f);
+    else if (!strncmp(what, "drhz_", 5)) {           /* drum n's last note, Hz */
+        int d = atoi(what + 5) & 3; const DrumV *v = &S.dr.v[d];
+        *got = v->node >= 0 ? (int)(S.eng.node[v->node].freq * fm_exp2f((float)(pint(&S, v->layer ? P_V2_REG : P_V1_REG) - 1)) + .5f) : -1;
+    } else if (!strcmp(what, "dry"))                  /* (1.0.6) the patch is Dry */
+        *got = pint(&S, P_DRY);
+    else if (!strcmp(what, "fxw"))                  /* the effects' share now, % */
+        *got = (int)(S.fx.fxw * 100.f + .5f);
+    else if (!strncmp(what, "knobdry_", 8))          /* the knob a parameter rides on a Dry patch */
+        *got = knob_of_dry(atoi(what + 8), 1);
     else if (!strcmp(what, "keys_pull"))
         *got = pint(&S, P_KEY_PULL);
     else if (!strcmp(what, "swlev"))
@@ -3064,6 +3242,8 @@ int app_expect(const char *what, int *got)
         *got = make_oldC(atoi(what + 6));
     else if (!strncmp(what, "makeD_", 6))           /* and the one before the undertones (MNPD) */
         *got = make_oldD(atoi(what + 6));
+    else if (!strncmp(what, "makeF_", 6))           /* and 1.0.5's (MNPF) */
+        *got = make_oldF(atoi(what + 6));
     else if (!strncmp(what, "makeE_", 6))           /* and the one before Balance (MNPE) */
         *got = make_oldE(atoi(what + 6));
     else if (!strncmp(what, "pmask_", 6))           /* layer 1's Clarity mask on note n */

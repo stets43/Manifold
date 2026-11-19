@@ -94,6 +94,41 @@ DSP_INL void colour(const float *a, float o, float *am) {
 }
 /* (in the flash: they run rarely, at a hit or when the notes change; the RAM window is short) */
 void hit_colour(const Synth *s, int l, float o, float *out) { colour(s->layer[l].amp, o, out); }
+/* (1.0.6) Fixed drums: each drum's own spectrum on its note while its hit settles, after the 808's (its kick and toms
+   round sine-like bodies, its snare two tones and a crack, its hats six square waves high-passed: all sizzle).
+     Kick  Body:   the fundamental, its 2nd and 3rd falling away fast, and an undertone (the weight under it)
+     Tom   Body:   a little more of the low partials
+     Snare Crack:  the middle partials (3rd to 9th) over the fundamental
+     Hat   Sizzle: its partials over 4.5 kHz flat (at least the 10th to the 13th), the 7th, 11th and 13th included
+                   (the clash is the metal), the rest near gone
+   Set as heard: Tone's slope (24 dB an octave over its corner) is undone here partial by partial, to 24 dB at most,
+   and the whole is set to the energy the note's own bank has under Tone, so a hit is no louder for its profile.
+   Odd/even still colours it. Worked out once a hit, in the flash */
+void hit_profile(const Synth *s, int d, int l, int node, float o, float *out) {
+    float p[MAX_HARM], f = s->eng.node[node].freq * fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
+    float fc = 250.f * fexp2(6.f * pval(s, LP(l, P_V1_TONE))), ifc2 = 1.f / (fc * fc), e = 0.f, ea = 0.f;
+    const float *am = s->layer[l].amp;
+    for (int j = 0; j < MAX_HARM; j++) {
+        float K = PR[j], v;
+        if (j >= NH) v = d == 0 ? (j == NH ? .35f : j == NH + 1 ? .12f : 0.f) : d == 3 ? (j == NH ? .15f : 0.f) : 0.f;
+        else if (d == 0) v = fexp2(-1.6f * (K - 1.f));                         /* kick: 1, .33, .11 .. */
+        else if (d == 3) v = fexp2(-1.0f * (K - 1.f));                         /* tom: 1, .5, .25 .. */
+        else if (d == 1) v = K < 2.5f ? (K < 1.5f ? .5f : .75f) : K <= 9.5f ? 1.f / (1.f + .08f * (K - 3.f)) : .3f;   /* snare */
+        else v = f * K >= 4500.f || K > 9.5f ? 1.f : .02f;                     /* hat: what is over 4.5 kHz (at least
+                                                                                 the 10th to the 13th, a low note's) */
+        p[j] = v;
+    }
+    colour(p, o, out);
+    for (int j = 0; j < MAX_HARM; j++) {                      /* (as heard: under Tone) */
+        float fk = f * PR[j], r2 = fk * fk * ifc2, tn = 1.f / (1.f + r2 * r2);
+        e += out[j] * out[j]; ea += am[j] * am[j] * tn * tn;
+    }
+    float sc = e > 1e-12f ? sqrtf(ea / e) : 0.f;
+    for (int j = 0; j < MAX_HARM; j++) {
+        float fk = f * PR[j], r2 = fk * fk * ifc2, un = 1.f + r2 * r2;
+        out[j] *= sc * (un > 251.2f ? 251.2f : un);           /* (Tone undone, to 24 dB at most) */
+    }
+}
 static void clarity_mask(Synth *s, int l, const float *key);
 #include "ctl_on.h"
 DSP_CTL static float pw(float x, float e) { return x <= 0.f ? 0.f : fexp2(e * flog2(x)); }

@@ -184,7 +184,7 @@ what the buttons do on this page.
 | --- | --- |
 | PLAY (tap) | start / stop the generators and the rhythm (the keys always play) |
 | PLAY (hold) | the performance keys appear on the white keys (see below) |
-| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs) |
+| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a quarter of the time it makes the patch Dry, which sets the effects to nothing; from a Dry patch to a wet one it rolls the effects too, unless they are locked) |
 | REC (double tap) | roll everything except the scale |
 | REC (hold 0.7 s) | mutate: a small nudge to every continuous setting |
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
@@ -233,11 +233,27 @@ the knob as you turn it.
 | Knob | Part of the instrument | Always on its path |
 | --- | --- | --- |
 | **Timbre** | both voices (their Colour too), both layers' Balance, the drums' Bright | Tone, Center, Band, Tilt and Depth of the voices; Balance |
-| **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too) | Density, Swing; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
+| **Groove** | the rhythm and the drums (the hits' Pluck and Odd / even too), the drums' levels (±4 dB at most) | Density, Swing, the drums' levels; in a genre style, each pattern (to its busier or sparser relatives, a few lines along the library) |
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
-| **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills | layer 1's Rate and Reach; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
+| **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills, the layers' levels (±3 dB at most, one up as the other goes down: which layer leads) | layer 1's Rate and Reach, the layers' levels; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
-Levels (layer levels, drum levels, master) and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
+**A Dry patch** (a quarter of all rolls) starts with its effects doing nothing: no fuzz, the filter wide open, nothing
+sent to the delay or the reverb. An effect set so is not run at all, which leaves the FM-1 more headroom (the delay and
+the reverb stop once their tails have rung out; the filter glides out over about 30 ms). They are still there: turn one
+up on its FX page and it runs as in any patch. The Space knob becomes **Shape** (FX → Output, K4, **Space knob**:
+Shape or Effects): the room the instrument makes itself instead of an effect's.
+
+| Knob (Dry) | Part of the instrument | Always on its path |
+| --- | --- | --- |
+| **Timbre** | as above, but for the voices' Width, Spin and Pluck | as above |
+| **Groove** | as above, but for the drums' envelopes, Snap, Pluck and the duck; with the compressor's **Pump** | Density, Swing, Pump, the drums' levels |
+| **Shape** | each drum's Attack, Hold, Decay, Curve, Settle, Snap and Pluck; the kick's duck; the layers' Contour; the voices' Pluck, Width and Spin; the compressor's attack | the drums' envelopes as a kit: one way the kick and the tom bloom long and open while the snare and the hat stay tight and snappy, the other way it all pulls in close (which way, and how far, is rolled); the layers' Contour; the voices' Width |
+| **Motion** | as above, but for the layers' Contour | as above |
+
+A Dry roll also sets the kit's roles: the kick and the tom long, the snare and the hat short and snappy. Its routes
+in the matrix go nowhere near the effects.
+
+The master, the drum bus level and Temper are never on a knob. **REC + HOME** rolls new paths; **SAVE +
 HOME** locks them so rolls keep them. The knobs can also be turned by the modulation matrix: see
 [Knobs as destinations](#knobs-as-destinations). A white tick on a knob's bar shows where the matrix has it.
 
@@ -319,7 +335,8 @@ relatives.
 
 **What a roll changes:**
 
-- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums.
+- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (a quarter Dry).
+  Its knobs' paths stay as they were; a double tap (or REC + HOME) gives a Dry patch Shape's kit paths too.
 - **REC (double tap)** rolls everything but the scale: the sound, the matrix, the LFOs, the effects and the knobs.
 - **REC + a page button** rolls only that page. **REC + SEL** is the only roll that changes the scale.
 - **PRESET** rolls everything in the chosen style; **ALGO** steps through seeds.
@@ -368,6 +385,9 @@ speakers, and storing a patch there could overwrite others.
 **Patches from before 1.0.5** load: the patterns' settings are new and arrive off (every drum Linear), with the keys'
 pull on, and each layer's Balance at Balanced. They may sound different: the voices themselves changed in 1.0.5. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
 Empty), so stay on 1.0.5 or later once you have saved with it.
+
+**Patches from 1.0.5** load in 1.0.6 as they were (wet, Drum notes at Follow). A patch saved by 1.0.6 is in a newer
+format again, which 1.0.5 shows as Empty.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
@@ -619,9 +639,10 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K4 | **Grip** | how strongly the stream accents every synth envelope |
 | **Hold** | K1–K4 | per drum | how long the envelope holds at full level after the attack (0–50 ms) |
 | **Place** | K1–K4 | per drum | which events it prefers: Strongest … Weakest (kick strongest, hat weakest). When a drum follows a layer: which point it follows |
-| **Shape & duck** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
+| **Shape, duck, notes** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
 | | K2 | **Shape depth** | how much |
 | | K3 | **Kick duck** | sidechain: the kick ducks the synth |
+| | K4 | **Drum notes** | **Follow** … **Fixed**: from each hit riding one of the notes the motion is sounding (Voice: lowest .. highest) to a kit, each drum on its own pitch (see below). On the Groove knob |
 | **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too. A drum with a pattern plays its pattern instead |
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
@@ -631,6 +652,21 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
 | | K4 | **Pluck** | the hit plucks the note it rides: its upper partials fade first after the hit, as the layer's own Pluck does (1.5 s … 25 ms). Off: the layer's own. The note stays plucked until it rises by itself (or, 2 s without a plucking hit, lets go over a second) |
 | **Odd / even** | K1–K4 | per drum | the hit pushes its note's colour toward hollow or even (as the layer's Odd / even), settling as its Bright does. None: the note's own |
+
+**Drum notes** (1.0.6) runs from **Follow** to **Fixed**. Each drum has a pitch and a band, after the TR-808's: the
+**kick** 45–76 Hz (the 808's is tuned near 56), the **tom** 90–185 Hz (its three toms), the **snare** 200–320 Hz (its
+body near 238), and the **hat** the top octave of the layout (up to 4 kHz); each drum's **Voice** sets its pitch in its
+band. At **Fixed**, a hit takes a note the motion is sounding inside its band (the one nearest its pitch), or else the
+scale's nearest note to its pitch, sounding or not: always in tune, always in its range. Turned toward **Follow**, the
+band widens (an octave each way at the middle), so the drums ride more of what the motion plays; at Follow they ride
+it as before. Half way, a kick locks to the bass notes near it and falls back to its own pitch when there are none.
+Toward Fixed each drum also takes its own spectrum while its hit settles: the kick and the tom a round **body** (the
+fundamental, a little of the 2nd and 3rd, an undertone under the kick), the snare a **crack** (its middle partials,
+3rd to 9th), the hat **sizzle** (only its partials above 4.5 kHz, the 7th, 11th and 13th included, which clash like the
+808's six square waves). Odd / even still colours them, and a hit is no louder for its spectrum. Rolls: Fixed about a
+quarter of the time in House, Hip-hop, Machine and Breakbeat, between (0.3–0.8) about 45 %, seldom either in Ambient
+and Cosmic. The kit's levels: the snare about 8 dB under the kick, the tom 6, the hat 13; the hat's decay a closed
+hat's (20–60 ms, longer only where a style opens it).
 
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 
@@ -742,6 +778,7 @@ The chain: **fuzz → filter → delay and reverb sends → compressor → maste
 | **Output** | K1 | **Comp mix** | parallel compression: dry … fully compressed |
 | | K2 | **Pump** | the compressor ducks on layer 1's onsets |
 | | K3 | **Master** | the output level (0–150 %) |
+| | K4 | **Space knob** | **Effects**: the third performance knob is Space; **Shape**: it is Shape (a Dry patch's). See [The performance knobs](#the-performance-knobs) |
 
 After the master, a look-ahead **limiter** holds peaks at −0.5 dBFS, and a soft clip catches anything that still gets
 past. Patches come out loud (about −14 dBFS on average) without distorting.
@@ -758,8 +795,7 @@ From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps the
 | --- | --- | --- | --- |
 | **General** | K1 | **Color theme** | nine themes |
 | | K2 | **Key octave** | −3 … +3 (also OCT − / OCT +) |
-| | K3 | **MIDI channel** | Omni or 1–16, for MIDI in |
-| | K4 | **Keys to MIDI out** | the keys send notes over USB and Bluetooth MIDI |
+| | K3 | **MIDI channel** | Omni or 1–16, for MIDI in (and the knobs' CCs out, in Standard) |
 | **Bluetooth audio** | K1–K4 | | see [Bluetooth audio](#bluetooth-audio) |
 | **Load** | K1 | **Layer 1 voices** | 4–8 notes at once |
 | | K2 | **Layer 2 voices** | 4–8 |
@@ -767,6 +803,10 @@ From the Perform page, press **HOME** again for Setup. **SAVE + OCT+** keeps the
 | **Load cuts 2** | K1 | **Second core** | a status, not a control: **Layer 2 on core 2** (always, since 1.0.5), or **Given up: one core** if the second core ever failed (fm1-base then renders both layers on the first core until power-off, which crackles: power off and on) |
 | | K2 | **Peak** | the worst block since reset; turn to reset |
 | **Keys** | K1 | **Keys play** | Layer 1, Layer 2, Both layers, Drums |
+| **MIDI out** | K1–K4 | | see [MIDI out](#midi-out) |
+| **MIDI out notes** | K1–K3 | | |
+| **MIDI out channels** | K1–K4 | | |
+| **MIDI out drum notes** | K1–K4 | | |
 
 ### The load page
 
@@ -794,8 +834,59 @@ MANIFOLD is a USB MIDI device, and a Bluetooth MIDI device.
 | CC 21, 22, 23, 24 | the Timbre, Groove, Space and Motion knobs |
 | CC 120, CC 123 | everything off |
 
-**Out** (with Keys to MIDI out on): the keys send note on / off on channel 1, each as its nearest equal-tempered
-note, over USB and Bluetooth MIDI. The generators do not send MIDI. MANIFOLD does not send or follow MIDI clock.
+MANIFOLD does not follow incoming MIDI clock.
+
+### MIDI out
+
+What MANIFOLD plays can go out over USB and Bluetooth MIDI: the layers' notes, the keys, the drums, the knobs and the
+clock. **It sends only while something listens**: a computer (or another USB host) that has set up USB MIDI, or a
+Bluetooth MIDI link. A USB charger or power bank does not count. With nothing listening, MIDI out is idle. When a
+link arrives it is given the MPE set-up (in MPE), the knobs' CCs, a Start at the next bar (if MANIFOLD is playing)
+and then the notes as they sound; when it goes, it is forgotten. (The TRS jack is MIDI in only: the FM-1 has no
+output on it. For 5-pin DIN out, go through a USB host MIDI box.)
+
+![MIDI out](img/manual/setup-midi.png)
+
+| Tab | Knob | Setting | What it does |
+| --- | --- | --- | --- |
+| **MIDI out** | K1 | **Notes** | **Keys + layers** (the default), **Keys**, or **Off** |
+| | K2 | **Tuning** | **Standard**: each note as its nearest equal-tempered pitch. **MPE (just)**: each note on its own channel with a pitch bend that puts it at its exact just pitch |
+| | K3 | **Drums** | **Kit** (the default: General MIDI notes), **Pitched** (each hit as the pitch of the note it lands on), or **Off** |
+| | K4 | **Knobs and clock** | **Knobs + clock** (the default), **Knobs**, **Clock**, or **Off** |
+| **MIDI out notes** | K1 | **Note floor** | −12 … −36 dB (default −18): how far under the layer's loudest note a note must rise to start |
+| | K2 | **Notes a second** | the most new notes a layer starts in any second: 6, 12, **24** (the default: 32nd notes at 180 BPM), 48, 96, or no cap |
+| | K3 | **Level** | **Off** (the default) or **On**: each note's level as it moves, as channel pressure (MPE) or polyphonic aftertouch (Standard), 20 times a second |
+| **MIDI out channels** | K1–K4 | **Layer 1, Layer 2, Keys, Drums** | Standard: 1, 2, 3 and 10 by default. In MPE the notes take channels 2–15 and the kit 16 |
+| **MIDI out drum notes** | K1–K4 | **Kick, Snare, Hat, Tom** | the kit's notes: 36, 38, 42 and 45 by default |
+
+**The layers' notes.** A layer's notes swell and fade without beginning or end, so MIDI out decides: a note starts
+when it rises above the **Note floor** under the layer's peak (its loudest note, held and let down over about a
+second and a half), with a velocity from its level (30 at the floor, 127 at the peak), and stops 12 dB under the
+floor (so it does not flicker at the edge). A note lasts 30 ms at least. **Notes a second** caps how many new notes
+a layer starts in any second; a note the cap holds back waits its turn, the loudest first, so fast motions come out
+thinned rather than as a flood. Stopped (PLAY), the layers send nothing; the keys still do.
+
+**MPE.** One zone: channel 1 is its master, channels 2–15 its 14 notes (shared by the layers, the keys and pitched
+drums). Each note's pitch bend, sent just before its note-on, is set for a bend range of ±48 semitones, MPE's
+standard (0.6 cents a step). MANIFOLD sends the MPE configuration message when a link arrives and when you choose MPE,
+and most MPE instruments set themselves up from it; on one that does not, set its pitch-bend range to 48. With 14
+notes sounding, a key, or a layer note louder than the quietest one, takes the quietest one's channel. The kit goes
+on channel 16, outside the zone.
+
+**The drums** go out when the hit sounds (timed to the audio within a millisecond), each as a 20 ms note.
+
+**The knobs** you turn go out as CC 21–24 (Timbre, Groove, Space, Motion: the numbers MANIFOLD takes in), on the MIDI
+channel (channel 1 at Omni, and in MPE), 30 times a second at most. A knob moved by a scene, a roll or incoming MIDI
+is not sent, so a DAW playing back what it recorded does not fight itself. Nothing MANIFOLD receives is sent back.
+
+**The clock:** 24 pulses a quarter note at MANIFOLD's tempo, Start when it starts (at the beginning of a bar) and
+Stop when it stops. Swing is not in the clock. Over Bluetooth a computer receives MIDI in steps of about 7.5 ms, so
+for tight sync use USB.
+
+**No stuck notes.** Every note sent is kept until its note-off; a link takes a note-on only while its queue has room
+for every note-off it may owe. Releasing a latched key (a second press, or Latch off) sends its note-off, and
+**Panic** lets every note go and sends All Notes Off on each channel used. A roll, a patch load or a change of these
+settings lets the notes go first.
 
 ---
 
@@ -819,6 +910,12 @@ The FM-1 sends SBC at 44.1 kHz, joint stereo. It works both with devices that wa
 stream and with those that set it up themselves after pairing (most speakers do; 1.0 refused those). If a device
 will not connect, put it back in pairing mode, connect again, then open the web installer's **Read the crash report**
 straight away: it lists each step of the Bluetooth set-up and whether the FM-1 or the device turned it down.
+
+**A device that once paired with the FM-1** may keep that pairing when the FM-1 no longer has it (a set-up that
+failed half way, or the device forgotten on the FM-1). Such a device can stop part way through pairing again; since
+1.0.6 the FM-1 gives up after 8 s and the crash report says so. Remove the FM-1 from the device's paired devices (for
+headphones and speakers, usually a reset of their pairings), then connect again. Since 1.0.6 the FM-1 also asks each
+of a device's audio inputs in turn for SBC, so a device that offers AAC or its own codec first is no longer refused.
 
 ---
 
@@ -898,7 +995,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.5 # -> build/manifold-1.0.5.fwsc
+python3 tools/build.py ../Manifold --release 1.0.6 # -> build/manifold-1.0.6.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key

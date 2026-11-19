@@ -91,9 +91,9 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(D##_SETTLE,"settle",SEC_DRUMS,CURVE_LIN,1,0, 0,1, se,.3f,.9f,0), \
  M(D##_SNAP,"snap",SEC_DRUMS,CURVE_LIN,1,0, 0,1, sn,0,.8f,0)
  DRUM_P(P_D1,0.55f,0,0,0.135f,0.1f,0.621f,0.2f,1,0.3f,0.5f,0.4f),
- DRUM_P(P_D2,0.5f,0.42f,0.6f,0,0.04f,0.46f,0.1f,0.55f,0.6f,0.7f,0.7f),
- DRUM_P(P_D3,0.6f,0.8f,1,0,0,0.25f,0.3f,0.4f,0.7f,0.85f,0.3f),
- DRUM_P(P_D4,0.45f,0.6f,0.3f,0.135f,0.08f,0.571f,0.2f,0.75f,0.4f,0.5f,0.4f),
+ DRUM_P(P_D2,0.5f,0.42f,0.6f,0,0.04f,0.46f,0.1f,0.4f,0.6f,0.7f,0.7f),
+ DRUM_P(P_D3,0.6f,0.8f,1,0,0,0.25f,0.3f,0.22f,0.7f,0.85f,0.3f),
+ DRUM_P(P_D4,0.45f,0.6f,0.3f,0.135f,0.08f,0.571f,0.2f,0.5f,0.4f,0.5f,0.4f),
 
 #define LFO_P(n,R,S,Y) \
  M(R,"lfo" #n " rate",SEC_LFO,CURVE_LOG,1,0, .01f,12, .4f,.1f,.75f,1), \
@@ -159,6 +159,8 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
     tick by tick, and work the mask out each time) */
  M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,1, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,1, 0,1, .5f,0,1,0),
  M(P_G1_BAL,"balance",SEC_GEN1,CURVE_LIN,1,0, -1,1, .5f,0,1,0), M(P_G2_BAL,"balance",SEC_GEN2,CURVE_LIN,1,0, -1,1, .5f,0,1,0),
+ M(P_DRY,"dry",SEC_FX,CURVE_DISC,0,0, 0,2, 0,0,0,0),
+ M(P_DR_NOTES,"drum notes",SEC_DRUMS,CURVE_LIN,1,0, 0,1, 0,0,0,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -206,9 +208,18 @@ static int mod_loop(int src, int dst) {
     int g2 = (dst >= P_G2_FUNC && dst <= P_G2_ROUTE) || dst == P_G2_BAL;
     return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
 }
+static uint8_t g_roll_dry;                    /* the roll makes a Dry patch (1.0.6): no route to the effects */
+static uint8_t g_dry_set;                     /* (1.0.6) this roll decided Dry (and so sets the effects to nothing) */
+static uint8_t g_fx_wake;                     /* (1.0.6) a sound roll from a Dry patch to a wet one: its effects rolled too */
+static uint8_t g_lock_fx;       /* the player's own locks on the effects and the knobs (not the roll's
+                                                 mask: a sound roll leaves the effects alone, yet decides Dry) */
+static int fx_off(int id) {                   /* an effect a Dry patch has not got (the compressor it has) */
+    return g_param_meta[id].section == SEC_FX && !(id >= P_CMP_THRESH && id <= P_CMP_PUMP);
+}
 static int rand_moddable(uint32_t *r) {
     for (;;) {
         int id = (int)(frand(r) * NUM_PARAMS) % NUM_PARAMS;
+        if (g_roll_dry && fx_off(id)) continue;
         if (g_param_meta[id].moddable && id != P_MASTER && id != P_V1_LEVEL && id != P_V2_LEVEL
             && !(id >= P_D1_PAT && id <= P_D4_LEN)) return id;   /* (a pattern moves only where a style puts it) */
     }
@@ -261,8 +272,10 @@ void params_roll_knobs_part(Synth *s, int i0, int i1) {    /* (the knobs' paths 
            band and tilt, the voices' Depth and the notes' Balance (the low end: Timbre), the rhythm's density and swing, the motions' rates */
         int must = i == P_FLT_CUT || i == P_FLT_RES || i == P_RV_SEND || i == P_RV_DECAY || i == P_RV_SIZE || i == P_RV_DAMP || i == P_DL_SEND || i == P_DL_FB
                 || i == P_V1_TONE || i == P_V2_TONE || i == P_V1_CENTER || i == P_V1_BAND || i == P_V1_TILT || i == P_V2_CENTER || i == P_RH_DENS || i == P_RH_SWING || i == P_G1_RATE || i == P_G1_REACH
-                || i == P_V1_DEPTH || i == P_V2_DEPTH || i == P_G1_BAL || i == P_G2_BAL;
-        if (knob_of(i) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
+                || i == P_V1_DEPTH || i == P_V2_DEPTH || i == P_G1_BAL || i == P_G2_BAL
+                || i == P_G1_CONTOUR || i == P_G2_CONTOUR || i == P_V1_WIDTH || i == P_V2_WIDTH || i == P_CMP_PUMP
+                || i == P_DR_NOTES;   /* (1.0.6: Shape's and Pump, on a Dry patch) */
+        if (knob_of_dry(i, s->target[P_DRY] > .5f) < 0 || (frand(r) > .8f && !must) || (i >= P_D1_PAT && i <= P_D4_LEN)) continue;   /* (patterns: roll_patterns') */
         const ParamMeta *m = &g_param_meta[i];
         float span = m->rhi - m->rlo + .15f; if (span < .45f) span = .45f; if (span > 1.f) span = 1.f;
         float dir = frand(r) < .5f ? -1.f : 1.f;              /* the two ends go opposite ways, mostly: a turn is a journey */
@@ -654,9 +667,10 @@ static void apply_style(Synth *s) {
                                        {.45f, .65f, .45f, .65f, .45f, .75f, .35f, .65f},/* machine */
                                        {.5f, .62f, .5f, .62f, .5f, .75f, .3f, .45f}};  /* breaks */
         static const float PL[4][2] = {{0.f, .1f}, {.36f, .48f}, {.74f, .88f}, {.5f, .68f}};
-        static const float DC[4][2] = {{.28f, .6f}, {.12f, .3f}, {.04f, .14f}, {.22f, .5f}};   /* seconds to -35 dB, before the kit's own scale */
+        static const float DC[4][2] = {{.28f, .6f}, {.08f, .18f}, {.02f, .05f}, {.22f, .5f}};   /* seconds to -35 dB, before the kit's own scale (1.0.6: the snare
+                                                                                                 shorter, the hat a closed hat's) */
         static const float VO[4][2] = {{0.f, .1f}, {.45f, .75f}, {.85f, 1.f}, {.15f, .45f}};  /* the note each rides: kick lowest, hat highest */
-        static const float LV[4] = {1.f, .55f, .4f, .75f};
+        static const float LV[4] = {1.f, .4f, .22f, .5f};      /* (1.0.6: kick 0, snare -8, hat -13, tom -6 dB) */
         float pfol = MA ? .35f : C ? .25f : A ? .25f : .08f;
         for (int d = 0; d < NUM_DRUMS; d++) {
             TR(s, DP(d, P_D1_DENS), DN[row][2 * d], DN[row][2 * d + 1]);
@@ -668,6 +682,7 @@ static void apply_style(Synth *s) {
             TR(s, DP(d, P_D1_ATTACK), .001f, d == 2 ? .002f : K[3] > .5f ? .003f : .006f);   /* (1 ms up; softer for the darker kits) */
             TR(s, DP(d, P_D1_HOLD), 0.f, d == 2 ? .002f : .012f);
             float dl = DC[d][0] * K[0] * (A ? 1.6f : 1.f), dh = DC[d][1] * K[0] * (A ? 1.25f : 1.f);
+            if (d == 2) { if (dh > .06f) dh = .06f; if (dl > dh) dl = dh; }   /* (the hat closed: at most 60 ms) */
             TR(s, DP(d, P_D1_DECAY), dl < .02f ? .02f : dl, dh > 3.f ? 3.f : dh);
             TR(s, DP(d, P_D1_CURVE), K[1], K[2]);
             float lv = LV[d] * fexp2((frand(r) - .5f) * 1.f);   /* within +-3 dB of the mix */
@@ -677,16 +692,17 @@ static void apply_style(Synth *s) {
                the tom half the time, dark instead: a fall from the undertones, the drop a pitch sweep would give */
             if (d == 0 ? frand(r) < .7f : d == 3 ? frand(r) < .5f : 0) TR(s, DP(d, P_D1_BRIGHT), d == 0 ? -.7f : -.6f, -.15f);
             else TR(s, DP(d, P_D1_BRIGHT), fclamp(.65f * K[3] + hb, 0.f, 1.f), fclamp(.65f * K[4] + hb, 0.f, 1.f));
-            TR(s, DP(d, P_D1_SETTLE), fclamp(K[5] + hb, 0.f, 1.f), fclamp(K[6] + hb, 0.f, 1.f));
+            {   float sb = d == 2 ? .35f : hb;              /* (the hat's colour settles quickly: its sizzle goes with it) */
+                TR(s, DP(d, P_D1_SETTLE), fclamp(K[5] + sb, 0.f, 1.f), fclamp(K[6] + sb, 0.f, 1.f)); }
             TR(s, DP(d, P_D1_SNAP), K[7], K[8]);
         }
         /* the genres' drum sounds: hip-hop a long, deep kick and short hats; house a punchy kick, a clap, a fourth part
            high and open (an open hat, a shaker); breakbeat a tight kick, a bright snare */
         if (HH) { TR(s, P_D1_DECAY, .6f, 1.4f); TR(s, P_D1_CURVE, 0.f, .15f); TR(s, P_D1_VOICE, 0.f, .05f);
-                  TR(s, P_D3_DECAY, .025f, .06f); TR(s, P_D3_HOLD, 0.f, 0.f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); }
-        if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .12f, .25f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .25f, .55f);
+                  TR(s, P_D3_DECAY, .02f, .045f); TR(s, P_D3_HOLD, 0.f, 0.f); TR(s, P_D2_DECAY, .1f, .2f); TR(s, P_D2_SNAP, .5f, .8f); }
+        if (HO) { TR(s, P_D1_DECAY, .25f, .5f); TR(s, P_D2_DECAY, .1f, .2f); TR(s, P_D2_SNAP, .5f, .8f); TR(s, P_D2_BRIGHT, .25f, .55f);
                   TR(s, P_D3_DECAY, .025f, .07f); TR(s, P_D4_VOICE, .8f, 1.f); TR(s, P_D4_DECAY, .12f, .35f); if (frand(r) < .5f) TR(s, P_D4_BRIGHT, .3f, .6f); else TR(s, P_D4_BRIGHT, -.6f, -.2f); TR(s, P_D4_SNAP, .2f, .6f); }
-        if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .3f); TR(s, P_D2_BRIGHT, .25f, .55f); TR(s, P_D3_DECAY, .03f, .1f); }
+        if (BR) { TR(s, P_D1_DECAY, .25f, .6f); TR(s, P_D2_DECAY, .1f, .2f); TR(s, P_D2_BRIGHT, .25f, .55f); TR(s, P_D3_DECAY, .02f, .05f); }
         /* each hit's colour on its note (1.0.5): Pluck, so the note it rides sounds struck (most on the snare and tom);
            Odd/even, a push toward hollow or even that settles with the hit (most on the hat and snare). Ambient: none */
         {
@@ -711,7 +727,7 @@ static void apply_style(Synth *s) {
         }
         TR(s, P_LFO_COUPLE, 0.f, .3f);
     }
-    if (!s->locked[SEC_FX]) {
+    if (!s->locked[SEC_FX] || g_fx_wake) {
         /* fuzz: Groove, Machine and Breaks often, Cosmic sometimes, a touch in Tongue, rarely Ambient */
         float pfz = (MA || BR) ? .4f : G ? .3f : C ? .2f : T ? .08f : .04f;
         if (frand(r) < pfz) { TR(s, P_FZ_MIX, .1f, (G || MA || BR) ? .5f : .25f); TR(s, P_FZ_SUSTAIN, .1f, .7f); TR(s, P_FZ_TONE, .25f, .7f); }
@@ -805,6 +821,107 @@ void params_roll(Synth *s, uint32_t seed) {
 /* the roll in parts, each a fraction of a block's work, so a roll run from the audio's interrupt (synth_roll_step) is
    spread over a few blocks: 0 the parameters, the effects' pairs, the matrix's random routes; 1, 2 the knobs' paths
    (each half); 3 the style, its matrix, Wild's patterns */
+/* (1.0.6) after the style: the levels' paths, and a Dry patch's kit, routes and Shape */
+static void level_paths(Synth *s) {          /* the drums' levels on Groove (+-4 dB), the layers' on Motion (+-3 dB, the two
+                                                opposite: a turn shifts which layer leads); always on their knobs */
+    uint32_t *r = &s->rng;
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int id = DP(d, P_D1_LEVEL); int8_t *w = s->kpath[id]; float v = s->target[id];
+        float dir = frand(r) < .5f ? -1.f : 1.f;
+        for (int side = 0; side < 2; side++) {
+            float db = (2.f + 2.f * frand(r)) * (side ? dir : -dir), nd = db * (.3f + .7f * frand(r));
+            w[side ? 3 : 0] = (int8_t)(fclamp(v * (fexp2(db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            w[side ? 2 : 1] = (int8_t)(fclamp(v * (fexp2(nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+        }
+    }
+    {   float v1 = s->target[P_V1_LEVEL], v2 = s->target[P_V2_LEVEL], dir = frand(r) < .5f ? -1.f : 1.f;
+        for (int side = 0; side < 2; side++) {
+            float db = (1.5f + 1.5f * frand(r)) * (side ? dir : -dir), nd = db * (.3f + .7f * frand(r));
+            s->kpath[P_V1_LEVEL][side ? 3 : 0] = (int8_t)(fclamp(v1 * (fexp2(db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V1_LEVEL][side ? 2 : 1] = (int8_t)(fclamp(v1 * (fexp2(nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V2_LEVEL][side ? 3 : 0] = (int8_t)(fclamp(v2 * (fexp2(-db * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+            s->kpath[P_V2_LEVEL][side ? 2 : 1] = (int8_t)(fclamp(v2 * (fexp2(-nd * .1661f) - 1.f), -1.f, 1.f) * 127.f);
+        }
+    }
+}
+/* a Dry patch's drums as a kit: the kick (1) and the tom (4) long, the snare (2) and the hat (3) short and snappy */
+static void dry_kit(Synth *s) {
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int lg = d == 0 || d == 3;
+        if (lg) { TR(s, DP(d, P_D1_DECAY), d ? .3f : .45f, d ? .9f : 1.5f); TR(s, DP(d, P_D1_HOLD), .005f, .02f); }
+        else if (d == 1) { TR(s, DP(d, P_D1_DECAY), .07f, .18f); TR(s, DP(d, P_D1_HOLD), 0.f, .004f); TR(s, DP(d, P_D1_SNAP), .5f, .85f); }
+        else { TR(s, DP(d, P_D1_DECAY), .02f, .055f); TR(s, DP(d, P_D1_HOLD), 0.f, .002f); TR(s, DP(d, P_D1_SNAP), .4f, .8f); }
+    }
+}
+/* Shape's paths for the drums' envelopes: one way (rolled) the kick and the tom bloom, long and open, while the snare
+   and the hat stay tight (tighter, snappier); the other way all of it pulls in close. Within that, rolled */
+static void dry_shape_paths(Synth *s) {
+    uint32_t *r = &s->rng;
+    float bd = frand(r) < .5f ? -1.f : 1.f;    /* the side of the knob that blooms */
+    for (int d = 0; d < NUM_DRUMS; d++) {
+        int lg = d == 0 || d == 3;
+        static const uint8_t P[6] = {P_D1_DECAY, P_D1_HOLD, P_D1_ATTACK, P_D1_SNAP, P_D1_SETTLE, P_D1_CURVE};
+        for (int k = 0; k < 6; k++) {
+            int id = DP(d, P[k]); int8_t *w = s->kpath[id];
+            for (int side = 0; side < 2; side++) {
+                int bloom = (side ? 1.f : -1.f) == bd;
+                float lo, hi;
+                switch (k) {
+                /* (1.0.6: far wider than first built, where a turn did little: the kick's decay from a click to
+                   seconds; and Shape's offsets are doubled on a Dry patch, mod.c) */
+                case 0: if (lg) { lo = bloom ? .35f : -.2f; hi = bloom ? .6f : -.12f; }      /* decay (the pull: a tight thump, never a click) */
+                        else    { lo = bloom ? -.06f : -.3f; hi = bloom ? .06f : -.15f; } break;
+                case 1: if (lg) { lo = bloom ? .4f : -.3f;  hi = bloom ? .8f : -.1f; }      /* hold */
+                        else    { lo = -.1f; hi = 0.f; } break;
+                case 2: if (lg) { lo = bloom ? .1f : -.2f; hi = bloom ? .35f : 0.f; }       /* attack */
+                        else    { lo = -.15f; hi = 0.f; } break;
+                case 3: if (lg) { lo = bloom ? -.4f : 0.f;  hi = bloom ? -.15f : .3f; }     /* snap */
+                        else    { lo = bloom ? .2f : 0.f;  hi = bloom ? .5f : .3f; } break;
+                default: lo = -.35f; hi = .35f; break;                                       /* settle, curve */
+                }
+                float far = lo + (hi - lo) * frand(r), near = far * (.4f + .6f * frand(r));
+                w[side ? 3 : 0] = (int8_t)(fclamp(far, -1.f, 1.f) * 127.f);
+                w[side ? 2 : 1] = (int8_t)(fclamp(near, -1.f, 1.f) * 127.f);
+            }
+        }
+    }
+}
+static void roll_finish(Synth *s) {
+    uint32_t *r = &s->rng;
+    int dry = s->target[P_DRY] > .5f;
+    if (!s->locked[SEC_DRUMS]) {               /* the drums' notes: Fixed (a kit) most often in the genres, seldom in
+                                                  the drifting styles */
+        /* Fixed / blended (0.3 .. 0.8) / Follow, by style */
+        static const float FB[NUM_STYLES][2] = {      /* (the share Fixed, the share blended) */
+            [STYLE_WILD] = {.15f, .35f}, [STYLE_HIPHOP] = {.3f, .45f}, [STYLE_GROOVE] = {.15f, .45f},
+            [STYLE_AMBIENT] = {.05f, .25f}, [STYLE_COSMIC] = {.05f, .3f}, [STYLE_HOUSE] = {.3f, .45f},
+            [STYLE_MACHINE] = {.3f, .45f}, [STYLE_BREAKS] = {.25f, .45f}};
+        int st = s->style % NUM_STYLES; float u = frand(r);
+        s->target[P_DR_NOTES] = u < FB[st][0] ? 1.f : u < FB[st][0] + FB[st][1] ? .3f + .5f * frand(r) : 0.f;
+    }
+    if (g_dry_set) {                           /* (1.0.6) Dry: the effects set to do nothing, so not run (fx.c); their
+                                                  other settings rolled as ever, for when they are turned up */
+        float *t = s->target;
+        t[P_FZ_MIX] = t[P_DL_SEND] = t[P_RV_SEND] = 0.f; t[P_RV_FREEZE] = disc(P_RV_FREEZE, 0);
+        t[P_FLT_CUT] = 1.f; t[P_FLT_RES] = t[P_FLT_MORPH] = 0.f;
+    }
+    if (dry && !s->locked[SEC_DRUMS]) dry_kit(s);
+    if (dry && !s->locked[SEC_LFO])            /* (the style's routes to the effects: elsewhere) */
+        for (int k = 0; k < MOD_SLOTS; k++) {
+            ModSlot *m = &s->slot[k];
+            if (m->src && m->dst < NUM_PARAMS && fx_off(m->dst)) {
+                g_roll_dry = 1;
+                m->dst = (uint8_t)rand_moddable(r);
+                if (mod_loop(m->src, m->dst)) m->src = 0;
+            }
+        }
+    if (!s->locked[SEC_KNOBS]) {               /* (a sound roll keeps the knobs' paths: a Dry patch it makes keeps
+                                                  them too, and its Shape rides them; a roll of the knobs gives it the kit's) */
+        level_paths(s);
+        if (dry) dry_shape_paths(s);
+    }
+}
+
 void params_roll_part(Synth *s, int part, uint32_t seed) {
     if (part == 1 || part == 2) {
         if (!s->locked[SEC_KNOBS]) params_roll_knobs_part(s, part == 1 ? 0 : NUM_PARAMS / 2, part == 1 ? NUM_PARAMS / 2 : NUM_PARAMS);
@@ -819,9 +936,11 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
             static const uint8_t GG[3] = {PG_HOUSE, PG_BREAKS, PG_HIPHOP};
             roll_patterns(s, GG[(int)(frand(r) * 3.f) % 3], 0, 1);
         }
+        roll_finish(s);
         return;
     }
     s->rng = seed * 2654435761u + 1u;
+    int was_dry = s->target[P_DRY] > .5f;
     for (int i = 0; i < NUM_PARAMS; i++) {
         const ParamMeta *m = &g_param_meta[i];
         if (s->locked[m->section] || i == P_TEMPER) continue;   /* (locked: left as it is; Temper is the player's: never rolled) */
@@ -829,7 +948,22 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         if (m->rlo == 0 && m->rhi == 0) s->target[i] = m->curve == CURVE_DISC ? disc(i, 0) : 0;
     }
     float *t = s->target;
-    if (!s->locked[SEC_FX]) {
+    /* (1.0.6) a quarter of the rolls Dry, in every style: any roll of the sound (a tap of REC too), unless the effects
+       are locked. A Dry roll sets the effects to do nothing (roll_finish: they stay usable, turned up); a tap from a
+       Dry patch to a wet one rolls them too, as they were off */
+    g_dry_set = 0;
+    if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS])) {
+        t[P_DRY] = disc(P_DRY, frand(r) < .25f);
+        g_dry_set = (uint8_t)(t[P_DRY] > .5f);
+    }
+    g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
+    g_fx_wake = (uint8_t)(!g_lock_fx && s->locked[SEC_FX] && was_dry && !g_roll_dry);
+    if (g_fx_wake) for (int i = P_FZ_SUSTAIN; i <= P_DL_TO_RV; i++) {
+        const ParamMeta *m = &g_param_meta[i];
+        t[i] = (m->rlo == m->rhi && m->curve != CURVE_DISC) ? m->rlo : roll_one(m, r);
+        if (m->rlo == 0 && m->rhi == 0) t[i] = m->curve == CURVE_DISC ? disc(i, 0) : 0;
+    }
+    if (!s->locked[SEC_FX] || g_fx_wake) {
         /* filter type and cutoff are rolled together so the voice never vanishes */
         float u = frand(r);
         if (u < .75f) { t[P_FLT_MORPH] = .08f * frand(r); }
@@ -851,6 +985,7 @@ static void roll_commit(Synth *s, uint32_t seed, float morph_seconds);
 void synth_roll_sections(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
     uint8_t keep[NUM_SECTIONS];
     memcpy(keep, s->locked, sizeof keep);
+    g_lock_fx = s->locked[SEC_FX];
     for (int i = 0; i < NUM_SECTIONS; i++) if (!(mask >> i & 1u)) s->locked[i] = 1;
     s->seed = seed;
     params_roll(s, seed);
@@ -877,6 +1012,7 @@ static void roll_swap(Synth *s) {               /* (the live matrix, paths and m
 void synth_roll_begin(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
     if (g_roll.part) { memcpy(s->locked, g_roll.keep, sizeof g_roll.keep); }   /* (a roll before the last finished: dropped) */
     memcpy(g_roll.keep, s->locked, sizeof g_roll.keep);
+    g_lock_fx = s->locked[SEC_FX];
     for (int i = 0; i < NUM_SECTIONS; i++) g_roll.mask_locked[i] = (mask >> i & 1u) ? s->locked[i] : 1;
     memcpy(g_rslot, s->slot, sizeof g_rslot); memcpy(g_rkp, s->kpath, sizeof g_rkp); memcpy(g_rmac, s->macro, sizeof g_rmac);
     g_roll.seed = seed; g_roll.morph = morph_seconds; g_roll.part = 1;

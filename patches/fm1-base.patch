@@ -1,8 +1,20 @@
 diff --git a/bt/br/bt_acl.c b/bt/br/bt_acl.c
-index fbfa06c..387a6b5 100644
+index fbfa06c..2115799 100644
 --- a/bt/br/bt_acl.c
 +++ b/bt/br/bt_acl.c
-@@ -44,6 +44,11 @@ static struct {
+@@ -32,9 +32,11 @@ static struct {
+     uint32_t rxn, rxneed;                          /* bytes of the frame so far, its whole length */
+     struct ba_ch ch[BA_NCH];
+     uint8_t stage, id, label, cont[17], contn, acp, conf[4];
++    uint8_t sinks[8], nsink, sink_i;               /* the device's free audio sinks (DISCOVER), the one asked now */
+     uint32_t t0;                                   /* fm1_ms: the set-up's start (BA_SETUP_MS: given up) */
+     uint32_t sdps_ms;                              /* fm1_ms: the device's last SDP request to us */
+     uint32_t auth_ms;                              /* fm1_ms: our authentication done, the device's awaited (BA_AUTH_WAIT_MS) */
++    uint32_t dh_ms;                                /* fm1_ms: the device's pairing at its last check (BA_DHCHECK_MS) */
+     uint8_t avc_label;                             /* our AVCTP transaction label (4 bits) */
+     uint8_t fresh;                                 /* this link paired afresh: our search, then let go and connect again
+                                                     * with the key (dedicated bonding, as BlueZ) */
+@@ -44,6 +46,11 @@ static struct {
      uint8_t paused;                                /* the stream suspended: the FM-1's own output plays (SHIFT + the
                                                      * volume knob, bt_audio.c bta_output) */
      uint16_t tid, avdtp_psm;
@@ -14,10 +26,12 @@ index fbfa06c..387a6b5 100644
      uint8_t sdp[BA_SDPMAX];
      uint32_t sdpn;
  } ba BA_ATTR;
-@@ -66,6 +71,11 @@ static void ba_reset(void)
+@@ -66,6 +73,13 @@ static void ba_reset(void)
      ba.fresh = 0;
      ba.rejoin = 0;
      ba.auth_ms = 0;
++    ba.dh_ms = 0;
++    ba.nsink = ba.sink_i = 0;
 +    ba.dev_cmd = 0;
 +    ba.streamed = 0;
 +    ba.sbc_new = 0;
@@ -26,7 +40,7 @@ index fbfa06c..387a6b5 100644
      for (i = 0; i < BA_NCH; i++)
          ba.ch[i].state = 0;
  }
-@@ -140,7 +150,8 @@ static void ba_sdp_report(void)
+@@ -140,7 +154,8 @@ static void ba_sdp_report(void)
      con_puts(ok ? " bytes, well formed" : " bytes, NOT well formed");
      bti_kv(", records ", in.records);
      con_puts("\r\n");
@@ -36,7 +50,7 @@ index fbfa06c..387a6b5 100644
      if (ok && in.records) {
          con_puts("btpage: SDP A2DP sink: class 0x110B ");
          con_puts(in.has_class ? "yes" : "no");
-@@ -162,7 +173,8 @@ static void ba_sdp_report(void)
+@@ -162,7 +177,8 @@ static void ba_sdp_report(void)
          if (in.has_class && in.proto_uuid == 0x0019u && in.psm)
              ba.avdtp_psm = in.psm;
      }
@@ -46,7 +60,7 @@ index fbfa06c..387a6b5 100644
      {                                              /* our search over: the channel closed, as BlueZ does. The AirPods
                                                      * opened theirs to us 1.8 s after a Raspberry Pi closed its own
                                                      * (2026-10-20); the response comes for no channel of ours */
-@@ -209,15 +221,50 @@ static void ba_av_cmd(uint32_t sig, const uint8_t *par, uint32_t n)
+@@ -209,15 +225,50 @@ static void ba_av_cmd(uint32_t sig, const uint8_t *par, uint32_t n)
      ba_line("AVDTP command (signal, label)", sig, ba.label);
  }
  
@@ -105,7 +119,7 @@ index fbfa06c..387a6b5 100644
  }
  
  static void ba_av_in(const uint8_t *p, uint32_t n)
-@@ -229,15 +276,21 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
+@@ -229,18 +280,27 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
          return;
      }
      if (msg == BV_CMD) {
@@ -129,9 +143,38 @@ index fbfa06c..387a6b5 100644
 +        return;                                    /* (ours crossed its own: its configuration stands) */
 +    }
      if (sig == BV_DISCOVER) {
-         ba.acp = (uint8_t)bv_pick_sink(p, n);
-         ba_line("AVDTP DISCOVER accepted (endpoints, the free audio sink's SEID)", (n - 2u) / 2u, ba.acp);
-@@ -259,17 +312,19 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
+-        ba.acp = (uint8_t)bv_pick_sink(p, n);
+-        ba_line("AVDTP DISCOVER accepted (endpoints, the free audio sink's SEID)", (n - 2u) / 2u, ba.acp);
++        ba.nsink = (uint8_t)bv_sinks(p, n, ba.sinks, sizeof ba.sinks);
++        ba.sink_i = 0;
++        ba.acp = ba.nsink ? ba.sinks[0] : 0;
++        ba_line("AVDTP DISCOVER accepted (endpoints, free audio sinks)", (n - 2u) / 2u, ba.nsink);
++        ba_line("AVDTP asking the audio sink (SEID, 0)", ba.acp, 0);
+         if (!ba.acp)
+             return;
+         par[0] = (uint8_t)(ba.acp << 2);
+@@ -248,7 +308,19 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
+         ba.stage = BA_AV_CAPS;
+     } else if (sig == BV_GET_CAPS) {
+         if (!bv_caps_sbc(p, n, cap) || !bv_sbc_choose(cap, ba.conf)) {
+-            ba_line("AVDTP GET_CAPABILITIES: no SBC we can use (bytes, 0)", n, 0);
++            int codec = bv_caps_codec(p, n);
++            ba_line("AVDTP GET_CAPABILITIES: no SBC we can use (SEID, codec: 0 SBC, 2 AAC, 255 vendor)", ba.acp,
++                    codec < 0 ? 0xFFFFu : (uint32_t)codec);
++            if (codec == 0)                        /* (SBC, but none of its settings ours: what it offered) */
++                ba_line("... its SBC (freq|mode block|sub|alloc, bitpool min|max)", cap[0] << 8 | cap[1],
++                        cap[2] << 8 | cap[3]);
++            if (++ba.sink_i < ba.nsink) {          /* the next sink: SBC may be there (MANIFOLD 1.0.6) */
++                ba.acp = ba.sinks[ba.sink_i];
++                ba_line("AVDTP asking the next audio sink (SEID, 0)", ba.acp, 0);
++                par[0] = (uint8_t)(ba.acp << 2);
++                ba_av_cmd(BV_GET_CAPS, par, 1);
++                return;
++            }
+             ba.stage = BA_FAILED;
+             return;
+         }
+@@ -259,17 +331,19 @@ static void ba_av_in(const uint8_t *p, uint32_t n)
                  ba.conf[0] << 8 | ba.conf[1], ba.conf[2] << 8 | ba.conf[3]);
          ba.stage = BA_AV_CONF;
      } else if (sig == BV_SET_CONF) {
@@ -154,7 +197,7 @@ index fbfa06c..387a6b5 100644
      } else {
          ba_line("AVDTP accepted (signal, label)", sig, label);
      }
-@@ -288,8 +343,11 @@ static void ba_chan_open(uint32_t c)               /* both configurations done *
+@@ -288,8 +362,11 @@ static void ba_chan_open(uint32_t c)               /* both configurations done *
          ba.stage = BA_SDP;
          ba_sdp_ask();
      } else if (c == BA_CH_SIG) {
@@ -167,7 +210,7 @@ index fbfa06c..387a6b5 100644
      } else {
          uint8_t par[1];
          con_puts("btpage: AVDTP media channel open: sending START\r\n");
-@@ -379,10 +437,12 @@ int bt_audio_feed(const int32_t *q15_pcm, uint32_t n)   /* 1: it streams (audio.
+@@ -379,10 +456,12 @@ int bt_audio_feed(const int32_t *q15_pcm, uint32_t n)   /* 1: it streams (audio.
          ba_qavg = (bp_mq.w - bp_mq.r) << 8;        /* (the mean from the depth now) */
      ba_live = 1;
      ba_qavg += ((int32_t)((bp_mq.w - bp_mq.r) << 8) - (int32_t)ba_qavg) >> 9;
@@ -182,7 +225,7 @@ index fbfa06c..387a6b5 100644
      }
      for (i = 0; i < n; i++) {
          int32_t l = q15_pcm[2u * i];
-@@ -502,6 +562,13 @@ static void ba_sig_in(const uint8_t *p, uint32_t n)   /* one or more signalling
+@@ -502,6 +581,13 @@ static void ba_sig_in(const uint8_t *p, uint32_t n)   /* one or more signalling
              ba_accept(BA_CH_SDPS, id, d, f, "accepted, our SDP server");
          } else if (code == BL_CONN_REQ && len >= 4u && ba_le16(d) == BL_PSM_AVCTP && !ba.ch[BA_CH_AVC].state) {
              ba_accept(BA_CH_AVC, id, d, f, "accepted, AVRCP (its control channel: our volume goes there)");
@@ -196,16 +239,41 @@ index fbfa06c..387a6b5 100644
          } else if (code == BL_CONN_REQ && len >= 4u) {
              ba_line("L2CAP connection request from the device (PSM, its CID): refused", ba_le16(d), ba_le16(d + 2));
              ba_send(f, bl_conn_rsp(f, id, 0, ba_le16(d + 2), 2u));
-@@ -598,7 +665,7 @@ static void ba_poll(void)
+@@ -583,6 +669,10 @@ static void ba_in(const struct bti_rx *r)          /* an ACL fragment: LLID 2 st
+ #define BA_AUTH_WAIT_MS 1000u                      /* the device's authentication of us awaited this long before the
+                                                     * encryption (bt_ssp.c: the AirPods do one, not every device may) */
+ #define BA_SETUP_MS 20000u                         /* the link up to the stream started: else given up, said */
++#define BA_DHCHECK_MS 8000u                        /* the device's pairing stopped before its last check this long:
++                                                    * given up (MANIFOLD 1.0.6: devices holding an old pairing with the
++                                                    * FM-1 paired afresh to there and waited, for their user or for
++                                                    * nothing) */
+ /* the main loop: SDP once LMP is set up; then the pairing and the encryption, ours to start unless the device started
+  * them (the FM-1, 2026-10-20: the WH-1000XM4 answered the AVDTP channel "pending: authentication", then "security
+  * block"); then AVDTP */
+@@ -598,7 +688,21 @@ static void ba_poll(void)
              btp_i_encrypt(&bp_ssp);
          }
      }
 -    if (ba.stage < BA_AV_READY && ba.stage != BA_FAILED && fm1_ms - bp.conn_ms >= BA_SETUP_MS) {   /* (first, from the link
++    if (!bp_ssp.init && bp_ssp.st == BTP_DHCHECK && ba.stage < BA_AV_READY && ba.stage != BA_FAILED) {
++        if (!ba.dh_ms)
++            ba.dh_ms = fm1_ms | 1u;
++        else if (fm1_ms - ba.dh_ms >= BA_DHCHECK_MS) {
++            ba_line(bp_ssp.stale ? "the device remembers an old pairing with the FM-1 and stopped re-pairing: remove the"
++                                   " FM-1 from its paired devices (or reset it), then connect again (s, stale)"
++                                 : "the device stopped before the pairing's last check (s, stale)",
++                    BA_DHCHECK_MS / 1000u, bp_ssp.stale);
++            ba.stage = BA_FAILED;
++            ba.gave_up = 1;
++            bp_leave();
++            return;
++        }
++    }
 +    if (ba.stage < BA_AV_READY && ba.stage != BA_FAILED && !ba.streamed && fm1_ms - bp.conn_ms >= BA_SETUP_MS) {   /* (first, from the link
                                                      * up, whatever the step: a pairing that never ends returns below each
                                                      * pass. 2026-10-20: SETTING UP for minutes; the device a Mac, "L..O",
                                                      * whose user was asked to confirm the pairing) */
-@@ -659,14 +726,14 @@ static void ba_poll(void)
+@@ -659,14 +763,14 @@ static void ba_poll(void)
          ba.stage = BA_SDP;
          ba.t0 = fm1_ms;
          ba_open(BA_CH_SDP, BL_PSM_SDP);
@@ -223,10 +291,46 @@ index fbfa06c..387a6b5 100644
           * questions after our request, then answer it. Waiting for them instead, they hung up the idle link after
           * ~3 s (0x13, twice, 2026-10-20) */
 diff --git a/bt/br/bt_avdtp.c b/bt/br/bt_avdtp.c
-index 8ff9fef..2b4db61 100644
+index 8ff9fef..a723ef5 100644
 --- a/bt/br/bt_avdtp.c
 +++ b/bt/br/bt_avdtp.c
-@@ -78,3 +78,122 @@ uint32_t bv_setconf_par(uint8_t *out, uint32_t acp, uint32_t intseid, const uint
+@@ -33,6 +33,35 @@ uint32_t bv_pick_sink(const uint8_t *p, uint32_t n)
+     return 0;
+ }
+ 
++/* every free audio sink, in the device's order (MANIFOLD 1.0.6: a sink offering AAC or a vendor codec first, SBC on
++   another, refused the stream when only the first was asked) -> how many */
++uint32_t bv_sinks(const uint8_t *p, uint32_t n, uint8_t *out, uint32_t max)
++{
++    uint32_t at, k = 0;
++    for (at = 2; at + 1u < n && k < max; at += 2) {
++        uint32_t seid = p[at] >> 2, inuse = (p[at] >> 1) & 1u, media = p[at + 1] >> 4, tsep = (p[at + 1] >> 3) & 1u;
++        if (!inuse && media == 0 && tsep == 1u && seid)
++            out[k++] = (uint8_t)seid;
++    }
++    return k;
++}
++
++/* the codec an endpoint's capabilities name (its media codec category): its type (0 SBC, 1 MPEG-1,2, 2 AAC, 0xFF a
++   vendor's), -1 none */
++int bv_caps_codec(const uint8_t *p, uint32_t n)
++{
++    uint32_t at = 2;
++    while (at + 2u <= n) {
++        uint32_t cat = p[at], losc = p[at + 1];
++        if (at + 2u + losc > n)
++            return -1;
++        if (cat == 7u && losc >= 2u)
++            return p[at + 3];
++        at += 2u + losc;
++    }
++    return -1;
++}
++
+ int bv_caps_sbc(const uint8_t *p, uint32_t n, uint8_t sbc[4])
+ {
+     uint32_t at = 2, i;
+@@ -78,3 +107,122 @@ uint32_t bv_setconf_par(uint8_t *out, uint32_t acp, uint32_t intseid, const uint
          out[k++] = conf[i];
      return k;
  }
@@ -350,7 +454,7 @@ index 8ff9fef..2b4db61 100644
 +    }
 +}
 diff --git a/bt/br/bt_avdtp.h b/bt/br/bt_avdtp.h
-index 15b8c07..7ede90d 100644
+index 15b8c07..e280e3a 100644
 --- a/bt/br/bt_avdtp.h
 +++ b/bt/br/bt_avdtp.h
 @@ -6,7 +6,8 @@
@@ -363,7 +467,15 @@ index 15b8c07..7ede90d 100644
  enum { BV_CMD = 0, BV_ACCEPT = 2, BV_REJECT = 3 };
  
  /* a single-packet command: label 0-15, signal id, parameters -> its length in out */
-@@ -23,4 +24,23 @@ int bv_sbc_choose(const uint8_t cap[4], uint8_t conf[4]);
+@@ -17,10 +18,31 @@ int bv_hdr(const uint8_t *p, uint32_t n, uint32_t *label, uint32_t *msg, uint32_
+ uint32_t bv_pick_sink(const uint8_t *p, uint32_t n);
+ /* the SBC codec information (4 bytes) in a GET_CAPABILITIES answer -> 1 found */
+ int bv_caps_sbc(const uint8_t *p, uint32_t n, uint8_t sbc[4]);
++uint32_t bv_sinks(const uint8_t *p, uint32_t n, uint8_t *out, uint32_t max);   /* every free audio sink's SEID */
++int bv_caps_codec(const uint8_t *p, uint32_t n);                               /* the codec type named, -1 none */
+ /* our SBC configuration from the sink's capabilities: 44.1 kHz else 48, joint stereo else stereo, 16 blocks, 8
+  * subbands, loudness, bitpool min..min(max, 53) -> 1 when a choice exists */
+ int bv_sbc_choose(const uint8_t cap[4], uint8_t conf[4]);
  /* SET_CONFIGURATION's parameters (ACP SEID, INT SEID, media transport, SBC codec) -> their length */
  uint32_t bv_setconf_par(uint8_t *out, uint32_t acp, uint32_t intseid, const uint8_t conf[4]);
  
@@ -387,6 +499,36 @@ index 15b8c07..7ede90d 100644
 +uint32_t bv_acp(const uint8_t *p, uint32_t n, struct bv_sep *s, uint8_t *out, uint32_t *ev);
 +
  #endif
+diff --git a/bt/br/bt_ssp.c b/bt/br/bt_ssp.c
+index 66e41ee..020a9b3 100644
+--- a/bt/br/bt_ssp.c
++++ b/bt/br/bt_ssp.c
+@@ -32,6 +32,8 @@ struct btp {
+     uint8_t init;                                       /* 1: we started it (btp_start): A is us, B the device */
+     uint8_t bonded;                                     /* 1: the link key is a bond's, kept from an earlier pairing */
+     uint8_t dev_authed;                                 /* 1: the device authenticated us (its au_rand answered) */
++    uint8_t stale;                                      /* 1: the device asked for a key we do not have (it remembers an
++                                                         * old pairing with the FM-1; MANIFOLD 1.0.6) */
+     uint8_t own_addr[6], peer_addr[6];                  /* air order */
+     uint8_t priv[24], pub[48], peer_pub[48], dhkey[24]; /* spec order */
+     uint8_t na[16], nb[16];                             /* the initiator's and the responder's nonce, spec order */
+@@ -409,6 +411,16 @@ static int btp_in(struct btp *p, const uint8_t *pdu, uint32_t len)
+         p->st = BTP_PAIRED;
+         return 1;
+     case BTL_AU_RAND:                                   /* the device authenticates us: SRES = E1(LK, AU_RAND, our address) */
++        if ((p->st == BTP_IDLE || p->st == BTP_IOCAP) && !p->bonded && n >= 16u) {
++            /* (no key: it remembers a pairing we do not. "PIN or key missing", as the spec has it (Part C 4.2.1.1),
++               so it may pair afresh; it was "unknown PDU" before MANIFOLD 1.0.6) */
++            uint8_t a[2];
++            a[0] = (uint8_t)op, a[1] = BTL_ERR_PIN_OR_KEY_MISSING;
++            p->tid = (uint8_t)tid;
++            btp_put(p, BTL_NOT_ACCEPTED, a, 2);
++            p->stale = 1;
++            return 1;
++        }
+         if (p->st < BTP_PAIRED || p->st == BTP_FAILED || n < 16u)
+             return 0;
+         {
 diff --git a/device/app.ld b/device/app.ld
 index 06002a2..b3c1c5f 100644
 --- a/device/app.ld
@@ -549,10 +691,24 @@ index f3ff8eb..28235f4 100644
  /* lights: bright buttons and keys, and dim ones (a short pulse each scan frame; a bright bit wins); glow 0 the dim
   * ones off, 1 low, 2 high. Bit NB in buttons / dim_buttons is PLAY's second, green LED */
 diff --git a/tests/bt/bt_avdtp_test.c b/tests/bt/bt_avdtp_test.c
-index 025377d..22bba37 100644
+index 025377d..ebf8d05 100644
 --- a/tests/bt/bt_avdtp_test.c
 +++ b/tests/bt/bt_avdtp_test.c
-@@ -41,6 +41,58 @@ int main(void)
+@@ -29,6 +29,13 @@ int main(void)
+     check("a fragmented packet is not read", !bv_hdr((const uint8_t *)"\x14\x01", 2, &l, &m, &s));
+     check("DISCOVER answer: the free sink is SEID 3", bv_pick_sink(disc, 8) == 3);
+     check("... none when only a source", bv_pick_sink(disc, 4) == 0);
++    {
++        uint8_t s[8];
++        static const uint8_t d3[8] = {0x02, 0x01, 0x04, 0x08, 0x08, 0x08, 0x0C, 0x08};   /* sinks 1, 2, 3 */
++        static const uint8_t aac[16] = {0x02, 0x02, 1, 0, 7, 8, 0x00, 0x02, 0x80, 0x01, 0x8C, 0x83, 0x00, 0x00, 8, 0};
++        check("DISCOVER: every free sink, in order", bv_sinks(d3, 8, s, 8) == 3 && s[0] == 1 && s[2] == 3);
++        check("an AAC endpoint: codec 2, no SBC", bv_caps_codec(aac, 16) == 2 && !bv_caps_sbc(aac, 16, s));
++    }
+     check("GET_CAPABILITIES answer: SBC FF FF 02 35", bv_caps_sbc(caps, 14, sbc) && sbc[0] == 0xFF && sbc[3] == 53);
+     check("... no codec, no SBC", !bv_caps_sbc(caps, 6, sbc));
+     check("SBC choice: 44.1 kHz joint stereo, 16 blocks 8 subbands loudness, bitpool 2..53",
+@@ -41,6 +48,58 @@ int main(void)
      conf[0] = 0x21, conf[1] = 0x15, conf[2] = 2, conf[3] = 53;
      check("SET_CONFIGURATION parameters: ACP 3, INT 1, transport, SBC", bv_setconf_par(o, 3, 1, conf) == 12 &&
                                                                               !memcmp(o, setp, 12));
@@ -611,6 +767,39 @@ index 025377d..22bba37 100644
      printf(fails ? "bt_avdtp_test: %d FAILED\n" : "bt_avdtp_test: all ok\n", fails);
      return fails != 0;
  }
+diff --git a/tests/bt/bt_ssp_test.c b/tests/bt/bt_ssp_test.c
+index cd679ce..521807b 100644
+--- a/tests/bt/bt_ssp_test.c
++++ b/tests/bt/bt_ssp_test.c
+@@ -344,8 +344,28 @@ static void run_bonded(int wrong_key)
+     }
+ }
+ 
++/* a device that remembers an old pairing asks us to authenticate before any pairing: "PIN or key missing" back (it
++   may pair afresh), the pairing still to come (MANIFOLD 1.0.6) */
++static void run_stale(void)
++{
++    const uint8_t own[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}, peer[6] = {0x93, 0x2a, 0xde, 0xdd, 0x3a, 0xd8};
++    uint8_t au[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, iocap_a[3] = {3, 0, 4};
++    uint32_t len;
++    const uint8_t *p;
++    nout = rd = 0;
++    btp_begin(&fm, own, peer, rng, sink, 0);
++    dev_pdu(BTL_AU_RAND, au, 16);
++    p = next(BTL_NOT_ACCEPTED, &len);
++    check("an old pairing's au_rand, no key: not accepted, PIN or key missing", p && p[0] == BTL_AU_RAND &&
++          p[1] == BTL_ERR_PIN_OR_KEY_MISSING && fm.stale && fm.st == BTP_IDLE);
++    dev_pdu(BTL_ESCAPE << 8 | BTL_X_IO_CAPABILITY_REQ, iocap_a, 3);
++    p = next(BTL_ESCAPE << 8 | BTL_X_IO_CAPABILITY_RES, &len);
++    check("... then its fresh pairing goes ahead", p && fm.st == BTP_PK_RX);
++}
++
+ int main(void)
+ {
++    run_stale();
+     run(0);
+     run(1);
+     run_initiator(0);
 diff --git a/tests/run_tests.sh b/tests/run_tests.sh
 index 64797f3..941696f 100755
 --- a/tests/run_tests.sh

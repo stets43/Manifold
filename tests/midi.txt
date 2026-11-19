@@ -1,0 +1,68 @@
+# MIDI out (1.0.6) in the host simulator: build/host/manifold_host tests/midi.txt <dir>
+# (the simulator's USB is always connected; Bluetooth MIDI comes and goes with "ble")
+wait 800
+expect mo_up_usb 1
+expect mo_notes 2
+# stopped: only the keys would go out
+expect mo_ons 0
+tap PLAY
+wait 4000
+expect transport 1
+expect mo_ons_min 4
+expect mo_clk_run 1
+# the link's greeting: the four knobs' CCs; then a knob you turn goes out as its CC (21..24)
+expect mo_ccs 4
+turn K2 3
+wait 200
+expect mo_ccs 7
+# Setup -> MIDI out (the sixth page): MPE
+tap HOME
+wait 40
+expect page 9
+turn SELECT 5
+wait 300
+expect sub 5
+shot setup_midi_out.png
+turn K2 1
+wait 300
+expect mo_mpe 1
+wait 3000
+expect mo_chans_ok 1
+turn SELECT 1
+wait 300
+shot setup_midi_notes.png
+turn SELECT 1
+wait 300
+shot setup_midi_channels.png
+turn SELECT 1
+wait 300
+shot setup_midi_drums.png
+turn SELECT -3
+wait 300
+# a held key in MPE, then let go
+key 12 down 90
+wait 200
+key 12 up
+wait 200
+# (Bluetooth MIDI: the simulator starts its radio only at power-on with Bluetooth set on; its links go through the
+# same code as USB's)
+turn SELECT -4
+wait 300
+# Panic: every note out lets go
+expect mo_panic 1
+expect mo_open 0
+wait 2000
+# the notes off: what is out lets go, nothing more starts
+turn SELECT 4
+wait 300
+turn K1 -2
+wait 1000
+expect mo_notes 0
+expect mo_open_max 0
+wait 1000
+# stop: the clock's Stop, nothing left sounding
+tap PLAY
+wait 1000
+expect transport 0
+expect mo_clk_run 0
+expect mo_open 0

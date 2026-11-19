@@ -195,6 +195,7 @@ DSP_CTL void synth_process(Synth *s, float *outL, float *outR, int n) {
         uint32_t c6 = CLK();
         memcpy(outL, L, sizeof(float) * (size_t)m); memcpy(outR, R, sizeof(float) * (size_t)m);
         outL += m; outR += m; n -= m;
+        s->nsamp += (uint32_t)m;
         if (s->clock) {                                 /* the profiler's sums */
             s->prof[PROF_CTRL] += c2 - c0;
             s->prof[PROF_PAD] += par ? (c5 - c4) : (c3 - c2);

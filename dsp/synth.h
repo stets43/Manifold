@@ -143,8 +143,12 @@ typedef enum {
     /* each layer's Balance: how its motion's energy is shared among the notes, Dark (toward the bass) .. Balanced
        (every note alike, whatever the motion favours) .. Bright (toward the middle) */
     P_G1_BAL, P_G2_BAL,
+    P_DRY,                     /* (1.0.6) the effects out: fuzz, filter, delay, reverb; the Space knob is Shape */
+    P_DR_NOTES,                /* (1.0.6) the drums' notes, Follow (0: the motion's sounding ones) .. Fixed (1: a kit at
+                                  set pitches); between, a drum rides a sounding note near its pitch, else its own */
     NUM_PARAMS
 } ParamId;
+#define NUM_PARAMS_F (P_G2_BAL + 1)                      /* 1.0.5's ("MNPF") */
 #define NUM_PARAMS_E (P_V2_CLARITY + 1)                  /* the 1.0.5 test build's before Balance ("MNPE") */
 #define NUM_PARAMS_D (P_D4_HPLUCK + 1)                   /* the 1.0.5 test build's before the undertones ("MNPD") */
 #define NUM_PARAMS_C (P_V2_PLUCK + 1)                    /* the 1.0.5 test build's with the voices' colour ("MNPC") */
@@ -327,6 +331,7 @@ enum { DSHAPE_NONE, DSHAPE_L1, DSHAPE_L2, NUM_DSHAPES };
 typedef struct { int8_t layer, node; uint8_t off, d; float h0, h1, tilt, snap, w, oe, pl; } DrumHit;   /* (oe: its Odd/even push, -1..1; pl: its Pluck) */   /* w: the character's strength, by the hit's envelope */
 typedef struct {
     float env;                 /* the envelope, 0..1 (Shape by's Drums motion envelope and the duck read it) */
+    float lc;                  /* (1.0.6) Dry: the level Shape's lengths give back (dr_lcomp) */
     float g;                   /* this hit's velocity */
     float t;                   /* samples since the hit (where the envelope is) */
     float ls;                  /* the level a hit started from (a retrigger rises from where it is, no click) */
@@ -347,6 +352,10 @@ typedef struct {
                                   this tick's start and end */
     float oa[NUM_DRUMS][MAX_HARM];   /* each drum's Odd/even push at full, as its layer's bank coloured (drums_tick) */
     float of[NUM_DRUMS];             /* ... and that push (-1..1): a note takes the share its hit gives it */
+    uint8_t hn[NUM_DRUMS];           /* each drum's hits, counted (MIDI out watches them) */
+    uint32_t hs[NUM_DRUMS];          /* ... and where the last one lands (Synth.nsamp's count) */
+    uint8_t pf[NUM_DRUMS];           /* (1.0.6) the last hit had Fixed in it: oa holds its colour toward its drum's
+                                        profile (Body, Crack, Sizzle), by how far toward Fixed */
 } Drums;
 #define MAX_PTS 8
 #define NUM_ERATES 13
@@ -426,6 +435,7 @@ typedef struct {
     float odc_x[2], odc_y[2];
     float rv_h[4], rv_o[2]; int rv_ph;   /* the half-rate reverb: its input low-pass's state (two biquads), its last
                                             output, which sample */
+    float fxw;                /* (1.0.6) the filter in: 1, or 0 set wide open (gliding ~30 ms between); at 0 it is not run */
 } Fx;
 
 /* ------------------------------------------------------------------ */
@@ -501,6 +511,7 @@ typedef struct Synth {
     uint8_t cap_nodes;         /* layer 1 voices, 4..MAX_VOICES */
     uint8_t cap_harm;          /* oscillators per note, 4..MAX_HARM */
     uint8_t transport;         /* the meter runs */
+    uint32_t nsamp;            /* samples rendered so far (MIDI out times the drums' hits by it) */
     uint8_t mute_seq;          /* performance: the generators keep time but drive nothing (keys still play) */
     float lay_t[2], lay_g[2];  /* performance: layer gains, target and glide (0 muted, 1 open) */
     float trig_env, last_vel, rand_hold, rand_a, rand_b;   /* rand_hold: smooth between a per-bar a and b */
@@ -545,9 +556,14 @@ void voices_init(void);
 void voices_build(Synth *s);                /* the bank's function, at once (a rebuild) */
 void bank_fn(float c, float w, float te, float st, int kmax, float *a);   /* the bank's function (unit energy) */
 void hit_colour(const Synth *s, int l, float o, float *out);           /* layer l's bank under Odd/even o */
+void hit_profile(const Synth *s, int d, int l, int node, float o, float *out);   /* (1.0.6) Fixed: drum d's spectrum on that note */
+int  drum_fixed(const Synth *s, int d, float x, int *layer);           /* (1.0.6) drum d's note at Follow..Fixed x (its layer), -1 none */
 void voices_tick(Synth *s, int layer);      /* per control tick: the bank's function (levels, phases) from the controls */
 void layer_render(Synth *s, int layer, float *L, float *R, int n);
 int  knob_of_r(int id);                     /* (knob_of, in RAM: the tick's) */
+int  knob_of_rd(int id, int dry);
+int  knob_of_dry(int id, int dry);          /* knob_of for a patch Dry or not (the roll's) */
+extern uint8_t g_knob_dry;                  /* the patch is Dry: Space is Shape */
 int  knob_of(int id);                       /* the performance knob a parameter rides: 0 Timbre, 1 Groove, 2 Space, 3 Motion; -1 none */
 const char *knob_name(int k);
 float knob_offset(const Synth *s, int id);  /* the parameter's offset now, from its knob's position along its path */
@@ -656,6 +672,7 @@ const char *drum_layer_name(int v);
 void lfo_tick(Synth *s, float dt);
 void mod_apply(Synth *s);
 
+int  fx_tails_on(void);         /* (1.0.6) the delay and the reverb are running */
 void fx_init(Fx *f);
 void fx_update(Synth *s);
 void fx_process(Synth *s, float *L, float *R, int n, float trig_env);

@@ -10,6 +10,7 @@
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BLE_AT_BOOT (manifold_bt_on())   /* the radio at power-on: as the player left it (Setup) */
 int manifold_bt_on(void);
+#define APP_TICK                         /* MIDI out (1.0.6): the clock, the drums, the layers' notes (midi_out.h) */
 #define APP_OVERLOAD                     /* the platform tells us when a render ran past 90 % (counted, shown) */
 void app_overload(void);
 
@@ -40,7 +41,7 @@ enum { OBJ_SETTINGS, OBJ_PANEL,
 #define APP_STORE_POOL_FOREIGN(obj, p, n) ((obj) != OBJ_BLE && !manifold_patch_magic((const unsigned char *)(p), (n)))
 static inline int manifold_patch_magic(const unsigned char *p, unsigned n)
 {
-    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u || p[0] == 0x42u || p[0] == 0x43u || p[0] == 0x44u || p[0] == 0x45u || p[0] == 0x46u);
+    return n >= 4u && p[1] == 0x50u && p[2] == 0x4Eu && p[3] == 0x4Du && (p[0] == 0x38u || p[0] == 0x39u || p[0] == 0x41u || p[0] == 0x42u || p[0] == 0x43u || p[0] == 0x44u || p[0] == 0x45u || p[0] == 0x46u || p[0] == 0x47u);
 }
 /* Bluetooth audio (fm1-base's own stack): the radio's receive queue, between its interrupt and the main loop. A packet
    acknowledged on air and dropped here when the queue is full is lost for good, and the audio set-up stalls; fm1-base
