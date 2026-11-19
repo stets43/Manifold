@@ -184,7 +184,7 @@ what the buttons do on this page.
 | --- | --- |
 | PLAY (tap) | start / stop the generators and the rhythm (the keys always play) |
 | PLAY (hold) | the performance keys appear on the white keys (see below) |
-| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs) |
+| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a third of the time it makes the patch Dry, the effects' settings kept for when it is wet again) |
 | REC (double tap) | roll everything except the scale |
 | REC (hold 0.7 s) | mutate: a small nudge to every continuous setting |
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
@@ -333,7 +333,8 @@ relatives.
 
 **What a roll changes:**
 
-- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums.
+- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (a third Dry).
+  Its knobs' paths stay as they were; a double tap (or REC + HOME) gives a Dry patch Shape's kit paths too.
 - **REC (double tap)** rolls everything but the scale: the sound, the matrix, the LFOs, the effects and the knobs.
 - **REC + a page button** rolls only that page. **REC + SEL** is the only roll that changes the scale.
 - **PRESET** rolls everything in the chosen style; **ALGO** steps through seeds.

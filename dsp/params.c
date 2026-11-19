@@ -209,6 +209,8 @@ static int mod_loop(int src, int dst) {
     return ((src == SRC_MOT1 || src == SRC_TRIG || src == SRC_PATHX || src == SRC_PATHY) && g1) || (src == SRC_MOT2 && g2);
 }
 static uint8_t g_roll_dry;                    /* the roll makes a Dry patch (1.0.6): no route to the effects */
+static uint8_t g_lock_fx;       /* the player's own locks on the effects and the knobs (not the roll's
+                                                 mask: a sound roll leaves the effects alone, yet decides Dry) */
 static int fx_off(int id) {                   /* an effect a Dry patch has not got (the compressor it has) */
     return g_param_meta[id].section == SEC_FX && !(id >= P_CMP_THRESH && id <= P_CMP_PUMP);
 }
@@ -903,7 +905,8 @@ static void roll_finish(Synth *s) {
                 if (mod_loop(m->src, m->dst)) m->src = 0;
             }
         }
-    if (!s->locked[SEC_KNOBS]) {
+    if (!s->locked[SEC_KNOBS]) {               /* (a sound roll keeps the knobs' paths: a Dry patch it makes keeps
+                                                  them too, and its Shape rides them; a roll of the knobs gives it the kit's) */
         level_paths(s);
         if (dry) dry_shape_paths(s);
     }
@@ -942,8 +945,11 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
         else { t[P_FLT_MORPH] = .75f + .1f * frand(r); t[P_FLT_CUT] = .2f + .2f * frand(r); }
         if (frand(r) < .85f) t[P_RV_TUNED] = disc(P_RV_TUNED, 0);
         if (t[P_DL_FB] > .65f && t[P_DL_SEND] > .4f) t[P_DL_SEND] = .25f;
-        t[P_DRY] = disc(P_DRY, frand(r) < .33f);   /* (1.0.6) a third of the rolls Dry, in every style */
     }
+    /* (1.0.6) a third of the rolls Dry, in every style: any roll of the sound (a tap of REC too, which keeps the
+       effects' settings: Dry only takes them out), unless the effects are locked */
+    if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS]))
+        t[P_DRY] = disc(P_DRY, frand(r) < .33f);
     g_roll_dry = (uint8_t)(t[P_DRY] > .5f);
     roll_together(s);
     params_roll_mod(s);
@@ -958,6 +964,7 @@ static void roll_commit(Synth *s, uint32_t seed, float morph_seconds);
 void synth_roll_sections(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
     uint8_t keep[NUM_SECTIONS];
     memcpy(keep, s->locked, sizeof keep);
+    g_lock_fx = s->locked[SEC_FX];
     for (int i = 0; i < NUM_SECTIONS; i++) if (!(mask >> i & 1u)) s->locked[i] = 1;
     s->seed = seed;
     params_roll(s, seed);
@@ -984,6 +991,7 @@ static void roll_swap(Synth *s) {               /* (the live matrix, paths and m
 void synth_roll_begin(Synth *s, uint32_t seed, float morph_seconds, uint32_t mask) {
     if (g_roll.part) { memcpy(s->locked, g_roll.keep, sizeof g_roll.keep); }   /* (a roll before the last finished: dropped) */
     memcpy(g_roll.keep, s->locked, sizeof g_roll.keep);
+    g_lock_fx = s->locked[SEC_FX];
     for (int i = 0; i < NUM_SECTIONS; i++) g_roll.mask_locked[i] = (mask >> i & 1u) ? s->locked[i] : 1;
     memcpy(g_rslot, s->slot, sizeof g_rslot); memcpy(g_rkp, s->kpath, sizeof g_rkp); memcpy(g_rmac, s->macro, sizeof g_rmac);
     g_roll.seed = seed; g_roll.morph = morph_seconds; g_roll.part = 1;
