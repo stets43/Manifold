@@ -12,7 +12,7 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
-  [`firmware/manifold-1.0.5.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
+  [`firmware/manifold-1.0.6.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
   It covers every page and setting, and ends with the mathematics of each generator for developers.
 
@@ -40,21 +40,21 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 
 ## Releases
 
-- **1.0.6** (in testing): **MIDI out** of what MANIFOLD plays, over USB and Bluetooth MIDI, only while something
-  listens: the layers' notes (started and stopped at a floor under each layer's peak, at most 24 new notes a second a
-  layer by default), the keys, the drums (a General MIDI kit, or pitched), the knobs as CC 21–24 and the clock.
-  **MPE** sends each note on its own channel with the pitch bend that puts it at its exact just pitch. Latch and
-  Panic no longer leave notes hanging on the receiver. **Dry patches**: a quarter of the rolls
-  start with the fuzz, filter, delay and reverb set to nothing, and so not run (about 40 % less work in the simulator; turned up, they run as ever), and the Space knob becomes **Shape** (FX → Output → Space knob):
-  the drums' envelopes as a kit (the kick and tom bloom, the snare and hat stay tight), the layers' contour, the
-  voices' pluck, width and spin, the duck and the compressor's attack, over a wide range with the drums' loudness held roughly steady; Pump goes to Groove. The drums' levels ride Groove
-  (±4 dB) and the layers' levels Motion (±3 dB, opposite) in every patch. **Drum notes, Follow … Fixed** (on Groove): from the drums riding the motion's notes
-  to a kit at pitches after the 808's (kick 45–76 Hz, tom 90–185, snare 200–320, hat at the top), each on a sounding
-  note in its band or else the scale's nearest, with its own spectrum (body, crack, sizzle); between, the bands widen.
-  The kit sits lower under the kick (snare −8 dB, tom −6, hat −13) and the hats are closed (20–60 ms). Bluetooth audio: each of a device's audio inputs is asked for
-  SBC in turn (one offering AAC or its own codec first was refused); a device holding an old pairing with the FM-1 is
-  answered "key missing" as the spec has it, and a re-pairing it stops part way is given up after 8 s, the crash
-  report saying why.
+- **1.0.6** (2026-11-19): **MIDI out** of what MANIFOLD plays, over USB and Bluetooth MIDI, only while something
+  listens: the layers' notes (at most 24 new notes a second a layer), the keys, the drums (a General MIDI kit, or
+  pitched), the knobs as CC 21–24 and the clock; **MPE** puts each note on its own channel at its exact just pitch.
+  Latch and Panic leave no notes hanging. **Dry patches** (a quarter of the rolls): the fuzz, filter, delay and reverb
+  start set to nothing and so are not run (turned up, they work as ever), and the Space knob becomes **Shape**: the
+  drums' envelopes as a kit (the kick and tom bloom, the snare and hat stay tight), the layers' contour, the voices'
+  pluck, width and spin, the duck and the compressor's attack, over a wide range with the drums' loudness held
+  roughly steady (FX → Output → Space knob: Shape or Effects). The drums' levels ride Groove (±4 dB) and the layers'
+  levels Motion (±3 dB, opposite) in every patch. **Drum notes, Follow … Fixed** (on Groove): from the drums riding
+  the motion's notes to a kit at pitches after the 808's (kick 45–76 Hz, tom 90–185, snare 200–320, hat at the top),
+  each with its own spectrum (body, crack, sizzle). The kit sits lower under the kick (snare −8 dB, tom −6, hat −13)
+  and the hats are closed (20–60 ms). Any effect set to do nothing is not run, in every patch. Bluetooth audio: each
+  of a device's audio inputs is asked for SBC in turn (one offering AAC first was refused); a device holding an old
+  pairing is answered "key missing" as the spec has it, and a re-pairing it stops part way is given up after 8 s,
+  the crash report saying why. Patches from 1.0.5 load; 1.0.5 cannot read patches saved by 1.0.6.
 - **1.0.5** (2026-11-18): drum **patterns** beside linear drumming: a library trained on about 100 house, techno,
   breakbeat, drum'n'bass and hip-hop patterns, played without a grid (swing bends them, Density thins them, fills,
   ghosts, rotation, polymetric loop lengths, mutes), rolled by a decision tree over the corpus. New styles **House**
@@ -107,7 +107,7 @@ python3 tools/build.py ../Manifold --host              # the host simulator (any
 
 tools/get_toolchain.sh                                     # JieLi's clang for the FM-1
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.5     # -> build/manifold-1.0.5.fwsc
+python3 tools/build.py ../Manifold --release 1.0.6     # -> build/manifold-1.0.6.fwsc
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,

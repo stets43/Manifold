@@ -386,6 +386,9 @@ speakers, and storing a patch there could overwrite others.
 pull on, and each layer's Balance at Balanced. They may sound different: the voices themselves changed in 1.0.5. A patch saved by 1.0.5 is in a newer format that 1.0.4 cannot read (it shows those slots as
 Empty), so stay on 1.0.5 or later once you have saved with it.
 
+**Patches from 1.0.5** load in 1.0.6 as they were (wet, Drum notes at Follow). A patch saved by 1.0.6 is in a newer
+format again, which 1.0.5 shows as Empty.
+
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
 
@@ -992,7 +995,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.5 # -> build/manifold-1.0.5.fwsc
+python3 tools/build.py ../Manifold --release 1.0.6 # -> build/manifold-1.0.6.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key
