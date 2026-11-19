@@ -584,8 +584,12 @@ static int patch_read(int slot, patch_t *p)
     int n;
     if (slot < 0 || slot >= N_PATCH)
         return 0;
-    if (plat_store_size(patch_obj(slot)) == (int)sizeof(patchB_t))
-        return patch_read_b(slot, p);
+    if (plat_store_size(patch_obj(slot)) == (int)sizeof(patchB_t)) {   /* (the withdrawn MNPB's size: by its magic, as
+                                                    MNPG has the same 215 parameters and the same size) */
+        uint32_t mg = 0;
+        if (plat_store_head(patch_obj(slot), &mg, 4) == 4 && mg == PATCH_MAGIC_B)
+            return patch_read_b(slot, p);
+    }
     n = plat_store_load(patch_obj(slot), p, sizeof *p);
     if (n == (int)sizeof(patch9_t) && (p->magic == PATCH_MAGIC_9 || p->magic == PATCH_MAGIC_8) && p->nparams == NUM_PARAMS_9
         && p->nslots == MOD_SLOTS) {
@@ -873,6 +877,7 @@ static void param_name(int id, char *b, int max)
     case P_LFO_COUPLE: n = "LFO coupling"; break;
     case P_RV_FREEZE: n = "Reverb freeze"; break;
     case P_DRY: n = "Dry"; break;
+    case P_DR_NOTES: n = "Drum notes"; break;
     case P_FLT_MORPH: n = "Filter type"; break;
     case P_FLT_CUT: n = "Filter cutoff"; break;
     case P_FLT_RES: n = "Filter resonance"; break;
@@ -986,6 +991,7 @@ static void value_text(int id, float n, char *b, int max)
         case P_RH_COUNT: int_text(i + 2, t); text_cat(t, " events"); break;
         case P_RV_FREEZE: case P_RV_TUNED: text_cpy(t, i ? "On" : "Off", sizeof t); break;
         case P_DRY: text_cpy(t, i ? "On: Shape" : "Off", sizeof t); break;
+        case P_DR_NOTES: text_cpy(t, i ? "Fixed (a kit)" : "Follow", sizeof t); break;
         case P_LFO1_SHAPE: case P_LFO2_SHAPE: case P_LFO3_SHAPE: case P_LFO4_SHAPE: case P_LFO5_SHAPE:
         case P_LFO6_SHAPE: text_cpy(t, PICK(LFO_N, i), sizeof t); break;
         case P_LFO1_SYNC: case P_LFO2_SYNC: case P_LFO3_SYNC: case P_LFO4_SYNC: case P_LFO5_SYNC:
@@ -1175,7 +1181,7 @@ static const sub_t SUB_METER[] = {           /* the rhythm and the drums it play
     {"Lock & motion", {P_RH_PULL, P_RH_MOTION, P_EVOLVE, P_RH_GRIP}},
     {"Hold", {P_D1_HOLD, P_D2_HOLD, P_D3_HOLD, P_D4_HOLD}},
     {"Place", {P_D1_PLACE, P_D2_PLACE, P_D3_PLACE, P_D4_PLACE}},
-    {"Shape & duck", {P_DR_SHAPE, P_DR_DEPTH, P_DR_DUCK, _}},
+    {"Shape, duck, notes", {P_DR_SHAPE, P_DR_DEPTH, P_DR_DUCK, P_DR_NOTES}},
     {"Follow", {P_D1_SRC, P_D2_SRC, P_D3_SRC, P_D4_SRC}},
     {"Rotate", {P_D1_ROT, P_D2_ROT, P_D3_ROT, P_D4_ROT}},
     {"Length", {P_D1_LEN, P_D2_LEN, P_D3_LEN, P_D4_LEN}},
@@ -3209,7 +3215,12 @@ int app_expect(const char *what, int *got)
         *got = S.slot[0].src;
     else if (!strcmp(what, "bal1"))                  /* layer 1's Balance, 0 (dark) .. 100 (bright) */
         *got = (int)(S.base[P_G1_BAL] * 100.0f + 0.5f);
-    else if (!strcmp(what, "dry"))                  /* (1.0.6) the patch is Dry */
+    else if (!strcmp(what, "drnotes"))              /* (1.0.6) the drums' notes: 0 Follow, 1 Fixed */
+        *got = pint(&S, P_DR_NOTES);
+    else if (!strncmp(what, "drhz_", 5)) {           /* drum n's last note, Hz */
+        int d = atoi(what + 5) & 3; const DrumV *v = &S.dr.v[d];
+        *got = v->node >= 0 ? (int)(S.eng.node[v->node].freq * fm_exp2f((float)(pint(&S, v->layer ? P_V2_REG : P_V1_REG) - 1)) + .5f) : -1;
+    } else if (!strcmp(what, "dry"))                  /* (1.0.6) the patch is Dry */
         *got = pint(&S, P_DRY);
     else if (!strcmp(what, "fxw"))                  /* the effects' share now, % */
         *got = (int)(S.fx.fxw * 100.f + .5f);

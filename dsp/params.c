@@ -160,6 +160,7 @@ ParamMeta g_param_meta[NUM_PARAMS] = {
  M(P_V1_CLARITY,"clarity",SEC_VOICE1,CURVE_LIN,0,1, 0,1, .5f,0,1,0), M(P_V2_CLARITY,"clarity",SEC_VOICE2,CURVE_LIN,0,1, 0,1, .5f,0,1,0),
  M(P_G1_BAL,"balance",SEC_GEN1,CURVE_LIN,1,0, -1,1, .5f,0,1,0), M(P_G2_BAL,"balance",SEC_GEN2,CURVE_LIN,1,0, -1,1, .5f,0,1,0),
  M(P_DRY,"dry",SEC_FX,CURVE_DISC,0,0, 0,2, 0,0,0,0),
+ M(P_DR_NOTES,"drum notes",SEC_DRUMS,CURVE_DISC,0,0, 0,2, 0,0,0,0),
 #undef PAT_P
 #undef ROT_P
 #undef LEN_P
@@ -878,6 +879,13 @@ static void dry_shape_paths(Synth *s) {
 static void roll_finish(Synth *s) {
     uint32_t *r = &s->rng;
     int dry = s->target[P_DRY] > .5f;
+    if (!s->locked[SEC_DRUMS]) {               /* the drums' notes: Fixed (a kit) most often in the genres, seldom in
+                                                  the drifting styles */
+        int st = s->style;
+        float p = st == STYLE_HOUSE || st == STYLE_HIPHOP || st == STYLE_MACHINE ? .6f : st == STYLE_BREAKS ? .5f
+                : st == STYLE_GROOVE ? .4f : st == STYLE_AMBIENT ? .15f : st == STYLE_COSMIC ? .2f : .3f;
+        s->target[P_DR_NOTES] = disc(P_DR_NOTES, frand(r) < p);
+    }
     if (dry && !s->locked[SEC_DRUMS]) dry_kit(s);
     if (dry && !s->locked[SEC_LFO])            /* (the style's routes to the effects: elsewhere) */
         for (int k = 0; k < MOD_SLOTS; k++) {

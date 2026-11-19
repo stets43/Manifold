@@ -48,7 +48,9 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   have no fuzz, filter, delay or reverb, not run at all (about 40 % less work in the simulator), and the Space knob becomes **Shape**:
   the drums' envelopes as a kit (the kick and tom bloom, the snare and hat stay tight), the layers' contour, the
   voices' pluck, width and spin, the duck and the compressor; Pump goes to Groove. The drums' levels ride Groove
-  (±4 dB) and the layers' levels Motion (±3 dB, opposite) in every patch. Bluetooth audio: each of a device's audio inputs is asked for
+  (±4 dB) and the layers' levels Motion (±3 dB, opposite) in every patch. **Drum notes: Fixed**: the drums as a kit
+  at set pitches after the 808's (kick 45–76 Hz, tom 90–185, snare 200–320, hat at the top), each on the scale's
+  nearest note every hit, with its own spectrum (body, crack, sizzle); Follow keeps the drums riding the motion. Bluetooth audio: each of a device's audio inputs is asked for
   SBC in turn (one offering AAC or its own codec first was refused); a device holding an old pairing with the FM-1 is
   answered "key missing" as the spec has it, and a re-pairing it stops part way is given up after 8 s, the crash
   report saying why.

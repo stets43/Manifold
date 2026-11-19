@@ -144,6 +144,7 @@ typedef enum {
        (every note alike, whatever the motion favours) .. Bright (toward the middle) */
     P_G1_BAL, P_G2_BAL,
     P_DRY,                     /* (1.0.6) the effects out: fuzz, filter, delay, reverb; the Space knob is Shape */
+    P_DR_NOTES,                /* (1.0.6) the drums' notes: Follow (the motion's sounding ones) or Fixed (a kit, set pitches) */
     NUM_PARAMS
 } ParamId;
 #define NUM_PARAMS_F (P_G2_BAL + 1)                      /* 1.0.5's ("MNPF") */
@@ -351,6 +352,7 @@ typedef struct {
     float of[NUM_DRUMS];             /* ... and that push (-1..1): a note takes the share its hit gives it */
     uint8_t hn[NUM_DRUMS];           /* each drum's hits, counted (MIDI out watches them) */
     uint32_t hs[NUM_DRUMS];          /* ... and where the last one lands (Synth.nsamp's count) */
+    uint8_t pf[NUM_DRUMS];           /* (1.0.6) the last hit was Fixed: oa holds its drum's profile (Body, Crack, Sizzle) */
 } Drums;
 #define MAX_PTS 8
 #define NUM_ERATES 13
@@ -551,6 +553,8 @@ void voices_init(void);
 void voices_build(Synth *s);                /* the bank's function, at once (a rebuild) */
 void bank_fn(float c, float w, float te, float st, int kmax, float *a);   /* the bank's function (unit energy) */
 void hit_colour(const Synth *s, int l, float o, float *out);           /* layer l's bank under Odd/even o */
+void hit_profile(const Synth *s, int d, int l, int node, float o, float *out);   /* (1.0.6) Fixed: drum d's spectrum on that note */
+int  drum_fixed(const Synth *s, int d, int *layer);                    /* (1.0.6) Fixed: drum d's note (its layer), -1 none */
 void voices_tick(Synth *s, int layer);      /* per control tick: the bank's function (levels, phases) from the controls */
 void layer_render(Synth *s, int layer, float *L, float *R, int n);
 int  knob_of_r(int id);                     /* (knob_of, in RAM: the tick's) */

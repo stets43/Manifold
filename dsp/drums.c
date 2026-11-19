@@ -43,6 +43,49 @@ const char *drum_name(int d) { return d >= 0 && d < NUM_DRUMS ? DRUM_N[d] : "?";
 const char *drum_src_name(int v) { return v >= 0 && v < NUM_DSRC ? DSRC_N[v] : "?"; }
 const char *drum_layer_name(int v) { return v >= 0 && v < NUM_DLAYERS ? DLAYER_N[v] : "?"; }
 
+/* the hit's Odd/even push at full, as its layer's bank coloured (Fixed: its drum's profile, the push at full): worked
+   out once a hit (in the flash: rare), the render blends each note toward it by its share */
+static void hit_spec(Synth *s, int d, int l, int node, int fx) {
+    float of = (pval(s, P_D1_OE + d) - .5f) * 2.f;
+    s->dr.pf[d] = (uint8_t)fx;
+    if (fx) {
+        s->dr.of[d] = 1.f;
+        hit_profile(s, d, l, node, fclamp(.5f + .5f * of, 0.f, 1.f), s->dr.oa[d]);
+    } else {
+        s->dr.of[d] = of;
+        if (of > .02f || of < -.02f)
+            hit_colour(s, l, fclamp(pval(s, P_V1_ODDEVEN + l) + .5f * of, 0.f, 1.f), s->dr.oa[d]);
+    }
+}
+/* (1.0.6) Fixed: each drum's note, a set pitch every hit, after the 808's: the kick 45..76 Hz (its 56), the tom 90..185
+   (its three toms), the snare 200..320 (its 238), the hat at the top of the layout (its sizzle above 5 kHz needs a
+   high note: up to 4 kHz, an octave below the highest by Voice). Voice moves each within its range. The scale's
+   nearest note to that pitch (the drum layer's; Split: either), so it is always in tune; silent or not, it plays.
+   -1: no note (an empty layout). In the flash: a hit's, rare */
+int drum_fixed(const Synth *s, int d, int *layer) {
+    int N = s->eng.n_nodes, dl = pint(s, P_DR_LAYER), best = -1;
+    float v = pval(s, DP(d, P_D1_VOICE)), bd = 1e9f, tgt;
+    float fmax = 0.f;
+    for (int l = 0; l < NUM_LAYERS; l++) {
+        if (dl != DLAYER_SPLIT && l != (dl == DLAYER_L2)) continue;
+        float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
+        for (int i = 0; i < N; i++) { float f = s->eng.node[i].freq * oct; if (f < 4000.f && f > fmax) fmax = f; }
+    }
+    tgt = d == 0 ? 45.f * fexp2(.75f * v) : d == 3 ? 90.f * fexp2(1.04f * v) : d == 1 ? 200.f * fexp2(.68f * v)
+        : fmax * fexp2(-v);
+    for (int l = 0; l < NUM_LAYERS; l++) {
+        if (dl != DLAYER_SPLIT && l != (dl == DLAYER_L2)) continue;
+        float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
+        for (int i = 0; i < N; i++) {
+            float f = s->eng.node[i].freq * oct;
+            if (f < 20.f || f >= 4000.f) continue;
+            float dd = flog2(f / tgt); if (dd < 0.f) dd = -dd;
+            if (dd < bd) { bd = dd; best = i; *layer = l; }
+        }
+    }
+    return best;
+}
+
 #include "ctl_on.h"
 /* a layer's sounding notes (their generator's level over 0.02): how many, the lowest and highest pitch */
 DSP_CTL static int sounding(const Synth *s, int l, float *lo, float *hi) {
@@ -95,7 +138,9 @@ DSP_CTL static int pick_layer(const Synth *s, int d) {
 DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
     DrumV *v = &s->dr.v[d];
     if (s->eng.n_nodes < 1) return;
-    int l = pick_layer(s, d), node = pick_node(s, l, pval(s, DP(d, P_D1_VOICE)));
+    int fx = pint(s, P_DR_NOTES), l = 0, node = -1;
+    if (fx) node = DSP_FAR(drum_fixed)(s, d, &l);              /* (1.0.6) Fixed: the drum's set pitch */
+    if (node < 0) { fx = 0; l = pick_layer(s, d); node = pick_node(s, l, pval(s, DP(d, P_D1_VOICE))); }
     if (v->on && (node != v->node || l != v->layer)) { v->old = v->cur; v->ls = 0.f; v->cur.h1 = 0.f; }   /* another voice: the last one fades */
     else v->ls = v->on ? v->env : 0.f;                      /* the same voice: rise from where it is */
     v->node = node; v->layer = l;
@@ -103,13 +148,7 @@ DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
     v->delay = delay < 0 ? 0 : delay > SUB - 1 ? SUB - 1 : delay;
     v->pend = 1;
     s->dr.hits++; s->dr.hs[d] = s->nsamp + (uint32_t)v->delay; s->dr.hn[d]++; s->dr.flash[d] = 1.f;
-    {   /* the hit's Odd/even push at full, as its layer's bank coloured: worked out once a hit (in the flash: rare), the
-           render blends each note toward it by its share */
-        float of = (pval(s, P_D1_OE + d) - .5f) * 2.f;
-        s->dr.of[d] = of;
-        if (of > .02f || of < -.02f)
-            DSP_FAR(hit_colour)(s, l, fclamp(pval(s, P_V1_ODDEVEN + l) + .5f * of, 0.f, 1.f), s->dr.oa[d]);
-    }
+    DSP_FAR(hit_spec)(s, d, l, node, fx);
 }
 
 void drums_hit(Synth *s, int d, int node, float vel) { (void)node; if (d >= 0 && d < NUM_DRUMS) DSP_FAR(hit)(s, d, vel, 0); }
@@ -207,7 +246,8 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
             c->snap = sn * (1.f + sn) * fexp2(-tm / tsn * 1.4427f);
         }
         c->w = e * 8.f > 1.f ? 1.f : e * 8.f;   /* (the character at full until the hit falls under -18 dB, then with it) */
-        c->oe = (pval(s, P_D1_OE + d) - .5f) * 2.f * se;   /* its Odd/even push, settling as its Bright does */
+        c->oe = (s->dr.pf[d] ? 1.f : (pval(s, P_D1_OE + d) - .5f) * 2.f) * se;   /* its Odd/even push (Fixed: its
+                                                    profile), settling as its Bright does */
         c->pl = pval(s, P_D1_HPLUCK + d);                  /* its Pluck on the note (voice.c holds it) */
         if (t1 > A + H && e < 1e-4f) { v->on = 0; v->env = 0.f; c->h1 = 0.f; }
         if (d == 0) kick = v->env * v->g;

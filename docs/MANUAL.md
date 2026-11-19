@@ -633,9 +633,10 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K4 | **Grip** | how strongly the stream accents every synth envelope |
 | **Hold** | K1–K4 | per drum | how long the envelope holds at full level after the attack (0–50 ms) |
 | **Place** | K1–K4 | per drum | which events it prefers: Strongest … Weakest (kick strongest, hat weakest). When a drum follows a layer: which point it follows |
-| **Shape & duck** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
+| **Shape, duck, notes** | K1 | **Shape by** | None, Layer 1, Layer 2: every drum is multiplied by that layer's envelope, and its decays lengthen in a swell and shorten in a trough |
 | | K2 | **Shape depth** | how much |
 | | K3 | **Kick duck** | sidechain: the kick ducks the synth |
+| | K4 | **Drum notes** | **Follow**: each hit rides one of the notes the motion is sounding (Voice: lowest .. highest). **Fixed**: a kit, each drum on a set pitch every hit (see below) |
 | **Follow** | K1–K4 | per drum | **The stream** (the rhythm decides), or **Layer 1 / Layer 2**: the drum fires when one point's envelope of that layer rises past 1 − its density. A silent, shaping layer works too. A drum with a pattern plays its pattern instead |
 | **Rotate** | K1–K4 | per drum | its pattern delayed by 0–15 16ths |
 | **Length** | K1–K4 | per drum | its pattern looped over its own length, or its first 2–32 steps |
@@ -645,6 +646,17 @@ route never falls back to Linear; only setting it to Linear by hand does.
 | | K3 | **Snap** | a push on the voice's Wave at the hit, past Wave's own top: a bite on the attack. It lasts as Settle says: 71 ms at 0, 25 ms in the middle, 9 ms at full |
 | | K4 | **Pluck** | the hit plucks the note it rides: its upper partials fade first after the hit, as the layer's own Pluck does (1.5 s … 25 ms). Off: the layer's own. The note stays plucked until it rises by itself (or, 2 s without a plucking hit, lets go over a second) |
 | **Odd / even** | K1–K4 | per drum | the hit pushes its note's colour toward hollow or even (as the layer's Odd / even), settling as its Bright does. None: the note's own |
+
+**Drum notes: Fixed** (1.0.6) makes the drums a kit at set pitches, after the TR-808's: the **kick** 45–76 Hz (the
+808's is tuned near 56), the **tom** 90–185 Hz (its three toms), the **snare** 200–320 Hz (its body near 238), and the
+**hat** at the top of the layout (up to 4 kHz). Each drum's **Voice** moves it within its range (the hat: an octave
+down from the top). The drum takes the scale's nearest note to that pitch, on the drum layer (Split: either layer),
+so it is always in tune; it plays that note every hit, sounding in the motion or not. In Fixed, each drum also has
+its own spectrum while its hit settles: the kick and the tom a round **body** (the fundamental, a little of the 2nd
+and 3rd, an undertone under the kick), the snare a **crack** (its middle partials, 3rd to 9th, over the fundamental),
+the hat **sizzle** (only its partials above 4.5 kHz, the 7th, 11th and 13th included, which clash like the 808's six
+square waves). Odd / even still colours them, and a hit is no louder for its spectrum. **Follow** is the drums as
+before. Rolls choose Fixed more often in House, Hip-hop, Machine and Breakbeat, seldom in Ambient and Cosmic.
 
 ![Kick](img/manual/drums-7.png) ![Rhythm](img/manual/drums-11.png) ![Kick sound](img/manual/drums-21.png) ![Odd / even](img/manual/drums-25.png)
 

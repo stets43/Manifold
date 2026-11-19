@@ -278,17 +278,17 @@ expect mx_src 0
 turn K2 1
 wait 50
 expect mx_src 1
-expect mx_dst 214
+expect mx_dst 215
 expect mx_depth 25
 turn K4 3
 wait 30
 expect mx_depth 28
 turn K3 1
 wait 30
-expect mx_dst 215
+expect mx_dst 216
 turn K3 -1
 wait 2000
-expect mx_dst 214
+expect mx_dst 215
 expect knob_moved0 >0
 shot page_matrix.png
 # a layer's motion onto the Motion knob: the generators on a knob
@@ -297,7 +297,7 @@ wait 30
 expect mx_src 17
 turn K3 3
 wait 1000
-expect mx_dst 217
+expect mx_dst 218
 tap HOME
 wait 300
 shot home_knob_routed.png
@@ -692,7 +692,7 @@ expect pat0 0
 expect pat1 0
 expect pat2 0
 expect pat3 0
-expect last_route 215
+expect last_route 216
 expect keys_pull 1
 # and one saved by the withdrawn drum-hits test build (MNPB): loads, its hit parameters and routes to them dropped,
 # its knob route moved (216 -> 214)
@@ -705,7 +705,7 @@ key 13 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
+expect last_route 216
 expect first_route 0
 expect keys_pull 1
 expect colour 1
@@ -719,7 +719,7 @@ key 14 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
+expect last_route 216
 expect keys_pull 1
 expect colour 1
 expect hitcolour 1
@@ -733,7 +733,7 @@ key 15 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
+expect last_route 216
 expect hitcolour 1
 # the colour's knobs: the voices' on Timbre, the hits' on Groove
 expect knobof_195 0
@@ -755,8 +755,8 @@ key 16 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
-# and one saved before Balance (MNPE): its route moved (212 -> 215)
+expect last_route 216
+# and one saved before Balance (MNPE): its route moved (212 -> 216)
 expect makeE_33 1
 press HOME
 wait 30
@@ -766,8 +766,8 @@ key 17 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
-# and 1.0.5's (MNPF): its route moved (214 -> 215), wet
+expect last_route 216
+# and 1.0.5's (MNPF): its route moved (214 -> 216), wet, its drums Follow
 expect makeF_34 1
 press HOME
 wait 30
@@ -777,8 +777,9 @@ key 18 up
 wait 30
 release HOME
 wait 1500
-expect last_route 215
+expect last_route 216
 expect dry 0
+expect drnotes 0
 # Depth on Timbre; Clarity on no knob (it switches partials); Balance on Timbre
 expect knobof_207 0
 expect knobof_210 -1
