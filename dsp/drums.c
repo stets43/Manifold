@@ -170,12 +170,13 @@ DSP_CTL static int pick_layer(const Synth *s, int d) {
 }
 
 /* the hit itself, landing delay samples into the coming block */
-DSP_CTL static void hit(Synth *s, int d, float vel, int delay) {
+/* (1.0.7: in the flash: it runs once a hit, and the effects needed the RAM) */
+static void hit(Synth *s, int d, float vel, int delay) {
     DrumV *v = &s->dr.v[d];
     if (s->eng.n_nodes < 1) return;
     float fx = pval(s, P_DR_NOTES); int l = 0, node = -1;
     if (fx > .01f) node = DSP_FAR(drum_fixed)(s, d, fx, &l);   /* (1.0.6) toward Fixed: its band, its pitch */
-    if (node < 0) { fx = 0.f; l = pick_layer(s, d); node = pick_node(s, l, pval(s, DP(d, P_D1_VOICE))); }
+    if (node < 0) { fx = 0.f; l = DSP_FAR(pick_layer)(s, d); node = DSP_FAR(pick_node)(s, l, pval(s, DP(d, P_D1_VOICE))); }
     if (v->on && (node != v->node || l != v->layer)) { v->old = v->cur; v->ls = 0.f; v->cur.h1 = 0.f; }   /* another voice: the last one fades */
     else v->ls = v->on ? v->env : 0.f;                      /* the same voice: rise from where it is */
     v->node = node; v->layer = l;
@@ -241,7 +242,7 @@ DSP_CTL void drums_tick(Synth *s, float dt) {
         if (!on) { v->nq = 0; continue; }
         for (int q = 0; q < v->nq; q++) if (v->qt[q] < SUB && (best < 0 || v->qt[q] < v->qt[best])) best = q;
         if (best >= 0) {
-            hit(s, d, v->qv[best], v->qt[best]);
+            DSP_FAR(hit)(s, d, v->qv[best], v->qt[best]);
             v->qt[best] = v->qt[--v->nq]; v->qv[best] = v->qv[v->nq]; v->qn[best] = v->qn[v->nq];
         }
         for (int q = 0; q < v->nq; q++) { v->qt[q] -= SUB; if (v->qt[q] < 0) v->qt[q] = 0; }

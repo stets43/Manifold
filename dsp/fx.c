@@ -237,24 +237,41 @@ DSP_INL float shape(Fx *f, float x, int c) {
     f->fz_thx[c] += C.fz_th * (y - f->fz_thx[c]);
     return ((1.f - C.fz_tone) * f->fz_tl[c] + C.fz_tone * .8f * (y - f->fz_thx[c])) * .13f;
 }
-DSP_INL float rd16(const int16_t *b, int len, float pos, float sc) {
+/* (1.0.7) The delay's and the reverb's memories: 16-bit floats in int16s, the FPU doing the work. They were 16-bit
+   integers at a fixed scale, where the signal used about 1/30 of the range: a rounding hiss about 71 dB under the
+   output for as long as a tail rang. A float's rounding stays about 66 dB under each value it keeps, so it falls with
+   the tail, and the tail ends in silence. One multiply by 2^-100 moves the exponent into a 16-bit float's 5 bits (2^-112
+   to its bias, and 2^12 so values down to 2^-26 keep their precision); the top 15 bits of the result, rounded, are the
+   magnitude and the int16's sign is the value's. Under 2^-26 (-156 dB) is stored as 0, so nothing subnormal is ever
+   stored or read back (an FPU may be slow on those); over 15 (+23 dB over the loudest measured) is held at 15. */
+DSP_INL int16_t to16(float v) {
+    union { float f; uint32_t u; } x = { v }; uint32_t u = x.u;
+    x.u = u & 0x7FFFFFFFu;
+    if (!(x.f >= 0x1p-26f)) return 0;                  /* (a NaN too) */
+    if (x.f > 15.f) x.f = 15.f;
+    x.f *= 0x1p-100f;
+    int32_t m = (int32_t)((x.u + 0x1000u) >> 13);     /* (rounded: a carry steps the exponent, as it should) */
+    return (int16_t)((int32_t)u < 0 ? -m : m);
+}
+DSP_INL float fr16(int16_t h) {
+    int32_t m = h; union { uint32_t u; float f; } x;
+    x.u = ((uint32_t)m & 0x80000000u) | ((uint32_t)(m < 0 ? -m : m) << 13);
+    return x.f * 0x1p100f;
+}
+DSP_INL float rd16(const int16_t *b, int len, float pos) {
     if (pos < 0) pos += (float)len;
     if (pos < 0) pos += (float)len;
     int i0 = (int)pos; float fr = pos - (float)i0; if (i0 >= len) i0 -= len;
     int i1 = i0 + 1 == len ? 0 : i0 + 1;
-    return ((float)b[i0] + ((float)b[i1] - (float)b[i0]) * fr) * sc;
-}
-DSP_INL int16_t to16(float v, float sc) {
-    v *= sc; if (v > 32767.f) v = 32767.f; if (v < -32767.f) v = -32767.f;
-    return (int16_t)(v < 0.f ? v - .5f : v + .5f);   /* (rounded: a cast cuts toward zero, a loss the tails then gated on) */
+    float a = fr16(b[i0]); return a + (fr16(b[i1]) - a) * fr;
 }
 
 /* one step of the FDN reverb: the pre-delay, the input diffusion, the eight lines, their mix. The lines' lengths
    (g_rint, g_rm0 / g_rm1) and the damping (C.r_lp) are already in steps of the rate it runs at (fx_update) */
 DSP_INL void rv_step(Fx *f, float rin, float fr, float gd, const int *apl, float *rlo, float *rro) {
-    f->pre[f->pre_w] = to16(rin, 8192.f);
+    f->pre[f->pre_w] = to16(rin);
     int pi2 = f->pre_w - C.r_prei; if (pi2 < 0) pi2 += RV_PRE;
-    float pd = (float)f->pre[pi2] * (1.f / 8192.f) + gd;
+    float pd = fr16(f->pre[pi2]) + gd;
     if (++f->pre_w >= RV_PRE) f->pre_w = 0;
     for (int a = 0; a < 4; a++) {                             /* input diffusion */
         float *b = f->ap_buf[a]; int w = f->ap_w[a];
@@ -273,7 +290,7 @@ DSP_INL void rv_step(Fx *f, float rin, float fr, float gd, const int *apl, float
     /* (a lean read: a line is shorter than its buffer, so one wrap; whole samples come out exactly) */
     #define RV_RD(i) do { float pos = (float)rw - (g_rf0[i] + (g_rf1[i] - g_rf0[i]) * fr); if (pos < 0.f) pos += (float)RV_BUF; \
                           int i0 = (int)pos; float fq = pos - (float)i0; const int16_t *bf = f->rbuf[i]; \
-                          float y0 = (float)bf[i0], y = (y0 + ((float)bf[i0 + 1 < RV_BUF ? i0 + 1 : 0] - y0) * fq) * (1.f / 8192.f); \
+                          float y0 = fr16(bf[i0]), y = y0 + (fr16(bf[i0 + 1 < RV_BUF ? i0 + 1 : 0]) - y0) * fq; \
                           RV_LINE(i, y); } while (0)
     RV_RD(0); RV_RD(1); RV_RD(2); RV_RD(3); RV_RD(4); RV_RD(5); RV_RD(6); RV_RD(7);
     #undef RV_RD
@@ -287,10 +304,10 @@ DSP_INL void rv_step(Fx *f, float rin, float fr, float gd, const int *apl, float
         v[2] = b2 + b6; v[6] = b2 - b6; v[3] = b3 + b7; v[7] = b3 - b7;
     }
     {   float pa = .35f * pd;
-        f->rbuf[0][rw] = to16(v[0] * 0.35355339f + pa, 8192.f); f->rbuf[1][rw] = to16(v[1] * 0.35355339f - pa, 8192.f);
-        f->rbuf[2][rw] = to16(v[2] * 0.35355339f + pa, 8192.f); f->rbuf[3][rw] = to16(v[3] * 0.35355339f - pa, 8192.f);
-        f->rbuf[4][rw] = to16(v[4] * 0.35355339f + pa, 8192.f); f->rbuf[5][rw] = to16(v[5] * 0.35355339f - pa, 8192.f);
-        f->rbuf[6][rw] = to16(v[6] * 0.35355339f + pa, 8192.f); f->rbuf[7][rw] = to16(v[7] * 0.35355339f - pa, 8192.f);
+        f->rbuf[0][rw] = to16(v[0] * 0.35355339f + pa); f->rbuf[1][rw] = to16(v[1] * 0.35355339f - pa);
+        f->rbuf[2][rw] = to16(v[2] * 0.35355339f + pa); f->rbuf[3][rw] = to16(v[3] * 0.35355339f - pa);
+        f->rbuf[4][rw] = to16(v[4] * 0.35355339f + pa); f->rbuf[5][rw] = to16(v[5] * 0.35355339f - pa);
+        f->rbuf[6][rw] = to16(v[6] * 0.35355339f + pa); f->rbuf[7][rw] = to16(v[7] * 0.35355339f - pa);
         if (++rw >= RV_BUF) rw = 0;
         f->rw[0] = rw;
     }
@@ -346,8 +363,8 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         f->dD += 0.0004f * (C.d_D_tgt - f->dD);
         float aa = C.d_aa;
         float wc = (float)f->dw + f->dacc;
-        yl = rd16(f->dbuf, DLN, wc - 1.f - f->dD, 1.f / 16384.f);
-        yr = rd16(f->dbuf, DLN, wc - 1.f - f->dD * C.d_tap, 1.f / 16384.f);
+        yl = rd16(f->dbuf, DLN, wc - 1.f - f->dD);
+        yr = rd16(f->dbuf, DLN, wc - 1.f - f->dD * C.d_tap);
         f->dout_lp[0] += aa * (yl - f->dout_lp[0]); f->dout_lp[1] += aa * (yr - f->dout_lp[1]);
         yl = f->dout_lp[0] + gd; yr = f->dout_lp[1] - gd;   /* int16 reads are exact zeros: guard */
         float fbs = 0.5f * (yl + yr);
@@ -357,7 +374,7 @@ DSP_RAM void fx_process(Synth *s, float *L, float *R, int n, float trig_env) {
         float din = 0.5f * (x[0] + x[1]) * C.d_send + C.d_fb * (f->dlp1 - f->dfb_hp);
         f->dlp2 += aa * (din - f->dlp2);                         /* anti-alias before write */
         f->dacc += g_drate;
-        if (f->dacc >= 1.f) { f->dacc -= 1.f; f->dbuf[f->dw] = to16(f->dlp2, 16384.f); f->dw = (f->dw + 1) & (DLN - 1); }
+        if (f->dacc >= 1.f) { f->dacc -= 1.f; f->dbuf[f->dw] = to16(f->dlp2); f->dw = (f->dw + 1) & (DLN - 1); }
 
         /* 4b. FDN reverb, every other sample: the input through a 4-pole low-pass at 9 kHz (Butterworth: -14 dB at
            12 kHz, -28 at 15: what is above 12 kHz would fold back down into the tail at half the rate; the [1 3 3 1]
