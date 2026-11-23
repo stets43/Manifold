@@ -123,7 +123,9 @@ void dr_lcomp(Synth *s) {
 
 #include "ctl_on.h"
 /* a layer's sounding notes (their generator's level over 0.02): how many, the lowest and highest pitch */
-DSP_CTL static int sounding(const Synth *s, int l, float *lo, float *hi) {
+#include "ctl_off.h"   /* (the flash code below: its own math, not the RAM's) */
+/* (1.0.7: sounding, pick_node and pick_layer in the flash with hit, their only caller: once a hit) */
+static int sounding(const Synth *s, int l, float *lo, float *hi) {
     const GenSt *g = &s->layer[l].g; int n = 0; *lo = 1e9f; *hi = 0.f;
     float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
     for (int i = 0; i < s->eng.n_nodes; i++) if (g->a[i] > .02f) {
@@ -135,7 +137,7 @@ DSP_CTL static int sounding(const Synth *s, int l, float *lo, float *hi) {
 
 /* the note a hit rides on layer l: the sounding one Voice points at (0 the lowest .. 1 the highest), or, with nothing
    sounding, the note under the motion's loudest point */
-DSP_CTL static int pick_node(const Synth *s, int l, float voice) {
+static int pick_node(const Synth *s, int l, float voice) {
     const GenSt *g = &s->layer[l].g; int N = s->eng.n_nodes;
     float lo, hi; int n = sounding(s, l, &lo, &hi);
     if (n > 0) {
@@ -149,13 +151,13 @@ DSP_CTL static int pick_node(const Synth *s, int l, float voice) {
     int jb = 0; float eb = -1.f;
     for (int j = 0; j < g->npts; j++) if (g->e[j] > eb) { eb = g->e[j]; jb = j; }
     int bn = 0; float bd = 1e30f;
-    SurfPt sp; surf_pt(s->eng.surface, g->qx[jb], g->qy[jb], &sp);
+    SurfPt sp; DSP_FAR(surf_pt)(s->eng.surface, g->qx[jb], g->qy[jb], &sp);
     for (int i = 0; i < N; i++) { float dd = surf_d2(s->eng.surface, &sp, &s->eng.node[i]); if (dd < bd) { bd = dd; bn = i; } }
     return bn;
 }
 
 /* the layer drum d plays on: Drum layer's, or (Split) kick and tom on the layer sounding lower, snare and hat higher */
-DSP_CTL static int pick_layer(const Synth *s, int d) {
+static int pick_layer(const Synth *s, int d) {
     int dl = pint(s, P_DR_LAYER);
     if (dl != DLAYER_SPLIT) return dl == DLAYER_L2 ? 1 : 0;
     float lo0, hi0, lo1, hi1; int n0 = sounding(s, 0, &lo0, &hi0), n1 = sounding(s, 1, &lo1, &hi1);
@@ -189,6 +191,7 @@ static void hit(Synth *s, int d, float vel, int delay) {
 
 void drums_hit(Synth *s, int d, int node, float vel) { (void)node; if (d >= 0 && d < NUM_DRUMS) DSP_FAR(hit)(s, d, vel, 0); }
 
+#include "ctl_on.h"
 DSP_CTL static void queue(DrumV *v, int node, float vel, int32_t t) {
     if (v->nq >= DQ) return;
     v->qt[v->nq] = t; v->qv[v->nq] = vel; v->qn[v->nq] = (int16_t)node; v->nq++;

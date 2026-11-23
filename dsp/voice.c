@@ -54,6 +54,106 @@ static float g_lv_key[NUM_LAYERS][6], g_ph_key[NUM_LAYERS], g_ph_t[NUM_LAYERS][M
 #endif
 #define OSC_FLOOR 6e-3f
 #define OSC_CAP   64          /* oscillators a layer (detuned copies and tails count) */
+
+/* (1.0.7) The oscillators. Each writes straight into the layer's left and right, its level ramped sample by sample
+   (the partial's own level from the last block's to this one's, times the voice's level, duck and hits, times its
+   place in the stereo field): no per-voice buffers and no mix pass after them, and no partial's level stepping once a
+   block (a buzz at 689 Hz while Bloom, Pluck or a hit moved it). The plain ones (no Wave), the detuned copies, the
+   undertones and partials 1-3 with Wave are exact: a recursion (x -= e y; y += e x, the "magic circle") started each
+   block from the oscillator's own 32-bit phase, so nothing drifts; a 4096-entry table read at the nearest entry left
+   a stepped sine about 60 dB down, the low notes' "bit-reduced" buzz. Partials 4-13 with Wave keep the table (their
+   2nd and 3rd from one read): they carry about 1 % of that error. The bass tails read their tables between entries. */
+#define TURN (1.f / 4294967296.f)
+#ifndef WAVE_EXACT
+#define WAVE_EXACT 1                                  /* (Wave on partials 1..this: exact; above it, the table) */
+#endif
+static float PS[NUM_LAYERS][MAX_NODES][19][3] DSP_POOL;   /* each exact oscillator's state and its e (16 partials, 3 copies) */
+static float g_phop[NUM_LAYERS][MAX_HARM]; static uint32_t g_blk[NUM_LAYERS];   /* (Phase's offsets last block; blocks) */
+static float PL[NUM_LAYERS][MAX_NODES][21] DSP_POOL;   /* each oscillator's level last block (slots: 16 partials, 3 copies,
+                                                          2 tails): this block ramps from it; -1 a voice starting */
+#ifdef OSC_SHADOW
+double g_shL[SUB], g_shR[SUB]; long g_shn[4], g_shv, g_shc[4];   /* (and voice-samples; oscillator-blocks of each kind) */ float g_eb[NUM_LAYERS][2][SUB], g_xb[NUM_LAYERS][2][SUB];   /* (each layer: error, exact) */       /* (the host's check: each oscillator again, exactly, in double) */
+static double sh_sin(uint32_t ph) { return __builtin_sin(6.283185307179586 * (double)ph * (1.0 / 4294967296.0)); }
+static double sh_tail(uint32_t ph, int tl) { double x = (double)ph / 4294967296.0, a = 0; int k0 = tl ? 33 : 14, k1 = tl ? 64 : 32;
+    for (int k = k0; k <= k1; k++) a += 13.0 / k * __builtin_sin(6.283185307179586 * k * x); return a; }
+#define SH(t, y, a) do { g_shL[off0 + (t)] += (y) * (a) * gl; g_shR[off0 + (t)] += (y) * (a) * gr; } while (0)
+#endif
+/* sin and cos of r (radians, 0 .. pi/2): series, so a step coefficient is right to the float (a table's linear error
+   would make a partial run a little fast or slow across a block) */
+DSP_INL void sc_series(float r, float *sn, float *cs) {
+    float r2 = r * r;
+    *sn = r * (1.f - r2 * (1.f / 6.f) * (1.f - r2 * (1.f / 20.f) * (1.f - r2 * (1.f / 42.f) * (1.f - r2 * (1.f / 72.f)))));
+    *cs = 1.f - r2 * .5f * (1.f - r2 * (1.f / 12.f) * (1.f - r2 * (1.f / 30.f) * (1.f - r2 * (1.f / 56.f) * (1.f - r2 * (1.f / 90.f)))));
+}
+/* an exact oscillator's coefficient e = 2 sin(w/2) for its step ik (and sin, cos of w/2, for Wave), and, when sync,
+   its state from its own phase: x = sin(ph - w), y = -cos(ph - w/2), so the first step lands on ph. Else the state goes
+   on from the block before (ps): a recursion keeps its phase to the float, and a resync now and then (a voice every 64
+   blocks, staggered), at a start, when the partial comes back or when Phase moves it keeps it on the 32-bit phase */
+DSP_RAM static __attribute__((noinline)) void mcf_seed(uint32_t ph, uint32_t ik, float *st, float *ps, int sync) {
+    float w = (float)ik * TURN, hs, hc;
+    sc_series(3.14159265f * w, &hs, &hc);
+    st[2] = 2.f * hs; st[3] = hs; st[4] = hc;
+    /* (from its phase also when its pitch moved, its orbit another; or the table had it last: 1e9 there) */
+    if (sync || st[2] != ps[2] || !(ps[1] < 100.f && ps[1] > -100.f)) {
+        float p = (float)ph * TURN; st[0] = fsin(p - w); st[1] = -fsin(p - .5f * w + .25f);
+    }
+    else { st[0] = ps[0]; st[1] = ps[1]; }
+    ps[2] = st[2];
+}
+/* the loops: n samples into L and R, the level from a (before the first) by da a sample; gl and gr its gains.
+   (Called once a block, or twice when a hit lands inside it: the level's slope changes there.) */
+DSP_RAM static __attribute__((noinline)) void o_mcf(float *L, float *R, int n, float *st, float a, float da, float gl, float gr
+#ifdef OSC_SHADOW
+    , uint32_t ph, uint32_t ik, int off0
+#endif
+    ) {
+    float x = st[0], y = st[1], e = st[2];
+    for (int t = 0; t < n; t++) { x -= e * y; y += e * x; a += da; float v = x * a; L[t] += v * gl; R[t] += v * gr; }
+    st[0] = x; st[1] = y;
+#ifdef OSC_SHADOW
+    g_shc[0]++; { float aa = a - da * (float)n; for (int t = 0; t < n; t++) { aa += da; SH(t, sh_sin(ph), aa); ph += ik; } g_shn[0] += n; }
+#endif
+}
+/* exact, with Wave: c2 sin 2t + c3 sin 3t = x (K1 x + K2 y + K0 + K3 x^2), x = sin t and y = -cos(t + w/2) the state */
+DSP_RAM static __attribute__((noinline)) void o_mcfw(float *L, float *R, int n, float *st, const float *K, float a, float da, float gl, float gr
+#ifdef OSC_SHADOW
+    , uint32_t ph, uint32_t ik, int off0, float c2, float c3
+#endif
+    ) {
+    float x = st[0], y = st[1], e = st[2], K0 = K[0], K1 = K[1], K2 = K[2], K3 = K[3];
+    for (int t = 0; t < n; t++) { x -= e * y; y += e * x; a += da; float v = x * a * ((K3 * x + K1) * x + K2 * y + K0); L[t] += v * gl; R[t] += v * gr; }
+    st[0] = x; st[1] = y;
+#ifdef OSC_SHADOW
+    { float aa = a - da * (float)n; for (int t = 0; t < n; t++) { aa += da; double sn = sh_sin(ph); SH(t, sn + c2 * sh_sin(2u * ph) + c3 * sh_sin(3u * ph), aa); ph += ik; } g_shn[1] += n; g_shc[1]++; }
+#endif
+}
+/* the table, with Wave (partials 4-13) */
+DSP_RAM static __attribute__((noinline)) void o_tabw(float *L, float *R, int n, uint32_t *php, uint32_t ik, const float *T, const float *D, float w, float a, float da, float gl, float gr
+#ifdef OSC_SHADOW
+    , int off0, float c2, float c3
+#endif
+    ) {
+    uint32_t ph = *php;
+#ifdef OSC_SHADOW
+    { uint32_t q = ph; float aa = a; for (int t = 0; t < n; t++) { aa += da; double sn = sh_sin(q); SH(t, sn + c2 * sh_sin(2u * q) + c3 * sh_sin(3u * q), aa); q += ik; } g_shn[2] += n; g_shc[2]++; }
+#endif
+    for (int t = 0; t < n; t++) { uint32_t x = ph >> 20; a += da; float v = (T[x] + D[x] * w) * a; L[t] += v * gl; R[t] += v * gr; ph += ik; }
+    *php = ph;
+}
+/* a bass tail: its table read between entries */
+DSP_RAM static __attribute__((noinline)) void o_tail(float *L, float *R, int n, uint32_t *php, uint32_t ik, const float *T, float a, float da, float gl, float gr
+#ifdef OSC_SHADOW
+    , int off0, int tl
+#endif
+    ) {
+    uint32_t ph = *php;
+#ifdef OSC_SHADOW
+    { uint32_t q = ph; float aa = a; for (int t = 0; t < n; t++) { aa += da; SH(t, sh_tail(q, tl), aa); q += ik; } g_shn[3] += n; g_shc[3]++; }
+#endif
+    for (int t = 0; t < n; t++) { uint32_t x = ph >> 20; float fr = (float)(ph & 0xFFFFFu) * (1.f / 1048576.f);
+        a += da; float v = (T[x] + fr * (T[(x + 1) & 4095u] - T[x])) * a; L[t] += v * gl; R[t] += v * gr; ph += ik; }
+    *php = ph;
+}
 static float g_thr[NUM_LAYERS] = {OSC_FLOOR, OSC_FLOOR};
 
 void voices_init(void) {
@@ -130,12 +230,11 @@ void hit_profile(const Synth *s, int d, int l, int node, float o, float *out) {
     }
 }
 static void clarity_mask(Synth *s, int l, const float *key);
-#include "ctl_on.h"
-DSP_CTL static float pw(float x, float e) { return x <= 0.f ? 0.f : fexp2(e * flog2(x)); }
+static float pw(float x, float e) { return x <= 0.f ? 0.f : fexp2(e * flog2(x)); }
 
 /* the bank's function itself: a bell over the partials (centre c, width w), a tilt k^te, a comb of stride st; unit
    energy over partials 1..kmax. The voices use it, and the drums (each drum a bank of its own) */
-DSP_CTL void bank_fn(float c, float w, float te, float st, int kmax, float *a) {
+void bank_fn(float c, float w, float te, float st, int kmax, float *a) {
     float e = 0.f, ist = 1.f / st, iw = 1.f / w;
     for (int k = 1; k <= MAX_HARM; k++) {
         float K = (float)k, d = (K - c) * iw, z = (K - 1.f) * ist;
@@ -153,7 +252,7 @@ DSP_CTL void bank_fn(float c, float w, float te, float st, int kmax, float *a) {
    Partials 7, 11 and 13 (no note of any scale but the series') are held back. Under it, Depth: its undertones, an
    octave, two and three below (in tune: octaves of the note), at 1.2 D, 1.2 D^2, 1.2 D^3 of the fundamental (before
    the whole is set to unit energy: the deeper, the more of the note's energy is down there). Unit energy. */
-DSP_CTL static void bank_levels(const Synth *s, int l, float *a) {
+static void bank_levels(const Synth *s, int l, float *a) {
     float c = 2.f + 10.f * pw(pval(s, LP(l, P_V1_CENTER)), 1.6f), iw = 1.f / (.5f + 7.f * pval(s, LP(l, P_V1_BAND)));
     float p = 1.6f - 1.2f * pval(s, LP(l, P_V1_TILT)), ist = 1.f / (1.f + 3.f * pval(s, LP(l, P_V1_STRIDE)));
     int kmax = s->cap_harm < 4 ? 4 : s->cap_harm > MAX_HARM ? MAX_HARM : s->cap_harm;
@@ -172,7 +271,7 @@ DSP_CTL static void bank_levels(const Synth *s, int l, float *a) {
     e = frsqrt(e > 1e-8f ? e : 1e-8f);
     for (int k = 0; k < MAX_HARM; k++) a[k] *= e;
 }
-DSP_CTL static void bank_phases(const Synth *s, int l, float *p) {
+static void bank_phases(const Synth *s, int l, float *p) {
     float D = pval(s, LP(l, P_V1_PHASE)) * .125f;            /* Schroeder phase at Phase = 1/2 */
     for (int k = 0; k < MAX_HARM; k++) {
         float K = (float)(k + 1), x = k < NH ? .5f * D * K * K : 0.f;   /* (the undertones: in phase with the note) */
@@ -203,7 +302,6 @@ void voices_build(Synth *s) {
    room is left. A note's place in it does not depend on whether it sounds (so nothing comes and goes as notes do):
    the low notes have the low octaves, the chord above does not crowd under them. Nothing under 20 Hz is ever played.
    Worked out when the notes, the register or Clarity change; the render reads a bit a partial */
-#include "ctl_off.h"
 static void clarity_mask(Synth *s, int l, const float *key) {
     static const uint8_t ORD[MAX_HARM - 1] = {13, 1, 14, 2, 3, 15, 4, 5, 6, 7, 8, 9, 10, 11, 12};   /* (slots by nearness) */
     static const float BASE[11] = {1.f, 2.f, 3.f, 5.f, 8.f, 13.f, 21.f, 34.f, 55.f, 89.f, 144.f};
@@ -232,8 +330,8 @@ static void clarity_mask(Synth *s, int l, const float *key) {
     }
     for (int i = N; i < MAX_NODES; i++) L->pmask[i] = 0;
 }
-#include "ctl_on.h"
-DSP_CTL void voices_tick(Synth *s, int l) {
+/* (1.0.7: in the flash, with the bank's functions: once a tick a layer, and the oscillators needed the RAM) */
+void voices_tick(Synth *s, int l) {
     Layer *L = &s->layer[l];
     float key[6] = {pval(s, LP(l, P_V1_CENTER)), pval(s, LP(l, P_V1_BAND)), pval(s, LP(l, P_V1_TILT)), pval(s, LP(l, P_V1_STRIDE)), (float)s->cap_harm, pval(s, P_V1_DEPTH + l)};
     float *lk = g_lv_key[l];
@@ -258,7 +356,6 @@ DSP_CTL void voices_tick(Synth *s, int l) {
     colour(L->amp, pval(s, P_V1_ODDEVEN + l), L->amc);      /* the layer's Odd/even, once a tick (the notes take it) */
 }
 
-#include "ctl_off.h"
 /* (the RAM code has little room: the render's short set-up loops stay loops, the oscillators are what is unrolled) */
 #if defined(__clang__)
 #define NOUNROLL _Pragma("clang loop unroll(disable) vectorize(disable)")
@@ -268,6 +365,10 @@ DSP_CTL void voices_tick(Synth *s, int l) {
 /* Pluck's rate (1/T, per partial step, per second) for an amount: T from 1.5 s down to 25 ms; 0 off */
 DSP_INL float pluck_rate(float p) { return p > .01f ? (1.f / 1.5f) * fexp2(6.f * p) : 0.f; }
 DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
+#ifdef OSC_SHADOW
+    for (int t = 0; t < n; t++) g_shL[t] = g_shR[t] = 0.;
+    float L0_[SUB], R0_[SUB]; for (int t = 0; t < n; t++) { L0_[t] = Lo[t]; R0_[t] = Ro[t]; }
+#endif
     Layer *L = &s->layer[l]; GenSt *g = &L->g; Engine *e = &s->eng;
     int N = e->n_nodes < g->n ? e->n_nodes : g->n;
     float oct = fexp2((float)(pint(s, LP(l, P_V1_REG)) - 1));
@@ -309,13 +410,8 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
     /* The oscillators are floating point throughout: 32-bit table reads and FPU multiplies. (They were 16-bit table
        reads beside integer multiplies, the pattern fm1-base's bsp/docs/CPU.md reports as leaving a register a bit off
        on this chip; in an accumulator that is a click.) */
-    /* Each oscillator adds into one buffer of four (one accumulate a sample, not two): the fundamental and the tails
-       (centre), the odd partials, the even ones, and the detuned copies. Mid and side are formed once a voice from
-       them: side = 0.6 Width (odd - even) + 0.8 Width (+-1) detuned. Partials 2 and 3 have buffers of their own: on a
-       detuned note their side is not taken down with their share of the level (it never was), so it is 1/0.8125 of
-       their mid's. (One way through for every note: rolls nearly always have Spin and Width, and the RAM is short.) */
-    static float accB[NUM_LAYERS][6][SUB] DSP_POOL;                  /* (a layer each: layer 2 may run on the second core) */
-    float *aC = accB[l][0], *aO = accB[l][1], *aE = accB[l][2], *aD = accB[l][3], *a2 = accB[l][4], *a3 = accB[l][5];
+    uint32_t phm = 0; NOUNROLL for (int j = 0; j < MAX_HARM; j++) if (L->pho[j] != g_phop[l][j]) { phm |= 1u << j; g_phop[l][j] = L->pho[j]; }
+    uint32_t blk = g_blk[l]++;
     int nv = 0, nosc = 0;
     const int capo = OSC_CAP, hard = capo + capo / 8;   /* (every oscillator counts against it: copies and tails too) */
     float thr = g_thr[l];
@@ -346,7 +442,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         }
         if (((g0 <= 0.f && g1 <= 0.f) || (a0 < 1e-6f && a1 < 1e-6f)) && H0 < 1e-6f && H1 < 1e-6f) { v->on = 0; continue; }
         if (f > .45f * SR) { v->on = 0; continue; }
-        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->age = 0.f; v->pk = 0.f; v->hp = 0.f; v->hq = 0.f; v->pq = 1.f; v->oe = 0.f; v->hd = -1; }   /* a note starting: its oscillators from the phase law */
+        if (!v->on) { v->ph = 0; v->ph2 = (uint32_t)i * 0x9E3779B9u; v->on = 1; v->age = 0.f; v->pk = 0.f; v->hp = 0.f; v->hq = 0.f; v->pq = 1.f; v->oe = 0.f; v->hd = -1; for (int z = 0; z < 21; z++) PL[l][i][z] = -1.f; }   /* a note starting: its oscillators from the phase law */
         float plv = plk;
         {   /* Pluck's clock: back to 0 while the note's level (and its hits) rises past where it was. A drum's Pluck
                holds on the note after its hit: until the note rises by itself, or, 2 s without a plucking hit, let go
@@ -375,6 +471,9 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             av = vam;
         }
         nv++;
+#ifdef OSC_SHADOW
+        g_shv += n;
+#endif
         uint32_t inc8 = (uint32_t)(f * (4294967296.f / (8.f * SR))), inc = inc8 * 8u, ph8 = v->ph;   /* (an eighth of its pitch) */
         uint16_t pmk = L->pmask[i];
         /* Detune: the note's first three partials are doubled by a copy a few cents away (up to 14, each note its own
@@ -425,23 +524,55 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             NOUNROLL for (int k = 0; k < MAX_HARM; k++) wk[k] = 1.f + cap * (wk[k] * nr - 1.f);
             ap = ab;
         }
-        for (int t = 0; t < n; t++) { aC[t] = 0.f; aO[t] = 0.f; aE[t] = 0.f; aD[t] = 0.f; a2[t] = 0.f; a3[t] = 0.f; }
+        /* the voice's place, level and hits, worked out before its oscillators now (they take them in their own level) */
+        float pn = fclamp(.5f + (nd->x - .5f) * width * .9f, 0.f, 1.f);   /* place on the surface, by Width */
+        float gl = fsin(.25f + pn * .25f) * lg * wnorm, gr = fsin(pn * .25f) * lg * wnorm;
+        /* the voice's own level, under the kick's duck; the hits' on top (not ducked), from the sample they land. Its
+           value before the first sample (K0), at the sample before the newest hit lands (Km) and at the last (K1): a
+           straight line between them, so an oscillator's level is too (a hit inside the block: two lines) */
+        float amp0 = a0 * g0 * dk0, amp1 = a1 * g1 * dk1, da = (amp1 - amp0) * inv_n;
+        float hsc = lg > 1e-6f ? DR_OUT / lg : 0.f;                  /* (the hits' own gain: not the layer's level staging) */
+        float hv0 = hl[i] > 0.f ? H0 * hsc : 0.f, hv1 = hl[i] > 0.f && off < n ? H1 * hsc : hv0;
+        int n1 = hl[i] > 0.f && off > 0 && off < n ? off : n;     /* (the first line's length) */
+        float K0 = amp0 + hv0, K1 = amp1 + hv1;
+        float Km = n1 < n ? amp0 + da * (float)n1 + hv0 : K1;   /* (one line: it ends at K1, a hit's rise from the block's start included) */
+        float i1 = 1.f / (float)n1, i2 = n1 < n ? 1.f / (float)(n - n1) : 0.f;
+        /* the stereo: side = 0.6 Width (odd - even) + 0.8 Width (+-1) on the detuned copies; partials 2 and 3 their own
+           (on a detuned note their side is not taken down with their share of the level, so it is 1/0.8125 of their
+           mid's). Each oscillator's left gain is gl (1 + side), its right gr (1 - side) */
+        float swo = .6f * width, w23 = dup ? swo * (1.f / .8125f) : swo, wd = !dup ? 0.f : (i & 1) ? .8f * width : -.8f * width;
+        float *pl = PL[l][i];
+        /* (while a hit sounds on the note, or its own level rises fast, the partials take this block's levels at once,
+           as they always did: the drums' bite is partly that step, block to block (ramped, a snare lost about 7 dB above
+           1.6 kHz), and an attack's crack comes with it. Elsewhere they ramp: no steps in a note's Bloom, Pluck or
+           colour as it moves) */
+        int jump = hl[i] > 0.f || K1 > 1.25f * K0 + 1e-6f;
+        int vsync = ((blk + (uint32_t)i * 7u) & 63u) == 0u;   /* (this voice's resync, a block in 64) */
+#ifdef OSC_SHADOW
+        const int off0 = 0;
+#endif
+        /* an oscillator's level line: from its last level pa (times K0) to its new one ai (times K1), through Km at n1 */
+        /* (a hit landing inside the block: the old levels up to the sample it lands on, its own from there, so a
+           hit's colour comes with it and not before; else the levels move across the block) */
+        #define LEVELS(pa_, ai_) float A0 = (pa_) * K0, Am = n1 < n ? (pa_) * Km : (ai_) * K1, A1 = (ai_) * K1, \
+                                       d1 = (Am - A0) * i1, d2 = (A1 - (ai_) * Km) * i2; \
+                                 float Am2 = (ai_) * Km
         /* each partial: a harmonic (slots 0..12: Bloom and Pluck step down along them) or an undertone (13..15: they
            keep their level, and are the last to go; no Wave on them, its 3rd would be out of tune) */
         for (int j = 0; j < MAX_HARM; j++) {
             int hm = j < NH;
             float sb = hm ? bm * pm : 1.f;
             if (hm) { bm *= dm; pm *= pq; }
-            if (!(pmk & (1u << j))) continue;                 /* (Clarity's mask, and the 20 Hz floor) */
+            if (!(pmk & (1u << j))) { pl[j] = 0.f; if (j < 3) pl[16 + j] = 0.f; continue; }   /* (Clarity's mask, and the 20 Hz floor) */
             float fk = f * PR[j], r2 = fk * fk * ifc2, ak = ap[j] * sb * reg / (1.f + r2 * r2);
             if (wo) ak *= wk[j];
-            if (ak < thr) continue;                       /* (under -42 dB of the note, or the cap's floor: not played) */
-            if (nosc >= hard && j > 0) continue;              /* (a burst past the cap, before the floor has risen) */
+            if (ak < thr || (nosc >= hard && j > 0)) { pl[j] = 0.f; if (j < 3) pl[16 + j] = 0.f; continue; }   /* (under -42 dB of the note, or the cap's floor; or a burst past the cap) */
             nosc++;
             float ai = ak;
             if (kw > 0.f && ak < 2.f * thr) ai *= 1.f - kw * (1.f - (ak - thr) / thr);   /* the cap's knee */
             int k = j + 1;
-            float *A = !hm || k == 1 ? aC : k == 2 ? a2 : k == 3 ? a3 : (k & 1) ? aO : aE;   /* (undertones: the centre) */
+            float sd = !hm || k == 1 ? 0.f : k == 2 ? -w23 : k == 3 ? w23 : (k & 1) ? swo : -swo;   /* (undertones: the centre) */
+            float glk = gl * (1.f + sd), grk = gr * (1.f - sd);
             uint32_t ph = ph8 * PM[j] + (uint32_t)(L->pho[j] * 4294967296.f), ik = inc8 * PM[j];
             const float *D = !hm ? 0 : 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
             /* Wave's 2nd and 3rd of this partial sit at 2 and 3 times its frequency: under Tone there, not here (taken
@@ -450,53 +581,83 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             float w = D ? wq * (1.f + r2 * r2) / (1.f + 39.06f * r2 * r2) : 0.f;
             int cp = dup && k <= 3 && nosc < hard;        /* (its detuned copy: under the cap) */
             if (cp) ai *= .8125f;                      /* (shared with its detuned copy: the pair at the same power) */
-            if (w == 0.f) {                                         /* the plain oscillator */
-                for (int t = 0; t < n; t++) { A[t] += T_SIN[ph >> OSC_SH] * ai; ph += ik; }
-            } else {                                          /* with Wave's addition (its 2nd and 3rd harmonic) */
-                float aw = ai * w;
-                for (int t = 0; t < n; t++) { uint32_t x = ph >> OSC_SH; A[t] += T_SIN[x] * ai + D[x] * aw; ph += ik; }
+            float pa_ = pl[j], pa = pa_ >= 0.f && !jump ? pa_ : ai; pl[j] = ai;
+            LEVELS(pa, ai);
+            if (w == 0.f || k <= WAVE_EXACT) {                /* exact: plain, or Wave on the lowest partials */
+                float st[5]; mcf_seed(ph, ik, st, PS[l][i][j], vsync || pa_ <= 0.f || ((phm >> j) & 1u));
+                if (w == 0.f) {
+#ifdef OSC_SHADOW
+                    o_mcf(Lo, Ro, n1, st, A0, d1, glk, grk, ph, ik, 0);
+                    if (n1 < n) o_mcf(Lo + n1, Ro + n1, n - n1, st, Am2, d2, glk, grk, ph + ik * (uint32_t)n1, ik, n1);
+#else
+                    o_mcf(Lo, Ro, n1, st, A0, d1, glk, grk);
+                    if (n1 < n) o_mcf(Lo + n1, Ro + n1, n - n1, st, Am2, d2, glk, grk);
+#endif
+                } else {
+                    float c2 = .5f * w, c3 = D == T_D1 ? .33f * w : 0.f, icw = 1.f / st[4];
+                    float Kw[4] = {1.f + 3.f * c3, 2.f * c2 * st[3] * icw, -2.f * c2 * icw, -4.f * c3};
+#ifdef OSC_SHADOW
+                    o_mcfw(Lo, Ro, n1, st, Kw, A0, d1, glk, grk, ph, ik, 0, c2, c3);
+                    if (n1 < n) o_mcfw(Lo + n1, Ro + n1, n - n1, st, Kw, Am2, d2, glk, grk, ph + ik * (uint32_t)n1, ik, n1, c2, c3);
+#else
+                    o_mcfw(Lo, Ro, n1, st, Kw, A0, d1, glk, grk);
+                    if (n1 < n) o_mcfw(Lo + n1, Ro + n1, n - n1, st, Kw, Am2, d2, glk, grk);
+#endif
+                }
+                PS[l][i][j][0] = st[0]; PS[l][i][j][1] = st[1];
+            } else {                                          /* the table, with Wave's 2nd and 3rd (partials 4-13) */
+                PS[l][i][j][1] = 1e9f;                        /* (back on the recursion: from its phase) */
+#ifdef OSC_SHADOW
+                float c2 = .5f * w, c3 = D == T_D1 ? .33f * w : 0.f;
+                o_tabw(Lo, Ro, n1, &ph, ik, T_SIN, D, w, A0, d1, glk, grk, 0, c2, c3);
+                if (n1 < n) o_tabw(Lo + n1, Ro + n1, n - n1, &ph, ik, T_SIN, D, w, Am2, d2, glk, grk, n1, c2, c3);
+#else
+                o_tabw(Lo, Ro, n1, &ph, ik, T_SIN, D, w, A0, d1, glk, grk);
+                if (n1 < n) o_tabw(Lo + n1, Ro + n1, n - n1, &ph, ik, T_SIN, D, w, Am2, d2, glk, grk);
+#endif
             }
-            if (cp) {                                         /* the detuned copy of the first three partials */
+            if (cp) {                                         /* the detuned copy of the first three partials (exact) */
                 nosc++;
-                float ad = ai * .625f;
+                float ad = ai * .625f, pd_ = pl[16 + j], pd = pd_ >= 0.f && !jump ? pd_ : ad; pl[16 + j] = ad;
                 uint32_t q = v->ph2 * (uint32_t)k, iq = inc2 * (uint32_t)k;
-                for (int t = 0; t < n; t++) { aD[t] += T_SIN[q >> OSC_SH] * ad; q += iq; }
-            }
+                float glc = gl * (1.f + wd), grc = gr * (1.f - wd), st[5]; mcf_seed(q, iq, st, PS[l][i][16 + j], vsync || pd_ <= 0.f);
+                LEVELS(pd, ad);
+#ifdef OSC_SHADOW
+                o_mcf(Lo, Ro, n1, st, A0, d1, glc, grc, q, iq, 0);
+                if (n1 < n) o_mcf(Lo + n1, Ro + n1, n - n1, st, Am2, d2, glc, grc, q + iq * (uint32_t)n1, iq, n1);
+#else
+                o_mcf(Lo, Ro, n1, st, A0, d1, glc, grc);
+                if (n1 < n) o_mcf(Lo + n1, Ro + n1, n - n1, st, Am2, d2, glc, grc);
+#endif
+                PS[l][i][16 + j][0] = st[0]; PS[l][i][16 + j][1] = st[1];
+            } else if (j < 3) pl[16 + j] = 0.f;
         }
         /* a low note has more than thirteen harmonics in the audible range: the rest (14..32, and 33..64) come from one
            table each, continuing at the 13th's level and a saw's slope, under Tone like the others (at their middle) */
         for (int tl = 0; tl < 2; tl++) {
             float top = f * (tl ? 64.f : 32.f), mid = f * (tl ? 46.f : 23.f), r2 = mid * mid * ifc2;
             float ak = av[NH - 1] * pm * reg / (1.f + r2 * r2);
-            if (top > .45f * SR || ak < 4e-3f || !(pmk & (1u << (NH - 1))) || nosc >= hard) break;
+            if (top > .45f * SR || ak < 4e-3f || !(pmk & (1u << (NH - 1))) || nosc >= hard) { for (int z = tl; z < 2; z++) pl[19 + z] = 0.f; break; }
             nosc++;
-            float ai = ak;
+            float ai = ak, pa = pl[19 + tl] >= 0.f && !jump ? pl[19 + tl] : ai; pl[19 + tl] = ai;
             const float *T = tl ? T_T2 : T_T1; uint32_t ph = ph8 * 8u;
-            for (int t = 0; t < n; t++) { aC[t] += T[ph >> 20] * ai; ph += inc; }
+            LEVELS(pa, ai);
+#ifdef OSC_SHADOW
+            o_tail(Lo, Ro, n1, &ph, inc, T, A0, d1, gl, gr, 0, tl);
+            if (n1 < n) o_tail(Lo + n1, Ro + n1, n - n1, &ph, inc, T, Am2, d2, gl, gr, n1, tl);
+#else
+            o_tail(Lo, Ro, n1, &ph, inc, T, A0, d1, gl, gr);
+            if (n1 < n) o_tail(Lo + n1, Ro + n1, n - n1, &ph, inc, T, Am2, d2, gl, gr);
+#endif
         }
+        #undef LEVELS
         v->ph2 += inc2 * (uint32_t)n;
         v->ph = ph8 + inc8 * (uint32_t)n;
-        float pn = fclamp(.5f + (nd->x - .5f) * width * .9f, 0.f, 1.f);   /* place on the surface, by Width */
-        float gl = fsin(.25f + pn * .25f) * lg * wnorm, gr = fsin(pn * .25f) * lg * wnorm;
-        /* the voice's own level, under the kick's duck; the hits' on top (not ducked), from the sample they land */
-        float amp = a0 * g0 * dk0, da = (a1 * g1 * dk1 - amp) * inv_n;
-        float hsc = lg > 1e-6f ? DR_OUT / lg : 0.f;                  /* (the hits' own gain: not the layer's level staging) */
-        float hv = H0 * hsc, dh = off < n ? (H1 - H0) * hsc / (float)(n - off) : 0.f;
-        {   float wo = .6f * width, w23 = dup ? wo * (1.f / .8125f) : wo, wd = !dup ? 0.f : (i & 1) ? .8f * width : -.8f * width;
-            if (hl[i] == 0.f) for (int t = 0; t < n; t++) {           /* (no hit on it: the plain mix) */
-                amp += da;
-                float o = aO[t], ev = aE[t], dd = aD[t], p2 = a2[t], p3 = a3[t];
-                float m = (aC[t] + o + ev + dd + p2 + p3) * amp, sd = (wo * (o - ev) + w23 * (p3 - p2) + wd * dd) * amp;
-                Lo[t] += (m + sd) * gl; Ro[t] += (m - sd) * gr;
-            } else for (int t = 0; t < n; t++) {
-                amp += da; if (t >= off) hv += dh;
-                float lev = amp + hv;
-                float o = aO[t], ev = aE[t], dd = aD[t], p2 = a2[t], p3 = a3[t];
-                float m = (aC[t] + o + ev + dd + p2 + p3) * lev, sd = (wo * (o - ev) + w23 * (p3 - p2) + wd * dd) * lev;
-                Lo[t] += (m + sd) * gl; Ro[t] += (m - sd) * gr;
-            }
-        }
     }
+#ifdef OSC_SHADOW
+    for (int t = 0; t < n; t++) { g_eb[l][0][t] = (float)((Lo[t] - L0_[t]) - g_shL[t]); g_eb[l][1][t] = (float)((Ro[t] - R0_[t]) - g_shR[t]);
+                                   g_xb[l][0][t] = (float)g_shL[t]; g_xb[l][1][t] = (float)g_shR[t]; }
+#endif
     if (nosc > capo) { thr *= 1.3f; if (thr > .1f) thr = .1f; }
     else if (thr > OSC_FLOOR && nosc < capo - capo / 8) { thr *= .92f; if (thr < OSC_FLOOR) thr = OSC_FLOOR; }
     g_thr[l] = thr;
