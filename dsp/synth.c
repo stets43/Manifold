@@ -86,7 +86,7 @@ DSP_CTL static void control_tick(Synth *s) {
     drums_tick(s, dt);
     if (s->clock) s->prof[PROF_SEQ] += s->clock() - c0;
     for (int l = 0; l < NUM_LAYERS; l++) {
-        voices_tick(s, l);
+        DSP_FAR(voices_tick)(s, l);
         /* gain staging: Level, over the square root of how much is sounding (its energy, averaged over ~1.5 s: the
            rhythm's own dynamics pass, a dense function and a sparse one sit at the same level) */
         Layer *L = &s->layer[l]; float e = 0.f;
@@ -187,7 +187,9 @@ DSP_CTL void synth_process(Synth *s, float *outL, float *outR, int n) {
             e2 += L[t] * L[t] + R[t] * R[t];
         }
         s->eng.env_follow += 0.05f * (e2 / (2.f * (float)m) * frsqrt(e2 / (2.f * (float)m) + 1e-20f) - s->eng.env_follow);
-        if (!finite_block(L, m) || !finite_block(R, m)) {  /* never let a blow-up through */
+        /* never let a blow-up through: a NaN, or a sample past 1e4, puts the block's energy past 1e8 (or makes it a NaN),
+           so the samples are looked at only then (1.0.7: not every block) */
+        if (!(e2 < 1e8f) && (!finite_block(L, m) || !finite_block(R, m))) {
             DSP_FAR(synth_silence)(s);
             memset(L, 0, sizeof(float) * (size_t)m); memset(R, 0, sizeof(float) * (size_t)m);
         }

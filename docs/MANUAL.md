@@ -20,8 +20,8 @@ This guide covers installing the firmware, playing it, and every page and settin
 
 ## Contents
 
-1. Install
-2. Quick start
+1. Quick start
+2. Install
 3. How MANIFOLD thinks
 4. The screen
 5. Controls at a glance
@@ -38,9 +38,77 @@ This guide covers installing the firmware, playing it, and every page and settin
 16. Setup (HOME twice)
 17. MIDI
 18. Bluetooth audio
-19. Recipes
-20. Troubleshooting
-21. For developers
+19. USB audio
+20. Recipes
+21. Troubleshooting
+22. For developers
+
+---
+
+## Quick start
+
+### Make music in a minute
+
+1. **Press PLAY.** The patch plays itself: two layers of points move over the scale and every note they pass sounds.
+   PLAY again stops it.
+2. **Turn PRESET** to pick a style (Wild, Hip-hop, Groove, Ambient, Cosmic, House, Machine, Breakbeat). Once the knob
+   rests it rolls a new patch in that style.
+3. **Tap REC** until you hear something you like. Each tap is a new sound over the same scale.
+4. **Turn K1–K4** to steer it while it plays.
+5. **Play the keys** over it. A key sounds its note and pulls the moving points toward it, so the music bends around
+   what you play.
+6. **Hold SAVE and press a key (1–16)** to keep the patch. **Hold HOME and press the key** to load it again.
+
+### How the rolls work
+
+A roll makes a whole patch from a random **seed**, shaped by the **style**. The same seed and style always give the
+same patch, and a roll glides into the new patch over about 1.5 s instead of jumping.
+
+| Do | Rolls |
+| --- | --- |
+| REC (tap) | the sound: both voices, both layers, the rhythm and the drums. The scale, the effects, the matrix and the knobs stay. Two rolls in five are **Dry** (the effects set to nothing, the Space knob becomes Shape) |
+| REC (double tap) | everything except the scale |
+| REC (hold) | a mutation: every setting nudged a little from where it is |
+| REC + a page button | only that page. **REC + SEL** is the only roll that changes the scale |
+| PRESET / ALGO | a new patch in the chosen style / the next or previous seed |
+
+**SAVE + a page button** locks that page so rolls leave it alone: keep a scale or a voice you like and roll the rest.
+**Hold PLAY and press key 13** to undo the last roll.
+
+### The performance knobs
+
+On the Perform page, K1–K4 are **Timbre** (the voices' tone), **Groove** (the rhythm and the drums), **Space** (the
+effects; **Shape** in a Dry patch: the drums' envelopes as a kit) and **Motion** (how the layers move). The centre is
+the patch as rolled. Each knob is not a single setting but a **path** through a dozen or more: every setting on it
+goes its own way, so a full turn travels through several sounds. **REC + HOME** rolls new paths; **SAVE + HOME** locks
+them. Hold PLAY for the performance keys: scenes 1–4 (tap to recall, hold to store), tap tempo, fill, freeze, latch,
+mutes, undo and panic.
+
+### Play it as a synth
+
+The keys always play, with or without PLAY. **Stopped**, nothing moves and nothing plays by itself: MANIFOLD is a
+polyphonic synth, every key a note of the scale (key 1 low, each key up the next note), always in tune with the
+patch. OCT − and OCT + shift by a scale period. Each layer's **Contour** (EDIT and ARP, *Envelope* tab, K3) shapes its
+notes: high is struck (a fast rise and fall), low is bowed (a slow rise, long hold and slow release). The voices (ENV
+and GLO) set the tone and the effects (FX) are as they are in the patch. **Setup → Keys** chooses which layer the keys
+play (or the drums), and **Latch** (PLAY held, key 8) holds notes for a drone. MIDI notes in (USB, Bluetooth or the TRS
+jack) play the scale note nearest their pitch, with velocity. Press PLAY to let the patch play around you again.
+
+### Tuning: just or equal
+
+MANIFOLD tunes in **just intonation**: every note is a whole-number ratio of the scale's root (3/2, 5/4, 7/4…), and
+every partial of every note a whole-number multiple of it, so chords fuse instead of beating, and intervals outside
+the piano's, such as the natural seventh (7/4), are notes of their own. Most other instruments use **12-tone equal temperament**, where every semitone is the
+same size and every interval but the octave is slightly out of tune. **Temper** (SEL, the *Temper & surface* tab, K1)
+moves every note continuously from its just ratio (Just) to the nearest equal-tempered pitch (Equal (12-tone)). The
+root is always an equal-tempered pitch at A = 440 Hz, so even in Just the root agrees with other instruments.¹
+
+¹ **To play with other synths or a band in 12-tone equal temperament:** SEL, *Temper & surface* tab, turn K1
+fully right (the screen shows **Equal (12-tone)**); on the *Tuning* tab set **Root** (K3) to the song's key; for MIDI
+out to other hardware choose Setup → MIDI out → **Tuning: Standard** (MPE sends the just pitches as pitch bends).
+Temper is never rolled or put on a knob, so it stays while you roll; it is stored with a patch, and a fresh power-on
+patch starts at Just. Scales built on high harmonics move furthest (the 7th harmonic by about a third of a semitone,
+the 11th by half) and lose their character; a mode or the Chromatic scale gives a conventional keyboard.
 
 ---
 
@@ -67,24 +135,6 @@ sounds the same as the FM-1, and patches you store there are kept in the browser
 
 **After installing**, the FM-1 starts on a fresh patch every time: a Groove-style roll on the 1-3-5-9 hexany with
 its root on A1. It is silent until you press PLAY (the keys play at once).
-
----
-
-## Quick start
-
-1. **Press PLAY.** The two layers start moving and the patch plays itself. PLAY again stops it.
-2. **Turn K1–K4** on the Perform page. These are the performance knobs: **Timbre**, **Groove**, **Space** and
-   **Motion**. Each one moves a dozen or more settings at once along its own path; the centre is the patch as rolled.
-3. **Play the keys.** A key sounds its note and pulls the moving points toward it, so the music bends around what
-   you play and lets go when you release.
-4. **Tap REC** for a new sound (the scale stays). **Double-tap REC** to roll everything.
-5. **Turn PRESET** to choose a style (Wild, Hip-hop, Groove, Ambient, Cosmic, House, Machine, Breakbeat); it
-   rolls a new patch in that style once the knob rests.
-6. **Hold SAVE and press a key (1–16)** to store the patch. **Hold HOME and press the key** to load it again. A tap
-   on **SAVE** shows the Patches page: four banks of 16.
-7. **Hold PLAY** to see the performance keys: scenes, tap tempo, fill, freeze, latch, mutes, undo and panic.
-
-That is enough to play. The rest of this guide explains what each part does, so you can shape it.
 
 ---
 
@@ -184,7 +234,7 @@ what the buttons do on this page.
 | --- | --- |
 | PLAY (tap) | start / stop the generators and the rhythm (the keys always play) |
 | PLAY (hold) | the performance keys appear on the white keys (see below) |
-| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; a quarter of the time it makes the patch Dry, which sets the effects to nothing; from a Dry patch to a wet one it rolls the effects too, unless they are locked) |
+| REC (tap) | roll the sound: both voices, both layers, the rhythm and the drums (never the scale, effects or knobs; two times in five it makes the patch Dry, which sets the effects to nothing; from a Dry patch to a wet one it rolls the effects too, unless they are locked) |
 | REC (double tap) | roll everything except the scale |
 | REC (hold 0.7 s) | mutate: a small nudge to every continuous setting |
 | REC + a page button | roll only that page (REC + FX or REC + LFO: the matrix, the LFOs and the effects together) |
@@ -237,7 +287,7 @@ the knob as you turn it.
 | **Space** | the effects | filter cutoff and resonance, reverb mix, size, decay and damp, delay send and feedback |
 | **Motion** | both layers, the path view and the LFOs, the patterns' rotations and fills, the layers' levels (±3 dB at most, one up as the other goes down: which layer leads) | layer 1's Rate and Reach, the layers' levels; in a genre style, often the hat's and the fourth part's rotation (by 8ths) |
 
-**A Dry patch** (a quarter of all rolls) starts with its effects doing nothing: no fuzz, the filter wide open, nothing
+**A Dry patch** (two rolls in five; a quarter before 1.0.7) starts with its effects doing nothing: no fuzz, the filter wide open, nothing
 sent to the delay or the reverb. An effect set so is not run at all, which leaves the FM-1 more headroom (the delay and
 the reverb stop once their tails have rung out; the filter glides out over about 30 ms). They are still there: turn one
 up on its FX page and it runs as in any patch. The Space knob becomes **Shape** (FX → Output, K4, **Space knob**:
@@ -335,7 +385,7 @@ relatives.
 
 **What a roll changes:**
 
-- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (a quarter Dry).
+- **REC (tap)** rolls the sound: both voices, both layers, the rhythm and the drums, and Dry or not (two in five Dry).
   Its knobs' paths stay as they were; a double tap (or REC + HOME) gives a Dry patch Shape's kit paths too.
 - **REC (double tap)** rolls everything but the scale: the sound, the matrix, the LFOs, the effects and the knobs.
 - **REC + a page button** rolls only that page. **REC + SEL** is the only roll that changes the scale.
@@ -387,7 +437,7 @@ pull on, and each layer's Balance at Balanced. They may sound different: the voi
 Empty), so stay on 1.0.5 or later once you have saved with it.
 
 **Patches from 1.0.5** load in 1.0.6 as they were (wet, Drum notes at Follow). A patch saved by 1.0.6 is in a newer
-format again, which 1.0.5 shows as Empty.
+format again, which 1.0.5 shows as Empty. **1.0.7** keeps 1.0.6's format: patches move between them both ways.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
@@ -919,6 +969,33 @@ of a device's audio inputs in turn for SBC, so a device that offers AAC or its o
 
 ---
 
+## USB audio
+
+The USB cable carries audio both ways as well as MIDI, with no driver to install: the FM-1 is a class-compliant USB
+audio device (UAC1) named **MANIFOLD FM-1**, for macOS, Windows and Linux, and most tablets and phones that take USB
+audio.
+
+**Record the FM-1 on a computer.** Connect it with a USB data cable and choose **MANIFOLD FM-1** as the input in your
+recording software (or in the system's sound settings). It sends the FM-1's stereo output, 16-bit, at 44.1 kHz or
+48 kHz: the software picks the rate, and at 48 kHz the FM-1 converts in step with its own 44.1 kHz. What is recorded is
+exactly what the speaker plays, after the effects and the limiter, at the **MASTER** knob's level. Turn MASTER most of
+the way up while recording: with 16 bits, a quiet setting records a quiet, noisier signal. The recording never
+contains the computer's own audio (below), so a computer playing back what it records makes no loop.
+
+**Play the computer through the FM-1.** Choose **MANIFOLD FM-1** as the output too: the computer's audio is mixed
+into the FM-1's speaker and headphones, also at MASTER's level, and goes out over Bluetooth audio if that is
+streaming. Use it to play along with a track, or to monitor a recording through the FM-1's headphones.
+
+Notes:
+
+- Both directions work alongside USB MIDI in and out, Bluetooth MIDI and Bluetooth audio. A USB charger or power bank
+  carries no audio: it takes a computer (or another USB audio host).
+- While Bluetooth audio streams, the FM-1's own speaker and headphones are muted (see [Bluetooth audio](#bluetooth-audio))
+  but the USB recording continues.
+- The USB recording is the lowest-latency way to hear the FM-1 on a computer; Bluetooth audio arrives 150–300 ms late.
+
+---
+
 ## Recipes
 
 **A slow ambient bed.** PRESET → Ambient. On Layer 1: Motion Drift or Gravity, Envelope Swell at 1 per 4 bars,
@@ -950,6 +1027,9 @@ exactly their notes over the beat. Turn Groove to move the patterns to busier or
 ---
 
 ## Troubleshooting
+
+**Nothing records over USB.** Choose MANIFOLD FM-1 as the recording input, check the cable carries data (charging-only
+cables do not), and turn MASTER up: the recording follows it.
 
 **No sound.** Press PLAY (the generators start stopped). Check Master (FX → Output) and the layer levels. Check the
 performance-key mutes (hold PLAY: L1, L2, GEN on the Perform page should be lit). If BT shows in the header, the
@@ -995,7 +1075,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.6 # -> build/manifold-1.0.6.fwsc
+python3 tools/build.py ../Manifold --release 1.0.7 # -> build/manifold-1.0.7.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key
@@ -1280,6 +1360,19 @@ adds each harmonic's own 2nd and 3rd harmonics (0.5 sin 2x + 0.33 sin 3x; not th
 under Tone where they sound (at 2.5 times the partial's frequency), not where the partial does;
 Detune doubles partials 1–3 with copies up to 14 cents away. No partial above 0.45·*f*ₛ is played.
 
+**The oscillators** (1.0.7). A plain partial, a Detune copy, an undertone and the fundamental with Wave are each an
+exact recursive sine, the magic circle x ← x − e·y, y ← y + e·x with e = 2 sin(ω/2): two multiplies and two adds a
+sample, no table, its amplitude constant to rounding. It is seeded from the note's phase (x = sin(φ − ω), y = −cos(φ −
+ω/2)) when a voice starts, when a partial returns, when Phase moves, when the pitch changes, and every 64 blocks
+otherwise (staggered across voices), so the phase law and the undertones' lock hold. Wave on the fundamental comes from
+the same state: c₂ sin 2θ + c₃ sin 3θ = x·(K₃x² + K₁x + K₂y + K₀). Wave on partials 2–13 reads a 4096-entry table, and
+the two bass tails (harmonics 14–32 and 33–64) read theirs with interpolation. Each oscillator adds straight into its
+layer's stereo with its own level line through the block: a ramp, or, while a drum hit sounds or the level rises
+fast, a step, as before, so the hits keep their attack; a hit landing inside the block bends the line where it lands.
+Against a double-precision copy of every oscillator, the error is 70–110 dB under the voices (it was 46–59 dB with
+tables throughout, a buzz on low notes). A note's Tone weights and each oscillator's e are kept until its pitch or
+Tone moves.
+
 The oscillator budget is 64 per layer. When a layer needs more, a floor rises (from −44 dB relative to each note) so
 the quietest partials fade first, over a one-octave knee; whole notes are never cut.
 
@@ -1315,8 +1408,9 @@ blend from a 500 Hz low-pass to a 1.4 kHz high-pass. Filter: one resonant state-
 high outputs crossfaded by Filter type. Delay: a bucket-brigade-style line whose write rate sets the time. Reverb: an
 8-line feedback delay network at half the sample rate (mutually prime lengths of 34–99 ms scaled by Size, four of them
 modulated), with allpass diffusion; its input through a 4-pole 9 kHz low-pass first (so nothing above 12 kHz folds
-back into the tail), its lines' damping split at 1.5 kHz (the top's decay 1 − 0.75·Damp of the rest's), its 16-bit
-lines rounded, not cut; Tuned snaps each line to a whole number of periods of a scale note. Compressor:
+back into the tail), its lines' damping split at 1.5 kHz (the top's decay 1 − 0.75·Damp of the rest's), its lines
+(and the delay's) 16-bit floating point (1.0.7: a 5-bit exponent and 10-bit mantissa packed into an int16 by one FPU
+multiply, so the rounding falls with the tail, about 66 dB under each value, instead of a fixed −71 dBFS hiss); Tuned snaps each line to a whole number of periods of a scale note. Compressor:
 a bus compressor with parallel mix; Pump ducks it on layer 1's onsets. Limiter: peak detection over eight 8-sample segments 64 samples
 ahead, a 16-sample attack and ~280 ms release, ceiling −0.5 dBFS; then a soft clip.
 

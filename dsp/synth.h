@@ -418,13 +418,13 @@ typedef struct {
     float fz_hp[2], fz_l1[2], fz_h1[2], fz_l2[2], fz_tl[2], fz_th[2], fz_thx[2];
     Svf   morph[2];
     /* BBD delay */
-    int16_t dbuf[16384];
+    int16_t dbuf[16384];      /* (1.0.7: 16-bit floats, fx.c to16 / fr16) */
     int    dw; float dacc, dD, dlp1, dlp2, dout_lp[2], dfb_hp;
     /* FDN reverb */
-    int16_t rbuf[8][RV_BUF];
+    int16_t rbuf[8][RV_BUF];  /* (16-bit floats) */
     int    rw[8]; float rlen[8], rlen_tgt[8], rlp[8];
     float  ap_buf[4][200]; int ap_w[4];
-    int16_t pre[RV_PRE]; int pre_w;
+    int16_t pre[RV_PRE]; int pre_w;   /* (16-bit floats) */
     float  rmod_ph;
     /* compressor */
     float cenv, cgain_db, cgain; int ccount;

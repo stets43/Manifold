@@ -953,7 +953,7 @@ void params_roll_part(Synth *s, int part, uint32_t seed) {
        Dry patch to a wet one rolls them too, as they were off */
     g_dry_set = 0;
     if (!g_lock_fx && (!s->locked[SEC_FX] || !s->locked[SEC_VOICE1] || !s->locked[SEC_DRUMS])) {
-        t[P_DRY] = disc(P_DRY, frand(r) < .25f);
+        t[P_DRY] = disc(P_DRY, frand(r) < .4f);
         g_dry_set = (uint8_t)(t[P_DRY] > .5f);
     }
     g_roll_dry = (uint8_t)(t[P_DRY] > .5f);

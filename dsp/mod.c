@@ -158,8 +158,23 @@ DSP_CTL void mod_apply(Synth *s) {
         if (!(v == v)) v = 0.f;                                  /* (never a NaN into the paths) */
         s->kmod[m] = v; if (v != 0.f) any = 1;
     }
+    /* (1.0.7) the knobs' table read here, once, and each parameter's offset worked out in line (as knob_offset): two
+       calls a parameter, 215 of them a tick, were most of this loop's time */
+    if (any && g_knob_made != g_knob_dry) DSP_FAR(knob_table)(g_knob_dry);
+    const float ksc2 = g_knob_dry ? 2.f / 127.f : 1.f / 127.f;
     for (int i = 0; i < NUM_PARAMS; i++) {
-        float v = g_param_meta[i].moddable ? s->mod[i] + (any ? knob_offset(s, i) : 0.f) : s->base[i];
+        float ko = 0.f;
+        if (any) {
+            int k = g_knob[i];
+            float m = k >= 0 ? s->kmod[k] : 0.f;
+            if (m != 0.f) {
+                const int8_t *w = s->kpath[i];
+                float a = m < 0.f ? -m : m, near = (float)(m < 0.f ? w[1] : w[2]), far = (float)(m < 0.f ? w[0] : w[3]);
+                float kv = a < .5f ? near * (a * 2.f) : near + (far - near) * (a * 2.f - 1.f);
+                ko = kv * (k == 2 ? ksc2 : 1.f / 127.f);
+            }
+        }
+        float v = g_param_meta[i].moddable ? s->mod[i] + ko : s->base[i];
         v = v < 0.f ? 0.f : v > 1.f ? 1.f : v;
         s->mod[i] = v;
         if (v != s->last_mod[i]) param_cache(s, i);   /* only what moved pays for its mapping */
