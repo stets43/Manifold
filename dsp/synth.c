@@ -86,7 +86,7 @@ DSP_CTL static void control_tick(Synth *s) {
     drums_tick(s, dt);
     if (s->clock) s->prof[PROF_SEQ] += s->clock() - c0;
     for (int l = 0; l < NUM_LAYERS; l++) {
-        voices_tick(s, l);
+        DSP_FAR(voices_tick)(s, l);
         /* gain staging: Level, over the square root of how much is sounding (its energy, averaged over ~1.5 s: the
            rhythm's own dynamics pass, a dense function and a sparse one sit at the same level) */
         Layer *L = &s->layer[l]; float e = 0.f;
