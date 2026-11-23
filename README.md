@@ -12,7 +12,7 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
-  [`firmware/manifold-1.0.6.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
+  [`firmware/manifold-1.0.7.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
   It covers every page and setting, and ends with the mathematics of each generator for developers.
 
@@ -36,10 +36,22 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 - **Effects**: fuzz, morphing filter, tempo delay, an 8-line reverb that can be tuned to the scale or frozen, bus
   compressor, look-ahead limiter.
 - Rolls in eight styles, locks, undo, 64 patches in four banks with four scenes each, MIDI in and out over USB and
-  Bluetooth (MPE out, in just intonation), Bluetooth audio out to headphones and speakers.
+  Bluetooth (MPE out, in just intonation), Bluetooth audio out to headphones and speakers, and USB audio both ways
+  (record the FM-1 on a computer, or play the computer through it; class compliant, no driver).
 
 ## Releases
 
+- **1.0.7** (2026-11-23): **Cleaner sound.** The oscillators are exact recursive sines (the magic circle) for the
+  plain partials, the Detune copies, the undertones and the fundamental's Wave, each adding straight into the stereo
+  with its own per-sample level line: the buzz and bit-reduced edge on low notes is gone (oscillator error 70–110 dB
+  under the voices, from 46–59), with the drums' attacks as before. The delay's and the reverb's memories are 16-bit
+  floats instead of 16-bit integers: their rounding falls with the tail instead of a hiss about 71 dB down that rang
+  through every tail, and tails end in silence. **Lighter on the CPU**: a note's Tone weights and each oscillator's
+  step kept until they move, the voice cap in one pass, the matrix's knob paths worked out in line, the output's
+  safety check only when the block's energy calls for it. **Dry patches** now two rolls
+  in five (from a quarter), in every style. The user guide opens with a **quick start** (rolls, the performance knobs,
+  playing it as a synth, just and equal tuning) and documents **USB audio**. Patches move between 1.0.6 and 1.0.7 both
+  ways.
 - **1.0.6** (2026-11-19): **MIDI out** of what MANIFOLD plays, over USB and Bluetooth MIDI, only while something
   listens: the layers' notes (at most 24 new notes a second a layer), the keys, the drums (a General MIDI kit, or
   pitched), the knobs as CC 21–24 and the clock; **MPE** puts each note on its own channel at its exact just pitch.
@@ -107,7 +119,7 @@ python3 tools/build.py ../Manifold --host              # the host simulator (any
 
 tools/get_toolchain.sh                                     # JieLi's clang for the FM-1
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.6     # -> build/manifold-1.0.6.fwsc
+python3 tools/build.py ../Manifold --release 1.0.7     # -> build/manifold-1.0.7.fwsc
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,
