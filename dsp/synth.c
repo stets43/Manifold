@@ -187,7 +187,9 @@ DSP_CTL void synth_process(Synth *s, float *outL, float *outR, int n) {
             e2 += L[t] * L[t] + R[t] * R[t];
         }
         s->eng.env_follow += 0.05f * (e2 / (2.f * (float)m) * frsqrt(e2 / (2.f * (float)m) + 1e-20f) - s->eng.env_follow);
-        if (!finite_block(L, m) || !finite_block(R, m)) {  /* never let a blow-up through */
+        /* never let a blow-up through: a NaN, or a sample past 1e4, puts the block's energy past 1e8 (or makes it a NaN),
+           so the samples are looked at only then (1.0.7: not every block) */
+        if (!(e2 < 1e8f) && (!finite_block(L, m) || !finite_block(R, m))) {
             DSP_FAR(synth_silence)(s);
             memset(L, 0, sizeof(float) * (size_t)m); memset(R, 0, sizeof(float) * (size_t)m);
         }
