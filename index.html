@@ -57,6 +57,13 @@ p + p { margin-top: 10px; }
 .grid4 div { background: var(--bg); padding: 12px 14px 14px; }
 .grid4 b { color: var(--white); font-weight: 700; display: block; font-size: 18px; }
 .grid4 small { font-size: 15px; display: block; margin-top: 2px; }
+.steps { list-style: none; counter-reset: s; margin-top: 14px; border-top: 2px solid var(--line); }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 9px 0 11px; border-bottom: 2px solid var(--line); }
+.steps li::before { content: counter(s); font-size: 12px; font-weight: 700; color: #000; background: var(--amb); text-align: center; border-radius: 2px; height: 18px; margin-top: 3px; }
+.steps b, .grid4 em { color: var(--white); font-weight: 700; font-style: normal; }
+.grid3 { grid-template-columns: repeat(3, 1fr); }
+.fn { color: var(--dim); font-size: 15px; margin-top: 12px; }
+.fn b { color: var(--gray); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .chip { font-weight: 700; font-size: 15px; padding: 3px 9px; background: var(--amb); color: #000; border-radius: 2px; }
 .chip.off { background: var(--line); color: var(--dim); }
@@ -77,6 +84,7 @@ p + p { margin-top: 10px; }
   .screen, .map { width: 100%; height: auto; aspect-ratio: 1; }
   h1 { font-size: 44px; }
   .grid4, .shots { grid-template-columns: repeat(2, 1fr); }
+  .grid3 { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -84,7 +92,7 @@ p + p { margin-top: 10px; }
 
 <header class="bar">
   <span class="name">MANIFOLD</span><span class="sub">for the M-VAVE FM-1</span>
-  <span class="right"><a class="src" href="https://github.com/stets43/Manifold">Source</a> v1.0.6 <span class="tri"></span></span>
+  <span class="right"><a class="src" href="https://github.com/stets43/Manifold">Source</a> v1.0.7 <span class="tri"></span></span>
 </header>
 
 <section class="hero">
@@ -101,11 +109,27 @@ p + p { margin-top: 10px; }
     <nav class="rows">
       <a class="row" href="emu/"><span class="k">K1</span><span>Play it in the browser</span><span class="v">no FM-1 needed</span><span class="b"><i style="--w:64%"></i></span></a>
       <a class="row" href="install/"><span class="k">K2</span><span>Install on the FM-1</span><span class="v">Chrome · Edge</span><span class="b"><i style="--w:38%"></i></span></a>
-      <a class="row" href="firmware/manifold-1.0.6.fwsc"><span class="k">K3</span><span>Download the firmware</span><span class="v">manifold-1.0.6.fwsc</span><span class="b"><i style="--w:55%"></i></span></a>
+      <a class="row" href="firmware/manifold-1.0.7.fwsc"><span class="k">K3</span><span>Download the firmware</span><span class="v">manifold-1.0.7.fwsc</span><span class="b"><i style="--w:55%"></i></span></a>
       <a class="row" href="manual/"><span class="k">K4</span><span>User guide</span><span class="v">every page</span><span class="b"><i style="--w:86%"></i></span></a>
     </nav>
   </div>
 </section>
+
+<h2 id="quick-start">Quick start <span>in a minute</span></h2>
+<ol class="steps">
+  <li><span><b>PLAY.</b> The patch plays itself: points move over the scale and every note they pass sounds.</span></li>
+  <li><span><b>PRESET</b> picks a style (Hip-hop, Groove, Ambient, House…) and rolls a patch in it. <b>Tap REC</b> for a new sound on the same scale.</span></li>
+  <li><span><b>K1–K4</b> steer it: Timbre, Groove, Space, Motion. Each rides a path through a dozen settings; the centre is the patch as rolled.</span></li>
+  <li><span><b>Play the keys.</b> A key sounds its note and pulls the moving points toward it. <b>SAVE + key</b> keeps the patch, <b>HOME + key</b> loads it.</span></li>
+</ol>
+<div class="grid4 grid3">
+  <div><b>Rolls</b><small>A seed and a style make a whole patch, the same every time. <em>REC</em> rolls the sound, a <em>double tap</em> everything but the scale, <em>hold</em> mutates, <em>REC + SEL</em> the scale. <em>SAVE + a page</em> locks it; PLAY held, key 13 undoes. Two rolls in five are Dry: Space becomes Shape.</small></div>
+  <div><b>As a synth</b><small>Stopped, nothing plays by itself: the keys are a polyphonic synth in the scale, always in tune with the patch. Contour sets struck or bowed; Latch holds a drone; MIDI notes in play the nearest scale note.</small></div>
+  <div><b>Just or equal</b><small>Every note is a whole-number ratio of the root and every partial a multiple of its note, so chords fuse. <em>Temper</em> (SEL) moves the notes continuously to 12-tone equal temperament.<sup>1</sup></small></div>
+</div>
+<p class="fn"><sup>1</sup> <b>With other synths:</b> SEL, Temper &amp; surface tab, K1 fully right (Equal (12-tone)); Root to the song's key;
+Setup → MIDI out → Tuning: Standard. The root is always at A = 440 Hz equal temperament. USB audio records the FM-1
+on a computer, no driver. <a href="manual/#quick-start">More in the guide</a>.</p>
 
 <h2>How it plays <span>Perform</span></h2>
 <div class="grid4">
