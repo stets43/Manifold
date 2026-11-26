@@ -7,6 +7,11 @@
 #define APP_NAME "MANIFOLD"
 #define APP_SPLASH_RGB RGB(120, 190, 255)
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz (four 64-sample control ticks); the I2S half buffer too, so an interrupt held up a millisecond or two by the radio or USB is not a dropout */
+/* (1.0.8) the USB recording's ring a half deeper: its packets are written when a render ends, and fm1-base's default
+   ring lasts through a render only while it takes under ~40 % of its time; ours take most of theirs, so it ran dry
+   several times a second (each packet short repeated its last frame: a crackle and a buzz in the recording). The
+   4 KB ring goes in the pool; the recording is 5.8 ms later */
+#define FM1B_UAC_DEEP 1
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BLE_AT_BOOT (manifold_bt_on())   /* the radio at power-on: as the player left it (Setup) */
 int manifold_bt_on(void);

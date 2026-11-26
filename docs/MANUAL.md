@@ -976,14 +976,14 @@ audio device (UAC1) named **MANIFOLD FM-1**, for macOS, Windows and Linux, and m
 audio.
 
 **Record the FM-1 on a computer.** Connect it with a USB data cable and choose **MANIFOLD FM-1** as the input in your
-recording software (or in the system's sound settings). It sends the FM-1's stereo output, 16-bit, at 44.1 kHz or
-48 kHz: the software picks the rate, and at 48 kHz the FM-1 converts in step with its own 44.1 kHz. What is recorded is
+recording software (or in the system's sound settings). It sends the FM-1's stereo output, 16-bit, at 44.1 kHz (the only
+rate it offers: a session at 48 kHz is converted by the computer). What is recorded is
 exactly what the speaker plays, after the effects and the limiter, at the **MASTER** knob's level. Turn MASTER most of
 the way up while recording: with 16 bits, a quiet setting records a quiet, noisier signal. The recording never
 contains the computer's own audio (below), so a computer playing back what it records makes no loop.
 
 **Play the computer through the FM-1.** Choose **MANIFOLD FM-1** as the output too: the computer's audio is mixed
-into the FM-1's speaker and headphones, also at MASTER's level, and goes out over Bluetooth audio if that is
+into the FM-1's speaker and headphones (44.1 kHz too), also at MASTER's level, and goes out over Bluetooth audio if that is
 streaming. Use it to play along with a track, or to monitor a recording through the FM-1's headphones.
 
 Notes:
