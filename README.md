@@ -29,8 +29,8 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   range, or toward the bass or the middle.
 - **A rhythm without a grid**: a stream of smooth peaks with continuous swing, three-against-four, fineness, rotation
   and long form; a threshold or a coupled-oscillator engine; four drums that put envelopes and colour on notes the synth
-  already plays, never changing pitch, either linear or playing patterns from a library trained on real house, techno,
-  breakbeat, drum'n'bass and hip-hop.
+  already plays, never changing pitch, either linear or playing patterns from a library trained on 678 house, techno,
+  breakbeat, drum'n'bass, hip-hop, funk, Latin and indie patterns.
 - **A 24-route modulation matrix** with six LFOs, the knobs, the generators' own motion and more as sources, and the
   performance knobs as destinations.
 - **Effects**: fuzz, morphing filter, tempo delay, an 8-line reverb that can be tuned to the scale or frozen, bus
@@ -41,6 +41,17 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 
 ## Releases
 
+- **1.0.8** (in testing): **Three new styles: Funk, Latin and Indie**, each with its own sound and over a hundred
+  trained patterns. Funk: six eras equally (James Brown, New Orleans second line, P-Funk, go-go, Minneapolis, modern
+  and neo-soul). Latin: seventeen styles equally (son montuno, salsa, mambo, cha-cha-chá, songo, rumba, bembé in 6/8
+  with triplet swing, samba, bossa nova, baião, partido alto, samba-reggae, reggaeton, merengue, bachata, cumbia, tango).
+  Indie: straight 8ths, motorik, dance-punk, post-punk, garage, dream pop and shoegaze, punk. **Every genre now has its
+  own sound**: House, Hip-hop, Breakbeat and Machine no longer share Groove's (each its own voices, scales, motions,
+  drive and room), and House, Hip-hop and Breakbeat have over a hundred patterns each. A roll keeps its drum parts to
+  one era or sub-style. Wild borrows from all six genres. **The bass stays in the middle**: each partial's stereo by its
+  own frequency (centre under 110 Hz, the full Width above 330). **USB recording fixed**: it ran dry several times a
+  second under MANIFOLD's load (clicks and a gritty edge); its buffer now holds a block more. The manual corrects USB
+  audio to 44.1 kHz only. Old patches load with exactly the drum patterns they had; a 1.0.8 patch is new to 1.0.7.
 - **1.0.7** (2026-11-23): **Cleaner sound.** The oscillators are exact recursive sines (the magic circle) for the
   plain partials, the Detune copies, the undertones and the fundamental's Wave, each adding straight into the stereo
   with its own per-sample level line: the buzz and bit-reduced edge on low notes is gone (oscillator error 70–110 dB

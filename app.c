@@ -83,7 +83,9 @@ static uint8_t set_dirty;
 int manifold_bt_on(void) { return set.bt_on; }
 
 /* a patch: every parameter, the matrix, the macros, the locks and four scenes */
-#define PATCH_MAGIC 0x4D4E5047u          /* "MNPG" (1.0.6): MNP9 with the patterns' 20, the colour's 12, the undertones' 4, Balance's 2 and Dry after */
+#define PATCH_MAGIC 0x4D4E5048u          /* "MNPH" (1.0.8): MNPG's layout, the patterns in 1.0.8's library */
+#define PATCH_MAGIC_G 0x4D4E5047u        /* "MNPG" (1.0.6, 1.0.7): MNP9 with the patterns' 20, the colour's 12, the undertones' 4, Balance's 2
+                                            and Dry after: read, its patterns moved to the new library */
 #define PATCH_MAGIC_F 0x4D4E5046u        /* "MNPF" (1.0.5): read, wet */
 #define PATCH_MAGIC_E 0x4D4E5045u        /* "MNPE": a 1.0.5 test build's, before Balance: read, it at its default */
 #define PATCH_MAGIC_D 0x4D4E5044u        /* "MNPD": a 1.0.5 test build's, before the undertones: read, those at their defaults */
@@ -553,6 +555,28 @@ typedef struct {                         /* MNPB's layout */
     uint8_t locked[NUM_SECTIONS]; uint16_t scene[NSCENE][NUM_PARAMS_B]; int8_t scene_macro[NSCENE][NUM_MACRO];
 } patchB_t;
 typedef char patchB_fits[sizeof(patchB_t) <= PLAT_STORE_MAX ? 1 : -1];
+/* (1.0.8) an older patch's drum patterns, from the 1.0.5..1.0.7 library to the same lines in this one: the patch,
+   its scenes, its knobs' paths and routes to them (their steps scaled to the new library's) */
+static void patch_pat_v107(patch_t *p)
+{
+    int d, k;
+    for (d = 0; d < NUM_DRUMS; d++) {
+        int id = P_D1_PAT + d;
+        float sc = pat_v107_scale(d);
+        p->p[id] = pat_v107(d, p->p[id]);
+        for (k = 0; k < NSCENE; k++) {
+            float u = pat_v107(d, (float)p->scene[k][id] * (1.0f / 65535.0f));
+            p->scene[k][id] = (uint16_t)(u * 65535.0f + 0.5f);
+        }
+        for (k = 0; k < KNOB_WP; k++) {
+            float w = (float)p->kpath[id][k] * sc;
+            p->kpath[id][k] = (int8_t)(w < 0.0f ? w - 0.5f : w + 0.5f);
+        }
+        for (k = 0; k < MOD_SLOTS; k++)
+            if (p->slot[k].src && p->slot[k].dst == id)
+                p->slot[k].depth *= sc;
+    }
+}
 static int patch_read_b(int slot, patch_t *p)   /* an MNPB patch, its drum-hit parameters dropped (and routes to them), the
                                                    voices' colour at its defaults */
 {
@@ -561,7 +585,7 @@ static int patch_read_b(int slot, patch_t *p)   /* an MNPB patch, its drum-hit p
     if (plat_store_load(patch_obj(slot), &o, sizeof o) != (int)sizeof o || o.magic != PATCH_MAGIC_B
         || o.nparams != NUM_PARAMS_B || o.nslots != MOD_SLOTS)
         return 0;
-    p->magic = PATCH_MAGIC; p->nparams = NUM_PARAMS; p->nslots = MOD_SLOTS; p->seed = o.seed; p->style = o.style;
+    p->magic = PATCH_MAGIC_G; p->nparams = NUM_PARAMS; p->nslots = MOD_SLOTS; p->seed = o.seed; p->style = o.style;
     p->scene_set = o.scene_set; p->rsv[0] = o.rsv[0]; p->rsv[1] = o.rsv[1];
     for (i = 0; i < NUM_PARAMS; i++) {
         int in = i < NUM_PARAMS_A;
@@ -595,22 +619,22 @@ static int patch_read(int slot, patch_t *p)
         && p->nslots == MOD_SLOTS) {
         patch_up9(p);                    /* (an older patch: the patterns' and the voices' new parameters at their defaults) */
         if (p->magic == PATCH_MAGIC_9)
-            p->magic = PATCH_MAGIC;
+            p->magic = PATCH_MAGIC_G;
     } else if (n == (int)sizeof(patchA_t) && p->magic == PATCH_MAGIC_A && p->nparams == NUM_PARAMS_A && p->nslots == MOD_SLOTS) {
         patch_upA(p);                    /* (an earlier 1.0.5 test build's: the voices' colour at its defaults) */
-        p->magic = PATCH_MAGIC;
+        p->magic = PATCH_MAGIC_G;
     } else if (n == (int)sizeof(patchC_t) && p->magic == PATCH_MAGIC_C && p->nparams == NUM_PARAMS_C && p->nslots == MOD_SLOTS) {
         patch_upC(p);                    /* (a later one's: the hits' colour at its defaults) */
-        p->magic = PATCH_MAGIC;
+        p->magic = PATCH_MAGIC_G;
     } else if (n == (int)sizeof(patchD_t) && p->magic == PATCH_MAGIC_D && p->nparams == NUM_PARAMS_D && p->nslots == MOD_SLOTS) {
         patch_upD(p);                    /* (a later one's still: the undertones at their defaults) */
-        p->magic = PATCH_MAGIC;
+        p->magic = PATCH_MAGIC_G;
     } else if (n == (int)sizeof(patchF_t) && p->magic == PATCH_MAGIC_F && p->nparams == NUM_PARAMS_F && p->nslots == MOD_SLOTS) {
         patch_upF(p);                    /* (1.0.5's: wet) */
-        p->magic = PATCH_MAGIC;
+        p->magic = PATCH_MAGIC_G;
     } else if (n == (int)sizeof(patchE_t) && p->magic == PATCH_MAGIC_E && p->nparams == NUM_PARAMS_E && p->nslots == MOD_SLOTS) {
         patch_upE(p);                    /* (the one before Balance: Balanced) */
-        p->magic = PATCH_MAGIC;
+        p->magic = PATCH_MAGIC_G;
     } else if (n != (int)sizeof *p)
         return 0;
     if (p->nparams != NUM_PARAMS || p->nslots != MOD_SLOTS)
@@ -624,6 +648,10 @@ static int patch_read(int slot, patch_t *p)
             u = fm_clampf((60.0f + 120.0f * u - tm->lo) / (tm->hi - tm->lo), 0.0f, 1.0f);
             p->scene[k][P_TEMPO] = (uint16_t)(u * 65535.0f + 0.5f);
         }
+        p->magic = PATCH_MAGIC_G;
+    }
+    if (p->magic == PATCH_MAGIC_G) {     /* (1.0.8) a patch of 1.0.5..1.0.7: its patterns to the same lines in the new library */
+        patch_pat_v107(p);
         p->magic = PATCH_MAGIC;
     }
     return p->magic == PATCH_MAGIC;
@@ -709,7 +737,7 @@ void app_init(void)
     S.transport = 0;                     /* silent at power-on: PLAY starts the generators (the keys play at once) */
     for (i = 0; i < N_PATCH; i++) {
         uint32_t magic;
-        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_F || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
+        if (plat_store_head(patch_obj((int)i), &magic, 4) == 4 && (magic == PATCH_MAGIC || magic == PATCH_MAGIC_G || magic == PATCH_MAGIC_A || magic == PATCH_MAGIC_B || magic == PATCH_MAGIC_C || magic == PATCH_MAGIC_D || magic == PATCH_MAGIC_E || magic == PATCH_MAGIC_F || magic == PATCH_MAGIC_9 || magic == PATCH_MAGIC_8))
             patch_here |= 1ull << i;
     }
     if (set.last_patch >= 0)
@@ -822,7 +850,7 @@ static void time_text(float s, char *b)  /* seconds: ms below one */
 }
 
 static const char *const SURF_N[] = {"Plane", "Torus", "Sphere"};
-static const char *const STYLE_N[] = {"Wild", "Hip-hop", "Groove", "Ambient", "Cosmic", "House", "Machine", "Breakbeat"};
+static const char *const STYLE_N[] = {"Wild", "Hip-hop", "Groove", "Ambient", "Cosmic", "House", "Machine", "Breakbeat", "Funk", "Latin", "Indie"};
 static const char *const KEYS_N[] = {"Layer 1", "Layer 2", "Both layers", "Drums"};
 static const char *const REG_N[] = {"Octave down", "As tuned", "Octave up"};
 

@@ -136,3 +136,9 @@ CORPUS = [
     E(P, "the and-of-1 kick", (86, 94), (.5, .75), 16, "x.x.......x.....", BACK, SIXT, w=1),
     E(P, "heavy, slow", (66, 76), (.6, .85), 16, "x......x..x...x.", "....x.......x...", "x.x.x.x.x.x.x.x.", w=1),
 ]
+
+# (1.0.8) the families (families.py): Funk, Latin and Indie, and the first genres grown, each to a hundred entries or more
+from families import FAMILIES, expand
+for _f in FAMILIES:
+    CORPUS.extend(expand(_f))
+

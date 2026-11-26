@@ -220,6 +220,7 @@ typedef struct {
 } Scale;
 
 int  scale_count(void);
+int  scale_find(const char *name);           /* a scale by its name, or -1 */
 int  scale_group_start(int g);                /* the first scale of group 0..3 (harmonic, pentatonic, modes, other); 4: the count */
 void scale_get(int index, Scale *out);        /* rotation 0 */
 void scale_get_rot(int index, int rot, Scale *out);
@@ -230,7 +231,8 @@ void scale_series_n(Scale *sc, int n);        /* a series scale's partials, n of
 /* ------------------------------------------------------------------ */
 enum { SURF_PLANE, SURF_TORUS, SURF_SPHERE, NUM_SURFACES };
 /* (1.0.5: Hip-hop took Tongue drum's place, House Drum circle's; Breaks became Breakbeat) */
-enum { STYLE_WILD, STYLE_HIPHOP, STYLE_GROOVE, STYLE_AMBIENT, STYLE_COSMIC, STYLE_HOUSE, STYLE_MACHINE, STYLE_BREAKS, NUM_STYLES };
+enum { STYLE_WILD, STYLE_HIPHOP, STYLE_GROOVE, STYLE_AMBIENT, STYLE_COSMIC, STYLE_HOUSE, STYLE_MACHINE, STYLE_BREAKS,
+       STYLE_FUNK, STYLE_LATIN, STYLE_INDIE, NUM_STYLES };   /* (1.0.8: the three after, so a saved style keeps its number) */
 
 typedef struct {
     float x, y;            /* surface coords, [0,1)^2 */
@@ -651,11 +653,17 @@ void path_view(const Synth *s, float px, float py, float *x, float *y);   /* a p
 
 /* the patterns (patterns.c, trained from tools/patterns/corpus.py; rhythm.c plays them, params.c rolls them) */
 typedef struct { uint32_t hit, ghost; uint8_t len; } PatLine;   /* a line: its steps (16ths, 16 or 32), the ghosts among them */
-typedef struct { uint8_t genre, line[4], bpm_lo, bpm_hi, sw_lo, sw_hi, lev, w; } PatEntry;   /* a corpus entry */
-enum { PG_HOUSE, PG_BREAKS, PG_DNB, PG_HIPHOP };
+typedef struct { uint8_t genre, line[4], bpm_lo, bpm_hi, sw_lo, sw_hi, lev, w, fam; } PatEntry;   /* a corpus entry (fam: its era
+                                                                                 or sub-style, 1..; 0 hand-written) */
+enum { PG_HOUSE, PG_BREAKS, PG_DNB, PG_HIPHOP, PG_FUNK, PG_LATIN, PG_INDIE, NUM_PG };   /* (train.py's GENRES) */
 enum { PMUTE_NONE, PMUTE_KICK, PMUTE_SNARE, PMUTE_HAT, PMUTE_TOM, PMUTE_LINEAR, NUM_PMUTE };
 extern const PatLine PAT_LIB[];
-extern const uint8_t PAT_OFF[], PAT_CNT[];
+extern const uint16_t PAT_OFF[], PAT_CNT[];
+extern const uint16_t PAT_GOFF[], PAT_USE[], PAT_UOFF[];   /* (1.0.8) each genre's entries; each genre's lines of each role */
+extern const uint16_t PAT_V107[];                         /* the 1.0.5..1.0.7 library's lines here (old patches) */
+extern const uint8_t PAT_V107_OFF[], PAT_V107_CNT[];
+float pat_v107(int d, float v);             /* an old patch's pattern (1.0.5..1.0.7) in this library */
+float pat_v107_scale(int d);                /* and its steps' scale (old lines per new) */
 extern const PatEntry PAT_ENT[];
 extern const int PAT_NENT;
 const PatLine *pat_line(const struct Synth *s, int d);   /* drum d's line now, or 0 (linear) */
