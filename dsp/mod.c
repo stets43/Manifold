@@ -110,13 +110,13 @@ static void knob_table(int dry) {
     for (int i = 0; i < NUM_PARAMS; i++) g_knob[i] = (int8_t)knob_of_rd(i, dry);
     g_knob_made = (uint8_t)dry;
 }
-DSP_CTL int knob_of_r(int id) {
+int knob_of_r(int id) {   /* (1.0.8: in the flash; the tick reads g_knob itself) */
     if (g_knob_made != g_knob_dry) DSP_FAR(knob_table)(g_knob_dry);
     return id >= 0 && id < NUM_PARAMS ? g_knob[id] : -1;
 }
 int knob_of(int id) { return DSP_FAR(knob_of_r)(id); }
 int knob_of_dry(int id, int dry) { return knob_of_rd(id, dry); }   /* (the roll's: the patch it makes) */      /* (the interface's and the roll's call, from the flash) */
-DSP_CTL float knob_offset(const Synth *s, int id) {
+float knob_offset(const Synth *s, int id) {   /* (1.0.8: in the flash; mod_apply has its own copy in line) */
     int k = knob_of_r(id); if (k < 0) return 0.f;
     float m = s->kmod[k]; if (m == 0.f) return 0.f;
     const int8_t *w = s->kpath[id];

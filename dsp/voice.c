@@ -73,7 +73,19 @@ static uint32_t PK[NUM_LAYERS][MAX_NODES][19] DSP_POOL;  /* (1.0.7) the step eac
                                                           at the same pitch takes e (and e/2) as they are */
 /* (1.0.7) a note's Tone weights, kept until its pitch or Tone moves: 1 / (1 + r^4) each partial (and the two tails'),
    Wave's share at its 2nd and 3rd, and the register's level. Worked out again only when they change */
-typedef struct { float f, ifc2, reg, tn[MAX_HARM], wr[MAX_HARM], tt[2]; } ToneC;
+typedef struct { float f, ifc2, reg, tn[MAX_HARM], wr[MAX_HARM], tt[2]; uint8_t pk[MAX_HARM]; } ToneC;
+/* (1.0.8) how much of the stereo each partial takes, by its own frequency (0..255): the bass stays in the middle. Under
+   PAN_LO Hz none (the note's place and Width's spread both left out), over PAN_HI all of it as before, a smooth step
+   between (on a log scale). With the note's pitch only, kept until it moves; in the flash (a new pitch only) */
+#define PAN_LO 110.f
+#define PAN_HI 330.f
+static __attribute__((noinline)) void pan_keys(float f, uint8_t *pk) {
+    for (int j = 0; j < MAX_HARM; j++) {
+        float u = flog2(f * PR[j] * (1.f / PAN_LO)) * (1.f / 1.5849625f);   /* (log2(PAN_HI / PAN_LO)) */
+        u = u < 0.f ? 0.f : u > 1.f ? 1.f : u;
+        pk[j] = (uint8_t)(u * u * (3.f - 2.f * u) * 255.f + .5f);
+    }
+}
 static ToneC TC[NUM_LAYERS][MAX_NODES] DSP_POOL;
 static float PL[NUM_LAYERS][MAX_NODES][21] DSP_POOL;   /* each oscillator's level last block (slots: 16 partials, 3 copies,
                                                           2 tails): this block ramps from it; -1 a voice starting */
@@ -526,7 +538,8 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
            (1.5 dB an octave above 350 Hz): the ear is keener there. */
         ToneC *tc = &TC[l][i];
         if (tc->f != f || tc->ifc2 != ifc2) {         /* (a new pitch or Tone: its weights again) */
-            if (tc->f != f) tc->reg = f > 350.f ? fexp2(-.25f * flog2(f * (1.f / 350.f))) : 1.f;   /* (the register's: by pitch only) */
+            if (tc->f != f) { tc->reg = f > 350.f ? fexp2(-.25f * flog2(f * (1.f / 350.f))) : 1.f;   /* (the register's: by pitch only) */
+                              DSP_FAR(pan_keys)(f, tc->pk); }
             tc->f = f; tc->ifc2 = ifc2;
             NOUNROLL for (int j = 0; j < MAX_HARM; j++) {
                 float fk = f * PR[j], r2 = fk * fk * ifc2, r4 = r2 * r2;
@@ -564,6 +577,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
         /* the voice's place, level and hits, worked out before its oscillators now (they take them in their own level) */
         float pn = fclamp(.5f + (nd->x - .5f) * width * .9f, 0.f, 1.f);   /* place on the surface, by Width */
         float gl = fsin(.25f + pn * .25f) * lg * wnorm, gr = fsin(pn * .25f) * lg * wnorm;
+        const float gc = .70710678f * lg * wnorm, dgl = gl - gc, dgr = gr - gc;   /* (the middle; a low partial's place nearer it) */
         /* the voice's own level, under the kick's duck; the hits' on top (not ducked), from the sample they land. Its
            value before the first sample (K0), at the sample before the newest hit lands (Km) and at the last (K1): a
            straight line between them, so an oscillator's level is too (a hit inside the block: two lines) */
@@ -606,7 +620,9 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
             if (kw > 0.f && ak < 2.f * thr) ai *= 1.f - kw * (1.f - (ak - thr) / thr);   /* the cap's knee */
             int k = j + 1;
             float sd = !hm || k == 1 ? 0.f : k == 2 ? -w23 : k == 3 ? w23 : (k & 1) ? swo : -swo;   /* (undertones: the centre) */
-            float glk = gl * (1.f + sd), grk = gr * (1.f - sd);
+            float kp = (float)tc->pk[j] * (1.f / 255.f);  /* (its share of the stereo, by its frequency) */
+            float glp = gc + dgl * kp, grp = gc + dgr * kp; sd *= kp;
+            float glk = glp * (1.f + sd), grk = grp * (1.f - sd);
             uint32_t ph = ph8 * PM[j] + (uint32_t)(L->pho[j] * 4294967296.f), ik = inc8 * PM[j];
             const float *D = !hm ? 0 : 3.f * fk < .45f * SR ? T_D1 : 2.f * fk < .45f * SR ? T_D2 : 0;
             /* Wave's 2nd and 3rd of this partial sit at 2 and 3 times its frequency: under Tone there, not here (taken
@@ -638,7 +654,7 @@ DSP_RAM void layer_render(Synth *s, int l, float *Lo, float *Ro, int n) {
                 float ad = ai * .625f, pd_ = pl[16 + j], pd = pd_ >= 0.f && !jump ? pd_ : ad; pl[16 + j] = ad;
                 uint32_t q = v->ph2 * (uint32_t)k, iq = inc2 * (uint32_t)k;
                 float st[5]; mcf_seed(q, iq, st, PS[l][i][16 + j], &PK[l][i][16 + j], vsync || pd_ <= 0.f);
-                LEVELS(pd, ad); sg.gl = gl * (1.f + wd); sg.gr = gr * (1.f - wd);
+                LEVELS(pd, ad); sg.gl = glp * (1.f + wd * kp); sg.gr = grp * (1.f - wd * kp);
 #ifdef OSC_SHADOW
                 sg.ph = q; sg.ik = iq;
 #endif
