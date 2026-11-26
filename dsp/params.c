@@ -552,7 +552,7 @@ static void genre_sound(Synth *s, int gi) {
         TR(s, P_V1_WAVE, g->wave[0], g->wave[1]); TR(s, P_V1_PHASE, g->phase[0], g->phase[1]); TR(s, P_V1_SPIN, g->spin[0], g->spin[1]);
         TR(s, P_V1_TONE, g->tone[0], g->tone[1]); TR(s, P_V1_BLOOM, g->bloom[0], g->bloom[1]);
         if (frand(r) < g->ppk) TR(s, P_V1_PLUCK, g->pk[0], g->pk[1]); else TR(s, P_V1_PLUCK, 0.f, 0.f);
-        if (frand(r) < g->pstr) s->target[P_V1_STRIDE] = .333f; else TR(s, P_V1_STRIDE, 0.f, .12f);
+        if (frand(r) < g->pstr) s->target[P_V1_STRIDE] = .333f; else s->target[P_V1_STRIDE] = 0.f;
     }
     if (!s->locked[SEC_VOICE2]) {
         TR(s, P_V2_LEVEL, g->v2lv[0], g->v2lv[1]); TD(s, P_V2_REG, frand(r) < g->v2bass ? 0 : 1);
@@ -562,11 +562,13 @@ static void genre_sound(Synth *s, int gi) {
     if (!s->locked[SEC_GEN1]) {
         if ((int)(s->target[P_G2_ROUTE] * NUM_ROUTES) == ROUTE_PLAY) {   /* (a motion layer 2 is routed into stays) */
             static const float we[NUM_ENVS] = {6, 0, 1, 2, 1, 0, 6, 0};    /* (Groove's envelopes, its points) */
-            TP(s, P_G1_FUNC, g->gf); TP(s, P_G1_ENV, we); TD(s, P_G1_POINTS, 2 + (int)(frand(r) * 3.f));
-            if ((int)(s->target[P_G1_ENV] * NUM_ENVS) == ENV_STREAM) TR(s, P_G1_CONTOUR, .1f, .6f); else TR(s, P_G1_CONTOUR, .8f, 1.f);
+            int kick = (int)(s->target[P_G1_ENV] * NUM_ENVS) == ENV_DRUMS;   /* (Machine's swell with the kick: kept) */
+            TP(s, P_G1_FUNC, g->gf); TD(s, P_G1_POINTS, 2 + (int)(frand(r) * 3.f));
+            if (!kick) { TP(s, P_G1_ENV, we);
+                         if ((int)(s->target[P_G1_ENV] * NUM_ENVS) == ENV_STREAM) TR(s, P_G1_CONTOUR, .1f, .6f); else TR(s, P_G1_CONTOUR, .8f, 1.f); }
             int fn = (int)(s->target[P_G1_FUNC] * NUM_GENS);
-            if (fn == GEN_LOOPS || fn == GEN_ERODE) { TD(s, P_G1_ENV, ENV_HOLD); TD(s, P_G1_POINTS, 3 + (int)(frand(r) * 4.f)); }
-            if (fn == GEN_CHORDS) { TD(s, P_G1_ENV, frand(r) < .5f ? ENV_HOLD : ENV_PULSE); TD(s, P_G1_POINTS, 2 + (int)(frand(r) * 2.f)); }
+            if (fn == GEN_LOOPS || fn == GEN_ERODE) { if (!kick) TD(s, P_G1_ENV, ENV_HOLD); TD(s, P_G1_POINTS, 3 + (int)(frand(r) * 4.f)); }
+            if (fn == GEN_CHORDS) { if (!kick) TD(s, P_G1_ENV, frand(r) < .5f ? ENV_HOLD : ENV_PULSE); TD(s, P_G1_POINTS, 2 + (int)(frand(r) * 2.f)); }
             if (fn == GEN_LOOPS) TR(s, P_G1_RATE, 0.f, .3f);
             else if (fn == GEN_CHORDS) TR(s, P_G1_RATE, .1f, .4f);
             else TR(s, P_G1_RATE, g->grate[0], g->grate[1]);

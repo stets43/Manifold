@@ -12,7 +12,7 @@ and every partial is in tune with its note (its harmonics, and undertones below 
 - **Play it in the browser:** [stets43.github.io/Manifold/emu](https://stets43.github.io/Manifold/emu/), the whole
   firmware in WebAssembly on a drawn FM-1 (the build is in [`emu/`](emu/)).
 - **Install:** the web installer on the [MANIFOLD site](https://stets43.github.io/Manifold/) (Chrome or Edge), or
-  [`firmware/manifold-1.0.7.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
+  [`firmware/manifold-1.0.8.fwsc`](firmware/) with fm1-base's `tools/fm1_install.py`.
 - **User guide:** [docs/MANUAL.md](docs/MANUAL.md), also [on the site](https://stets43.github.io/Manifold/manual/).
   It covers every page and setting, and ends with the mathematics of each generator for developers.
 
@@ -35,23 +35,26 @@ and every partial is in tune with its note (its harmonics, and undertones below 
   performance knobs as destinations.
 - **Effects**: fuzz, morphing filter, tempo delay, an 8-line reverb that can be tuned to the scale or frozen, bus
   compressor, look-ahead limiter.
-- Rolls in eight styles, locks, undo, 64 patches in four banks with four scenes each, MIDI in and out over USB and
+- Rolls in eleven styles, locks, undo, 64 patches in four banks with four scenes each, MIDI in and out over USB and
   Bluetooth (MPE out, in just intonation), Bluetooth audio out to headphones and speakers, and USB audio both ways
   (record the FM-1 on a computer, or play the computer through it; class compliant, no driver).
 
 ## Releases
 
-- **1.0.8** (in testing): **Three new styles: Funk, Latin and Indie**, each with its own sound and over a hundred
-  trained patterns. Funk: six eras equally (James Brown, New Orleans second line, P-Funk, go-go, Minneapolis, modern
-  and neo-soul). Latin: seventeen styles equally (son montuno, salsa, mambo, cha-cha-chá, songo, rumba, bembé in 6/8
-  with triplet swing, samba, bossa nova, baião, partido alto, samba-reggae, reggaeton, merengue, bachata, cumbia, tango).
-  Indie: straight 8ths, motorik, dance-punk, post-punk, garage, dream pop and shoegaze, punk. **Every genre now has its
-  own sound**: House, Hip-hop, Breakbeat and Machine no longer share Groove's (each its own voices, scales, motions,
-  drive and room), and House, Hip-hop and Breakbeat have over a hundred patterns each. A roll keeps its drum parts to
-  one era or sub-style. Wild borrows from all six genres. **The bass stays in the middle**: each partial's stereo by its
-  own frequency (centre under 110 Hz, the full Width above 330). **USB recording fixed**: it ran dry several times a
-  second under MANIFOLD's load (clicks and a gritty edge); its buffer now holds a block more. The manual corrects USB
-  audio to 44.1 kHz only. Old patches load with exactly the drum patterns they had; a 1.0.8 patch is new to 1.0.7.
+- **1.0.8** (2026-11-26): **Three new styles: Funk, Latin and Indie**, each with its own sound and over a hundred
+  trained drum patterns. Funk covers six eras equally (James Brown, New Orleans second line, P-Funk, go-go,
+  Minneapolis, modern funk and neo-soul); Latin seventeen styles equally (son montuno, salsa, mambo, cha-cha-chá,
+  songo, rumba guaguancó, bembé in 6/8 with triplet swing, samba, bossa nova, baião, partido alto, samba-reggae,
+  reggaeton, merengue, bachata, cumbia, tango and habanera); Indie seven (straight 8ths, motorik, dance-punk,
+  post-punk, garage rock, dream pop and shoegaze, punk). **Every genre has its own sound**: House, Hip-hop, Breakbeat
+  and Machine no longer share Groove's; each rolls its own voices, scales, motions, drive and room. **678 trained
+  patterns** (from 102): House, Hip-hop and Breakbeat over a hundred each too, and a roll keeps its drum parts to one
+  era or sub-style (76–95 % of parts). Wild borrows patterns from all six genres. **The bass stays in the middle**:
+  each partial takes Width's stereo by its own frequency (centred under 110 Hz, as before above 330 Hz), so low notes
+  and the drums on them no longer pan hard. **USB recording fixed**: under MANIFOLD's load its buffer ran dry several
+  times a second (clicks and a gritty, distorted edge); it now holds a block more (5.8 ms later). The manual opens
+  with a quick start and has USB audio corrected to 44.1 kHz. **Patches**: 1.0.5–1.0.7 patches load with exactly the
+  drum patterns they had; a patch saved by 1.0.8 is new to 1.0.7 (shown as Empty there).
 - **1.0.7** (2026-11-23): **Cleaner sound.** The oscillators are exact recursive sines (the magic circle) for the
   plain partials, the Detune copies, the undertones and the fundamental's Wave, each adding straight into the stereo
   with its own per-sample level line: the buzz and bit-reduced edge on low notes is gone (oscillator error 70–110 dB
@@ -130,7 +133,7 @@ python3 tools/build.py ../Manifold --host              # the host simulator (any
 
 tools/get_toolchain.sh                                     # JieLi's clang for the FM-1
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.7     # -> build/manifold-1.0.7.fwsc
+python3 tools/build.py ../Manifold --release 1.0.8     # -> build/manifold-1.0.8.fwsc
 ```
 
 The device build needs three files from JieLi's AC79 SDK V1.2.1 (`cpu/wl82/tools/uboot.boot`, `cfg_tool.bin`,

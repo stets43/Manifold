@@ -1083,7 +1083,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.7 # -> build/manifold-1.0.7.fwsc
+python3 tools/build.py ../Manifold --release 1.0.8 # -> build/manifold-1.0.8.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key

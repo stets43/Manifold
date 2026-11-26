@@ -851,7 +851,7 @@ turn SELECT 1
 wait 1200
 expect sub 1
 shot seq_patterns.png
-turn K1 -60
+turn K1 -120
 wait 300
 expect pat0 0
 turn K1 3
