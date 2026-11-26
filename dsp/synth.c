@@ -107,7 +107,7 @@ DSP_CTL static void control_tick(Synth *s) {
     s->tick++;
 }
 
-DSP_CTL static int finite_block(const float *a, int n) {
+static __attribute__((noinline)) int finite_block(const float *a, int n) {   /* (1.0.8: in the flash: a blow-up's, rare) */
     for (int i = 0; i < n; i++) if (!(a[i] == a[i]) || fabsf(a[i]) > 1e4f) return 0;
     return 1;
 }
@@ -189,7 +189,7 @@ DSP_CTL void synth_process(Synth *s, float *outL, float *outR, int n) {
         s->eng.env_follow += 0.05f * (e2 / (2.f * (float)m) * frsqrt(e2 / (2.f * (float)m) + 1e-20f) - s->eng.env_follow);
         /* never let a blow-up through: a NaN, or a sample past 1e4, puts the block's energy past 1e8 (or makes it a NaN),
            so the samples are looked at only then (1.0.7: not every block) */
-        if (!(e2 < 1e8f) && (!finite_block(L, m) || !finite_block(R, m))) {
+        if (!(e2 < 1e8f) && (!DSP_FAR(finite_block)(L, m) || !DSP_FAR(finite_block)(R, m))) {
             DSP_FAR(synth_silence)(s);
             memset(L, 0, sizeof(float) * (size_t)m); memset(R, 0, sizeof(float) * (size_t)m);
         }

@@ -49,12 +49,18 @@ press REC
 wait 900
 release REC
 wait 500
-# PRESET and ALGO: a fast turn is one roll, once the knob rests (eight steps: Groove round to Groove)
+# PRESET and ALGO: a fast turn is one roll, once the knob rests (eleven steps: Groove round to Groove)
 turn PRESET 1
 wait 40
 turn PRESET 1
 wait 40
 expect rolls 2
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
+turn PRESET 1
+wait 40
 turn PRESET 1
 wait 40
 turn PRESET 1
@@ -811,6 +817,31 @@ expect drums_on 1
 expect drum_clear 0
 wait 4000
 expect drum_hits 1
+# (1.0.8) Funk (8), Latin (9), Indie (10): the same
+turn PRESET 1
+wait 1500
+expect style 8
+expect kick_pat_on 1
+expect drums_on 1
+wait 4000
+expect drum_hits 1
+turn PRESET 1
+wait 1500
+expect style 9
+expect kick_pat_on 1
+expect drums_on 1
+wait 4000
+expect drum_hits 1
+turn PRESET 1
+wait 1500
+expect style 10
+expect kick_pat_on 1
+expect drums_on 1
+wait 4000
+expect drum_hits 1
+turn PRESET -3
+wait 1500
+expect style 7
 # Seq, Patterns (the second sub-page): K1 moves the kick's line, all the way down is Linear; Mutes (K3: the hat mutes)
 tap SEQ
 wait 30
@@ -820,7 +851,7 @@ turn SELECT 1
 wait 1200
 expect sub 1
 shot seq_patterns.png
-turn K1 -60
+turn K1 -120
 wait 300
 expect pat0 0
 turn K1 3

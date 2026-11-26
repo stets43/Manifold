@@ -51,7 +51,8 @@ This guide covers installing the firmware, playing it, and every page and settin
 
 1. **Press PLAY.** The patch plays itself: two layers of points move over the scale and every note they pass sounds.
    PLAY again stops it.
-2. **Turn PRESET** to pick a style (Wild, Hip-hop, Groove, Ambient, Cosmic, House, Machine, Breakbeat). Once the knob
+2. **Turn PRESET** to pick a style (Wild, Hip-hop, Groove, Ambient, Cosmic, House, Machine, Breakbeat, Funk, Latin,
+   Indie). Once the knob
    rests it rolls a new patch in that style.
 3. **Tap REC** until you hear something you like. Each tap is a new sound over the same scale.
 4. **Turn K1–K4** to steer it while it plays.
@@ -363,19 +364,24 @@ give the same patch.
 | Style | Character |
 | --- | --- |
 | **Wild** | everything anywhere: the whole range of every setting (45–165 BPM); a quarter of the rolls take genre patterns too |
-| **Hip-hop** | Groove's sound with boom-bap drums from the [patterns](#patterns): heavily swung 16ths, syncopated kicks, the snare on 2 and 4, about 62–100 BPM, a long deep kick, short hats |
+| **Hip-hop** | dusty, mellow keys through a filtered sampler, a heavy low bass, a touch of saturation; minor pentatonic, Dorian, blues; boom-bap, lo-fi, West Coast, trap and Southern [patterns](#patterns), heavily swung (about 62–100 BPM); a long deep kick, short hats |
 | **Groove** | rhythmic and bright, runs and loops on the beat, drums on most of the time (80–132 BPM) |
 | **Ambient** | slow, soft, wide; swells and drifts, down to a single slow note; drums rarely (40–90 BPM) |
 | **Cosmic** | strange scales and combs, passing motions, anything from sparse and slow to dense (60–135 BPM) |
-| **House** | Groove's sound with house and techno patterns: the kick on every beat, the clap on 2 and 4, off-beat and 16th hats, percussion against the bar (115–140 BPM) |
-| **Machine** | Groove's sound with an IDM rhythm: drums always on, the matrix moving the rhythm's own controls firmly (80–170 BPM) |
-| **Breakbeat** | Groove's sound with the classic breaks: syncopated kicks, ghosted snares, mostly 124–140 BPM, a third of the rolls drum'n'bass at 160–178 |
+| **House** | warm, round chords and stabs over a deep bass, the compressor pumping; minor and Dorian; classic, deep, tech, techno, garage and disco patterns: the kick on every beat, the clap on 2 and 4, off-beat and 16th hats (112–142 BPM) |
+| **Machine** | glassy, metallic, hollow combs and twangs; the harmonic series, whole tone, the hexany; an IDM rhythm, drums always on, the matrix moving the rhythm's own controls firmly (80–170 BPM) |
+| **Breakbeat** | bright and edgy rave stabs, a growling bass, drive often; minor, Phrygian, Hijaz; the classic breaks, big beat and nu-skool (mostly 96–140 BPM), a third of the rolls jungle and drum'n'bass at 160–178 |
+| **Funk** | clavinet and slap-bass tones, bright, buzzy and plucked, loud notes snapping open; Dorian, Mixolydian, minor pentatonic, blues; six eras equally: James Brown, New Orleans second line, P-Funk, go-go, Minneapolis, modern funk and neo-soul (82–130 BPM); a tight kit, ghost notes everywhere |
+| **Latin** | struck wood and tuned bars (marimba, vibes), a montuno's keys, a round tumbao bass, a warm room; major, harmonic minor, Phrygian dominant; seventeen styles equally: son montuno, salsa, mambo, cha-cha-chá, songo, rumba guaguancó, bembé (6/8), samba, bossa nova, baião, partido alto, samba-reggae, reggaeton, merengue, bachata, cumbia, tango and habanera. The kick is the bass drum (bombo, surdo, tumbao), the snare's part the rim or clave, the hat a shaker, cáscara or güira, the fourth the congas, tamborim or bongos |
+| **Indie** | guitars, jangly to fuzzed, strummed and ringing, drive on more often than not, a big room; major, Mixolydian, Aeolian; seven styles equally: straight 8ths, motorik, dance-punk, post-punk, garage rock, dream pop and shoegaze, punk (66–180 BPM) |
 
-House, Hip-hop and Breakbeat build their drums from a **pattern library trained on about 100 genre patterns** (see
-[Patterns](#patterns)). Each roll walks a decision tree through the corpus: a kick, then a snare that goes with that
-kick, then hats that go with both, then the swing those hats are played with. Most rolls are combinations the corpus
-never has, but they keep its rules: in 60 rolls of each, the snare lands on 2 and 4 in 92–96 % of bars and House's kick
-is on every beat in 89 %.
+The genres (Hip-hop, House, Breakbeat, Funk, Latin, Indie) build their drums from a **pattern library trained on 678
+genre patterns**, over a hundred for each (see [Patterns](#patterns)). Each roll walks a decision tree through its
+genre's corpus: a root pattern (an era or sub-style, all of a genre's equally likely in Funk, Latin and Indie), a kick,
+then a snare that goes with that kick, then hats that go with both, then the swing those hats are played with. The
+parts mostly keep to the root's style (three times in four or more), and now and then borrow from another of the
+genre's. Most rolls are combinations the corpus never has, but they keep its rules. The 6/8 feels (bembé) are played
+with triplet swing: each beat's two 8ths land on the first and third triplet.
 
 **The matrix in rolls.** Every curated style rolls 3–10 routes (Machine up to 12: two to four more on the rhythm's own controls) to a wide list of musical places
 (the voices, the motions, the path, the rhythm, the drums, the effects), deep enough to be heard, each limited so
@@ -437,7 +443,9 @@ pull on, and each layer's Balance at Balanced. They may sound different: the voi
 Empty), so stay on 1.0.5 or later once you have saved with it.
 
 **Patches from 1.0.5** load in 1.0.6 as they were (wet, Drum notes at Follow). A patch saved by 1.0.6 is in a newer
-format again, which 1.0.5 shows as Empty. **1.0.7** keeps 1.0.6's format: patches move between them both ways.
+format again, which 1.0.5 shows as Empty. **1.0.7** keeps 1.0.6's format: patches move between them both ways. **1.0.8**'s pattern library is larger, so its
+patches are in a new format again: 1.0.5–1.0.7 patches load with exactly the drum patterns they had (each moved to the
+same line in the new library), but a patch saved by 1.0.8 shows as Empty in 1.0.7 and earlier.
 
 **Scenes.** Four snapshots inside the current patch, on performance keys 1–4. **Hold** a scene key for a second to
 store the current sound; **tap** it to recall, with a 1.2 s morph. Scenes are saved with the patch.
@@ -627,8 +635,8 @@ motion follow it.
 ### Patterns
 
 Each drum can either take part in the choice above (**Linear**: one drum per event, MANIFOLD's own drumming) or
-play a **pattern**: a line from a library trained on about 100 house, techno, breakbeat, drum'n'bass and hip-hop
-patterns (44 kick lines, 20 snare, 14 hat, 17 percussion, each one or two bars of 16ths). The two live side by side,
+play a **pattern**: a line from a library trained on 678 house, techno, breakbeat, drum'n'bass, hip-hop, funk, Latin
+and indie patterns (108 kick lines, 77 snare, 25 hat, 62 percussion, each one or two bars of 16ths). The two live side by side,
 a drum at a time: a patterned kick and snare with a linear hat and tom is the stream's own drumming over a genre
 skeleton.
 
@@ -714,7 +722,7 @@ Toward Fixed each drum also takes its own spectrum while its hit settles: the ki
 fundamental, a little of the 2nd and 3rd, an undertone under the kick), the snare a **crack** (its middle partials,
 3rd to 9th), the hat **sizzle** (only its partials above 4.5 kHz, the 7th, 11th and 13th included, which clash like the
 808's six square waves). Odd / even still colours them, and a hit is no louder for its spectrum. Rolls: Fixed about a
-quarter of the time in House, Hip-hop, Machine and Breakbeat, between (0.3–0.8) about 45 %, seldom either in Ambient
+quarter of the time in House, Hip-hop, Machine, Breakbeat, Funk and Indie (a third in Latin), between (0.3–0.8) about 45 %, seldom either in Ambient
 and Cosmic. The kit's levels: the snare about 8 dB under the kick, the tom 6, the hat 13; the hat's decay a closed
 hat's (20–60 ms, longer only where a style opens it).
 
@@ -976,14 +984,14 @@ audio device (UAC1) named **MANIFOLD FM-1**, for macOS, Windows and Linux, and m
 audio.
 
 **Record the FM-1 on a computer.** Connect it with a USB data cable and choose **MANIFOLD FM-1** as the input in your
-recording software (or in the system's sound settings). It sends the FM-1's stereo output, 16-bit, at 44.1 kHz or
-48 kHz: the software picks the rate, and at 48 kHz the FM-1 converts in step with its own 44.1 kHz. What is recorded is
+recording software (or in the system's sound settings). It sends the FM-1's stereo output, 16-bit, at 44.1 kHz (the only
+rate it offers: a session at 48 kHz is converted by the computer). What is recorded is
 exactly what the speaker plays, after the effects and the limiter, at the **MASTER** knob's level. Turn MASTER most of
 the way up while recording: with 16 bits, a quiet setting records a quiet, noisier signal. The recording never
 contains the computer's own audio (below), so a computer playing back what it records makes no loop.
 
 **Play the computer through the FM-1.** Choose **MANIFOLD FM-1** as the output too: the computer's audio is mixed
-into the FM-1's speaker and headphones, also at MASTER's level, and goes out over Bluetooth audio if that is
+into the FM-1's speaker and headphones (44.1 kHz too), also at MASTER's level, and goes out over Bluetooth audio if that is
 streaming. Use it to play along with a track, or to monitor a recording through the FM-1's headphones.
 
 Notes:
@@ -1075,7 +1083,7 @@ python3 tools/build.py ../Manifold --host        # the host simulator: any Linux
 ../Manifold/build/host/manifold_host ../Manifold/tests/basic.txt ../Manifold/build/host
 tools/get_toolchain.sh                           # JieLi's clang for pi32v2
 export JIELI_TOOLCHAIN=~/.jieli/toolchain AC79_SDK=/path/to/fw-AC79_AIoT_SDK
-python3 tools/build.py ../Manifold --release 1.0.7 # -> build/manifold-1.0.7.fwsc
+python3 tools/build.py ../Manifold --release 1.0.8 # -> build/manifold-1.0.8.fwsc
 ```
 
 MANIFOLD needs a few changes to fm1-base (a larger RAM code window for its control tick, the battery read in the key
@@ -1288,8 +1296,13 @@ Above its detuning a drum locks to its exact rate; below, it slips and catches. 
 
 ### The patterns
 
-**The corpus** (`tools/patterns/corpus.py`) holds 102 kit patterns, 36 house and techno, 24 breakbeat, 8
-drum'n'bass and 34 hip-hop, each four lines (kick, snare, hat, a fourth part, or none: that drum stays linear) of one
+**The corpus** (`tools/patterns/corpus.py`, and `families.py` since 1.0.8) holds 678 kit patterns: 132 house and
+techno, 72 breakbeat, 28 drum'n'bass, 114 hip-hop, 108 funk, 119 Latin and 105 indie. The first 102 are written out
+one by one; the rest come from 45 **families** (an era or sub-style each: James Brown funk, son montuno, motorik…),
+each listing, for every part, the lines that style's players reach for, with how typical each is. Any line of a part
+goes with any line of the others, so `expand` draws 7–20 distinct combinations from each (a fixed seed per family),
+and a family's weight is shared among them: families, not entries, are weighted, so a genre's styles come up equally.
+Each entry is four lines (kick, snare, hat, a fourth part, or none: that drum stays linear) of one
 or two bars of 16ths, hits and ghosts, with a tempo range, a swing range, the level the swing works at and a weight.
 They are skeletons in the manner of each genre and of the well-known breaks, not transcriptions.
 
@@ -1300,7 +1313,8 @@ half). It writes `dsp/patterns.c`: the lines as hit and ghost masks, and every c
 
 **The decision tree** (params.c `roll_patterns`): a root entry of the genre by weight; then for each role *r* in
 order, an entry *e* drawn with probability ∝ wₑ · exp(−Dₑ/4), Dₑ the summed distance of *e*'s earlier roles to the
-ones already chosen, and *e*'s line taken (with probability 0.15–0.2 a close variation instead: another line of the
+ones already chosen (an entry of the root's family 25 times likelier, so a roll mostly keeps to one style), and
+*e*'s line taken (with probability 0.15–0.2 a close variation instead: another line of the
 genre's corpus within three hits, nearer likelier). This samples P(kick), P(snare | kick), P(hat | kick, snare),
 P(fourth | kick, snare, hat) as the corpus implies them, smoothed so unseen but rule-keeping combinations appear.
 Tempo comes from the root (Breakbeat outside drum'n'bass: 124–140), swing and its level from the hats' entry. Mutes,

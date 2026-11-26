@@ -83,6 +83,10 @@ static const Def SC[] = {
 static const int GROUP[6] = {0, 7, 17, 25, 36, SC_COUNT};   /* harmonic, tongue drum, pentatonic, modes, other */
 
 int scale_count(void) { return SC_COUNT; }
+int scale_find(const char *name) {   /* (1.0.8) a scale by its name, or -1: the genres' rolls name theirs */
+    for (int i = 0; i < SC_COUNT; i++) { const char *a = SC[i].name, *b = name; while (*a && *a == *b) a++, b++; if (!*a && !*b) return i; }
+    return -1;
+}
 int scale_group_start(int g) { return g < 0 ? 0 : g > 5 ? SC_COUNT : GROUP[g]; }
 
 static int gcd_i(int a, int b) { while (b) { int t = a % b; a = b; b = t; } return a; }

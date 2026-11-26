@@ -17,8 +17,8 @@ them, the linear layer adds its ghosts, the long form brings fills.
 
 H, B, D, P = "house", "breakbeat", "dnb", "hiphop"   # (drum'n'bass: a breakbeat at its own tempo)
 
-def E(genre, name, bpm, sw, lev, K, S, H_, T=None, w=1.0):
-    return dict(genre=genre, name=name, bpm=bpm, sw=sw, lev=lev, K=K, S=S, H=H_, T=T, w=w)
+def E(genre, name, bpm, sw, lev, K, S, H_, T=None, w=1.0):   # (1.0.8: the written entries one family per genre)
+    return dict(genre=genre, fam=genre + " (written)", name=name, bpm=bpm, sw=sw, lev=lev, K=K, S=S, H=H_, T=T, w=w)
 
 FOUR = "x...x...x...x..."
 BACK = "....x.......x..."
@@ -136,3 +136,9 @@ CORPUS = [
     E(P, "the and-of-1 kick", (86, 94), (.5, .75), 16, "x.x.......x.....", BACK, SIXT, w=1),
     E(P, "heavy, slow", (66, 76), (.6, .85), 16, "x......x..x...x.", "....x.......x...", "x.x.x.x.x.x.x.x.", w=1),
 ]
+
+# (1.0.8) the families (families.py): Funk, Latin and Indie, and the first genres grown, each to a hundred entries or more
+from families import FAMILIES, expand
+for _f in FAMILIES:
+    CORPUS.extend(expand(_f))
+
